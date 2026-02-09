@@ -6,7 +6,7 @@
 
 @layer base {
   :root {
-    /* Deep space cosmic theme */
+    /* Deep space cosmic theme (dark mode) */
     --background: 240 50% 5%;
     --foreground: 200 100% 95%;
 
@@ -60,6 +60,71 @@
     --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 240 30% 20%;
     --sidebar-ring: 190 100% 50%;
+
+    /* Fog overlay variables - Dark mode */
+    --fog-color: rgba(10, 10, 10, 0.8);
+    --fog-opacity: 1.0;
+    --fog-blur: 40px;
+  }
+
+  .light {
+    /* Surreal light theme with blue and pink tones */
+    --background: 200 100% 97%;
+    --foreground: 210 30% 25%;
+
+    --card: 200 100% 95%;
+    --card-foreground: 210 30% 25%;
+
+    --popover: 200 100% 96%;
+    --popover-foreground: 210 30% 25%;
+
+    /* Soft sky blue as primary */
+    --primary: 195 85% 55%;
+    --primary-foreground: 200 100% 97%;
+
+    /* Cotton candy pink as secondary */
+    --secondary: 340 75% 75%;
+    --secondary-foreground: 210 30% 25%;
+
+    --muted: 200 30% 85%;
+    --muted-foreground: 210 25% 45%;
+
+    /* Dreamy lavender accent */
+    --accent: 270 65% 70%;
+    --accent-foreground: 200 100% 97%;
+
+    --destructive: 0 65% 60%;
+    --destructive-foreground: 200 100% 97%;
+
+    --border: 200 25% 88%;
+    --input: 200 25% 90%;
+    --ring: 195 85% 55%;
+
+    /* Light glassmorphism tokens */
+    --glass-bg: 200 100% 98%;
+    --glass-border: 195 85% 65%;
+    --glass-blur: 20px;
+    --glass-opacity: 0.25;
+
+    /* Light glow effects */
+    --glow-primary: 195 85% 65%;
+    --glow-secondary: 340 75% 75%;
+    --glow-accent: 270 65% 75%;
+
+    /* Light sidebar theme */
+    --sidebar-background: 200 100% 94%;
+    --sidebar-foreground: 210 30% 25%;
+    --sidebar-primary: 195 85% 55%;
+    --sidebar-primary-foreground: 200 100% 97%;
+    --sidebar-accent: 340 75% 75%;
+    --sidebar-accent-foreground: 210 30% 25%;
+    --sidebar-border: 200 25% 88%;
+    --sidebar-ring: 195 85% 55%;
+
+    /* Fog overlay variables - Light mode */
+    --fog-color: rgba(240, 240, 240, 0.9);
+    --fog-opacity: 1.0;
+    --fog-blur: 35px;
   }
 }
 
@@ -292,6 +357,72 @@
     box-shadow:
       inset 0 1px 0 hsl(var(--glass-border) / 0.35),
       0 0 20px hsl(var(--glow-secondary) / 0.12);
+  }
+
+  /* Fog overlay system */
+  .fog-viewport-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: 5; /* Behind main content (10) but above background */
+    overflow: hidden;
+    transition: background 0.5s ease;
+  }
+
+  .fog-layer-deep,
+  .fog-layer-whispy {
+    position: absolute;
+    top: -10%;
+    left: -10%;
+    width: 120%;
+    height: 120%;
+    background: radial-gradient(
+      circle at center,
+      transparent 60%,
+      var(--fog-color) 100%
+    );
+    filter: blur(var(--fog-blur));
+    will-change: transform;
+  }
+
+  .fog-layer-deep {
+    opacity: var(--fog-opacity);
+    animation: fogDriftDeep 30s infinite ease-in-out;
+  }
+
+  .fog-layer-whispy {
+    opacity: calc(var(--fog-opacity) * 0.6);
+    animation: fogDriftWhispy 45s infinite ease-in-out;
+  }
+
+  @keyframes fogDriftDeep {
+    0%, 100% {
+      transform: translate(0, 0) scale(1) rotate(0deg);
+    }
+    25% {
+      transform: translate(-20px, -15px) scale(1.05) rotate(2deg);
+    }
+    50% {
+      transform: translate(15px, -25px) scale(0.95) rotate(-1deg);
+    }
+    75% {
+      transform: translate(-10px, 20px) scale(1.02) rotate(1deg);
+    }
+  }
+
+  @keyframes fogDriftWhispy {
+    0%, 100% {
+      transform: translate(0, 0) scale(1) rotate(0deg);
+    }
+    33% {
+      transform: translate(25px, 10px) scale(0.98) rotate(-2deg);
+    }
+    66% {
+      transform: translate(-15px, -20px) scale(1.03) rotate(1.5deg);
+    }
   }
 }
 

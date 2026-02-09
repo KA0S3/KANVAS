@@ -31,7 +31,7 @@ const initialAssets: Omit<Asset, 'id' | 'children'>[] = [
       panY: 30,
     },
     backgroundConfig: {
-      color: '#1a1a2e',
+      color: 'hsl(var(--background))',
       gridSize: 30,
     },
   },

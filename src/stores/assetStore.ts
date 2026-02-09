@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { Asset } from '@/components/AssetItem';
 import type { CustomField, CustomFieldValue, GlobalCustomField, ViewportDisplaySettings } from '@/types/extendedAsset';
 import { DEFAULT_VIEWPORT_DISPLAY_SETTINGS } from '@/types/extendedAsset';
+import { useBookStore } from './bookStoreSimple';
 
 interface AssetStore {
   // Registry for O(1) lookups
@@ -16,6 +17,11 @@ interface AssetStore {
   // Viewport UI settings
   viewportOffset: { x: number; y: number };
   viewportScale: number;
+  
+  // World-aware actions
+  loadWorldData: (worldData: any) => void;
+  getWorldData: () => any;
+  clearWorldData: () => void;
   
   // Actions
   createAsset: (assetData: Omit<Asset, 'id' | 'children'>, parentId?: string) => string;
@@ -471,5 +477,38 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
   },
   setViewportScale: (scale: number) => {
     set({ viewportScale: scale });
+  },
+
+  // World-aware methods
+  loadWorldData: (worldData) => {
+    if (worldData) {
+      set({
+        assets: worldData.assets || {},
+        currentActiveId: null,
+        globalCustomFields: worldData.globalCustomFields || [],
+        viewportOffset: worldData.viewportOffset || { x: -45, y: -20 },
+        viewportScale: worldData.viewportScale || 1,
+      });
+    }
+  },
+
+  getWorldData: () => {
+    const state = get();
+    return {
+      assets: state.assets,
+      globalCustomFields: state.globalCustomFields,
+      viewportOffset: state.viewportOffset,
+      viewportScale: state.viewportScale,
+    };
+  },
+
+  clearWorldData: () => {
+    set({
+      assets: {},
+      currentActiveId: null,
+      globalCustomFields: [],
+      viewportOffset: { x: -45, y: -20 },
+      viewportScale: 1,
+    });
   },
 }));

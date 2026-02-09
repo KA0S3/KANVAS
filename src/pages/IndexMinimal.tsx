@@ -1,16 +1,14 @@
 import { useState, useEffect } from "react";
-import { BookOpen, ChevronLeft } from "lucide-react";
+import { BookOpen } from "lucide-react";
 import cosmicBackground from "@/assets/cosmic-background.png";
 import lightBackground from "@/assets/BG-light.png";
-import { AssetPort } from "@/components/AssetPort";
-import { AssetExplorer } from "@/components/explorer/AssetExplorer";
 import { Button } from "@/components/ui/button";
 import { useAssetStore } from "@/stores/assetStore";
 import { useBookStore } from "@/stores/bookStoreSimple";
 import { useThemeStore } from "@/stores/themeStore";
 import type { Book } from "@/types/book";
 
-const Index = () => {
+const IndexMinimal = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [bookLibraryOpen, setBookLibraryOpen] = useState(true);
   const { currentActiveId, loadWorldData } = useAssetStore();
@@ -25,10 +23,6 @@ const Index = () => {
     setCurrentBook(book.id);
     loadWorldData(book.worldData);
     setBookLibraryOpen(false);
-  };
-
-  const handleOpenBookLibrary = () => {
-    setBookLibraryOpen(true);
   };
 
   const backgroundStyle = {
@@ -87,54 +81,33 @@ const Index = () => {
         </div>
       )}
 
-      {/* Main App Content */}
+      {/* Main Content */}
       {currentBookId && (
         <div className="flex h-screen">
-          {/* Main Content Area */}
-          <div className="flex-1 flex flex-col relative">
-            {/* World Library Button */}
-            <div className="absolute top-4 right-4 z-20">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleOpenBookLibrary}
-                className="glass cosmic-glow border-glass-border/40 gap-2"
-              >
-                <BookOpen className="w-4 h-4" />
-                {getAllBooks().find(b => b.id === currentBookId)?.title || 'Current World'}
-              </Button>
-            </div>
-            
-            {/* Asset Port */}
-            <div className="flex-1 p-4">
-              <AssetPort onToggleSidebar={() => setSidebarOpen(prev => !prev)} />
-            </div>
-          </div>
-
-          {/* Discrete Expand Button - Only visible when sidebar is collapsed */}
-          {!sidebarOpen && (
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="fixed right-4 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full glass-strong cosmic-glow border border-glass-border/40 hover:scale-110 transition-all duration-200 shadow-lg"
-              title="Expand Sidebar"
+          <div className="absolute top-4 right-4 z-20">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setBookLibraryOpen(true)}
+              className="gap-2"
             >
-              <ChevronLeft className="w-4 h-4 text-foreground" />
-            </button>
-          )}
-
-          {/* Fantasy Sidebar */}
-      <aside className={`fantasy-overlay ${sidebarOpen ? "is-open" : ""}`} aria-hidden={!sidebarOpen}>
-        <div className="fantasy-sidebar">
-          <div className="fantasy-sidebar-content">
-            {/* Use the new AssetExplorer component */}
-            <AssetExplorer sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(prev => !prev)} />
+              <BookOpen className="w-4 h-4" />
+              {getAllBooks().find(b => b.id === currentBookId)?.title || 'Current World'}
+            </Button>
           </div>
-        </div>
-      </aside>
+          
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center p-8">
+              <h1 className="text-4xl font-bold text-white mb-4">🎯 Current World</h1>
+              <h2 className="text-2xl text-blue-400 mb-2">
+                {getAllBooks().find(b => b.id === currentBookId)?.title || 'No World Selected'}
+              </h2>
+            </div>
+          </div>
         </div>
       )}
     </div>
   );
 };
 
-export default Index;
+export default IndexMinimal;

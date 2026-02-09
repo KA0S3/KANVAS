@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Download, Upload, Trash2, Settings as SettingsIcon } from 'lucide-react';
+import { X, Download, Upload, Trash2, Settings as SettingsIcon, Sun, Moon, BookOpen, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,7 +14,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAssetStore } from '@/stores/assetStore';
 import { useTagStore } from '@/stores/tagStore';
+import { useThemeStore } from '@/stores/themeStore';
+import { useBookStore } from '@/stores/bookStoreSimple';
 import { toast } from 'sonner';
+import type { Book } from '@/types/book';
 
 interface SettingsPanelProps {
   isOpen: boolean;
@@ -31,12 +34,22 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     setViewportScale,
   } = useAssetStore();
   const { tags } = useTagStore();
+  const { theme, toggleTheme } = useThemeStore();
+  const { 
+    getAllBooks, 
+    exportBooks, 
+    importBooks, 
+    settings: bookSettings, 
+    updateSettings 
+  } = useBookStore();
   
   const [activeTab, setActiveTab] = useState('general');
-  const [autoSave, setAutoSave] = useState(true);
+  const [autoSave, setAutoSave] = useState(bookSettings.autoSave);
   const [showGrid, setShowGrid] = useState(true);
   const [snapToGrid, setSnapToGrid] = useState(false);
   const [gridSize, setGridSize] = useState(40);
+  
+  const allBooks = getAllBooks();
 
   const handleExportData = () => {
     try {
@@ -113,8 +126,9 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
         </DialogHeader>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="general">General</TabsTrigger>
+            <TabsTrigger value="worlds">Worlds</TabsTrigger>
             <TabsTrigger value="data">Data Management</TabsTrigger>
             <TabsTrigger value="about">About</TabsTrigger>
           </TabsList>
@@ -125,6 +139,23 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                 <CardTitle className="text-lg">Display Settings</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="theme-toggle" className="flex items-center gap-2">
+                      {theme === 'light' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                      Theme
+                    </Label>
+                    <div className="text-sm text-muted-foreground">
+                      {theme === 'light' ? 'Light mode' : 'Dark mode'}
+                    </div>
+                  </div>
+                  <Switch
+                    id="theme-toggle"
+                    checked={theme === 'light'}
+                    onCheckedChange={toggleTheme}
+                  />
+                </div>
+                
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label htmlFor="auto-save">Auto Save</Label>
@@ -229,6 +260,123 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                         className="bg-glass/50 border-glass-border/40"
                       />
                     </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="worlds" className="space-y-4 mt-4">
+            <Card className="glass cosmic-glow border-glass-border/40">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Globe className="w-5 h-5" />
+                  World Management
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4 text-center">
+                  <div className="p-4 border border-glass-border/30 rounded-lg bg-glass/30">
+                    <div className="text-2xl font-bold text-primary">{allBooks.length}</div>
+                    <div className="text-sm text-muted-foreground">Total Worlds</div>
+                  </div>
+                  <div className="p-4 border border-glass-border/30 rounded-lg bg-glass/30">
+                    <div className="text-2xl font-bold text-accent">
+                      {allBooks.reduce((sum, book) => sum + Object.keys(book.worldData.assets || {}).length, 0)}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Total Assets</div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="auto-save-worlds">Auto Save Worlds</Label>
+                    <div className="text-sm text-muted-foreground">
+                      Automatically save world changes
+                    </div>
+                  </div>
+                  <Switch
+                    id="auto-save-worlds"
+                    checked={autoSave}
+                    onCheckedChange={(checked) => {
+                      setAutoSave(checked);
+                      updateSettings({ autoSave: checked });
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>World List</Label>
+                  <div className="max-h-40 overflow-y-auto space-y-2">
+                    {allBooks.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No worlds created yet</p>
+                    ) : (
+                      allBooks.map((book) => (
+                        <div key={book.id} className="flex items-center justify-between p-2 border border-glass-border/30 rounded-lg bg-glass/30">
+                          <div className="flex items-center gap-2">
+                            <BookOpen className="w-4 h-4" />
+                            <div>
+                              <div className="font-medium text-sm">{book.title}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {Object.keys(book.worldData.assets || {}).length} assets
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => {
+                      const data = exportBooks();
+                      const blob = new Blob([data], { type: 'application/json' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `worlds-export-${new Date().toISOString().split('T')[0]}.json`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                      toast.success('Worlds exported successfully');
+                    }}
+                    className="flex-1"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Export Worlds
+                  </Button>
+                  
+                  <div className="flex-1">
+                    <input
+                      type="file"
+                      accept=".json"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            const data = event.target?.result as string;
+                            if (importBooks(data)) {
+                              toast.success('Worlds imported successfully');
+                            } else {
+                              toast.error('Failed to import worlds');
+                            }
+                          };
+                          reader.readAsText(file);
+                        }
+                      }}
+                      className="hidden"
+                      id="import-worlds"
+                    />
+                    <Label htmlFor="import-worlds" className="w-full">
+                      <Button variant="outline" className="w-full">
+                        <Upload className="w-4 h-4 mr-2" />
+                        Import Worlds
+                      </Button>
+                    </Label>
                   </div>
                 </div>
               </CardContent>
