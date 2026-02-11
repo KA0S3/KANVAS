@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ChevronRight, ChevronDown, File, Folder, FolderOpen } from 'lucide-react';
 import { useAssetStore } from '@/stores/assetStore';
+import { useTagStore } from '@/stores/tagStore';
 import { AssetContextMenu } from '@/components/AssetContextMenu';
 import type { Asset } from '@/components/AssetItem';
 import { cn } from '@/lib/utils';
@@ -16,6 +17,7 @@ interface AssetTreeNodeProps {
 
 export function AssetTreeNode({ asset, depth, searchQuery = '', level = 0, onEdit, onSelectAndFocus }: AssetTreeNodeProps) {
   const { assets, setActiveAsset, currentActiveId } = useAssetStore();
+  const { getAssetTags } = useTagStore();
   const [isExpanded, setIsExpanded] = useState(asset.isExpanded || false);
   const [contextMenu, setContextMenu] = useState<{
     visible: boolean;
@@ -26,6 +28,9 @@ export function AssetTreeNode({ asset, depth, searchQuery = '', level = 0, onEdi
   const hasChildren = asset.children && asset.children.length > 0;
   const childAssets = asset.children?.map(childId => assets[childId]).filter(Boolean) || [];
   const isActive = currentActiveId === asset.id;
+  
+  // Get tags for this asset with their colors
+  const assetTags = getAssetTags(asset.id);
   
   // Filter children based on search query
   const filteredChildren = childAssets.filter(child => 
@@ -110,15 +115,21 @@ export function AssetTreeNode({ asset, depth, searchQuery = '', level = 0, onEdi
           <span className="text-sm truncate">{asset.name}</span>
         </div>
         
-        {asset.tags && asset.tags.length > 0 && (
+        {assetTags.length > 0 && (
           <div className="flex gap-1">
-            {asset.tags.slice(0, 3).map((tag, index) => (
+            {assetTags.slice(0, 3).map((tag) => (
               <div
-                key={tag}
-                className="w-2 h-2 rounded-full bg-primary/60"
-                title={tag}
+                key={tag.id}
+                className="w-2 h-2 rounded-full border border-border/30"
+                style={{ backgroundColor: tag.color }}
+                title={tag.name}
               />
             ))}
+            {assetTags.length > 3 && (
+              <span className="text-xs text-muted-foreground">
+                +{assetTags.length - 3}
+              </span>
+            )}
           </div>
         )}
       </div>

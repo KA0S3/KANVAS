@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import type { Book, BookViewMode, BookLibrarySettings, BookCoverPreset, WorldData } from '@/types/book';
 
 const defaultCoverPresets: BookCoverPreset[] = [
@@ -45,148 +46,161 @@ const createDefaultWorldData = (): WorldData => ({
   viewportScale: 1,
 });
 
-export const useBookStore = create<BookStore>((set, get) => {
-  return {
-    books: {},
-    currentBookId: null,
-    viewMode: 'carousel' as BookViewMode,
-    settings: defaultSettings,
-    coverPresets: defaultCoverPresets,
+export const useBookStore = create<BookStore>()(
+  persist(
+    (set, get) => {
+      return {
+        books: {},
+        currentBookId: null,
+        viewMode: 'carousel' as BookViewMode,
+        settings: defaultSettings,
+        coverPresets: defaultCoverPresets,
 
-    createBook: (bookData) => {
-      const id = crypto.randomUUID();
-      const now = Date.now();
-      const newBook: Book = {
-        ...bookData,
-        id,
-        createdAt: now,
-        updatedAt: now,
-        worldData: bookData.worldData || createDefaultWorldData(),
-      };
+        createBook: (bookData) => {
+          const id = crypto.randomUUID();
+          const now = Date.now();
+          const newBook: Book = {
+            ...bookData,
+            id,
+            createdAt: now,
+            updatedAt: now,
+            worldData: bookData.worldData || createDefaultWorldData(),
+          };
 
-      set((state) => ({
-        books: {
-          ...state.books,
-          [id]: newBook,
-        },
-      }));
-
-      return id;
-    },
-
-    updateBook: (bookId, updates) => {
-      set((state) => {
-        const book = state.books[bookId];
-        if (!book) return state;
-
-        return {
-          books: {
-            ...state.books,
-            [bookId]: {
-              ...book,
-              ...updates,
-              updatedAt: Date.now(),
+          set((state) => ({
+            books: {
+              ...state.books,
+              [id]: newBook,
             },
-          },
-        };
-      });
-    },
+          }));
 
-    deleteBook: (bookId) => {
-      set((state) => {
-        const newBooks = { ...state.books };
-        delete newBooks[bookId];
+          return id;
+        },
 
-        const newCurrentBookId = state.currentBookId === bookId ? null : state.currentBookId;
+        updateBook: (bookId, updates) => {
+          set((state) => {
+            const book = state.books[bookId];
+            if (!book) return state;
 
-        return {
-          books: newBooks,
-          currentBookId: newCurrentBookId,
-        };
-      });
-    },
-
-    setCurrentBook: (bookId) => {
-      set({ currentBookId: bookId });
-    },
-
-    getCurrentBook: () => {
-      const state = get();
-      return state.currentBookId ? state.books[state.currentBookId] || null : null;
-    },
-
-    getAllBooks: () => {
-      const state = get();
-      return Object.values(state.books);
-    },
-
-    updateWorldData: (bookId, worldDataUpdates) => {
-      set((state) => {
-        const book = state.books[bookId];
-        if (!book) return state;
-
-        return {
-          books: {
-            ...state.books,
-            [bookId]: {
-              ...book,
-              worldData: {
-                ...book.worldData,
-                ...worldDataUpdates,
+            return {
+              books: {
+                ...state.books,
+                [bookId]: {
+                  ...book,
+                  ...updates,
+                  updatedAt: Date.now(),
+                },
               },
-              updatedAt: Date.now(),
-            },
-          },
-        };
-      });
-    },
-
-    getWorldData: (bookId) => {
-      const state = get();
-      const book = state.books[bookId];
-      return book ? book.worldData : null;
-    },
-
-    setViewMode: (mode) => {
-      set({ viewMode: mode });
-    },
-
-    updateSettings: (settingsUpdates) => {
-      set((state) => ({
-        settings: {
-          ...state.settings,
-          ...settingsUpdates,
+            };
+          });
         },
-      }));
-    },
 
-    exportBooks: () => {
-      const state = get();
-      return JSON.stringify({
+        deleteBook: (bookId) => {
+          set((state) => {
+            const newBooks = { ...state.books };
+            delete newBooks[bookId];
+
+            const newCurrentBookId = state.currentBookId === bookId ? null : state.currentBookId;
+
+            return {
+              books: newBooks,
+              currentBookId: newCurrentBookId,
+            };
+          });
+        },
+
+        setCurrentBook: (bookId) => {
+          set({ currentBookId: bookId });
+        },
+
+        getCurrentBook: () => {
+          const state = get();
+          return state.currentBookId ? state.books[state.currentBookId] || null : null;
+        },
+
+        getAllBooks: () => {
+          const state = get();
+          return Object.values(state.books);
+        },
+
+        updateWorldData: (bookId, worldDataUpdates) => {
+          set((state) => {
+            const book = state.books[bookId];
+            if (!book) return state;
+
+            return {
+              books: {
+                ...state.books,
+                [bookId]: {
+                  ...book,
+                  worldData: {
+                    ...book.worldData,
+                    ...worldDataUpdates,
+                  },
+                  updatedAt: Date.now(),
+                },
+              },
+            };
+          });
+        },
+
+        getWorldData: (bookId) => {
+          const state = get();
+          const book = state.books[bookId];
+          return book ? book.worldData : null;
+        },
+
+        setViewMode: (mode) => {
+          set({ viewMode: mode });
+        },
+
+        updateSettings: (settingsUpdates) => {
+          set((state) => ({
+            settings: {
+              ...state.settings,
+              ...settingsUpdates,
+            },
+          }));
+        },
+
+        exportBooks: () => {
+          const state = get();
+          return JSON.stringify({
+            books: state.books,
+            settings: state.settings,
+            exportedAt: new Date().toISOString(),
+          }, null, 2);
+        },
+
+        importBooks: (data) => {
+          try {
+            const parsed = JSON.parse(data);
+            
+            if (!parsed.books || typeof parsed.books !== 'object') {
+              throw new Error('Invalid data format');
+            }
+
+            set((state) => ({
+              books: parsed.books,
+              settings: parsed.settings ? { ...state.settings, ...parsed.settings } : state.settings,
+            }));
+
+            return true;
+          } catch (error) {
+            console.error('Failed to import books:', error);
+            return false;
+          }
+        },
+      };
+    },
+    {
+      name: 'kanvas-world-storage',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
         books: state.books,
+        currentBookId: state.currentBookId,
         settings: state.settings,
-        exportedAt: new Date().toISOString(),
-      }, null, 2);
-    },
-
-    importBooks: (data) => {
-      try {
-        const parsed = JSON.parse(data);
-        
-        if (!parsed.books || typeof parsed.books !== 'object') {
-          throw new Error('Invalid data format');
-        }
-
-        set((state) => ({
-          books: parsed.books,
-          settings: parsed.settings ? { ...state.settings, ...parsed.settings } : state.settings,
-        }));
-
-        return true;
-      } catch (error) {
-        console.error('Failed to import books:', error);
-        return false;
-      }
-    },
-  };
-});
+      }),
+    }
+  )
+);

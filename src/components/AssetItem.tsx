@@ -1,6 +1,7 @@
- import React from "react";
-import { X, FileText, Image, Film, Music, Code, File, Move, Maximize2 } from "lucide-react";
+import React from "react";
+import { X, FileText, Image, Film, Music, Code, File, Move, Maximize2, Edit } from "lucide-react";
 import { AssetContextMenu } from '@/components/AssetContextMenu';
+import { useTagStore } from '@/stores/tagStore';
 import type { CustomField, CustomFieldValue, ViewportDisplaySettings } from "@/types/extendedAsset";
 
 export interface Asset {
@@ -25,9 +26,13 @@ export interface Asset {
     panY: number;
   };
   backgroundConfig?: {
+    isClear?: boolean;
     color?: string;
     image?: string;
+    position?: { x: number; y: number };
+    scale?: number;
     gridSize?: number;
+    imageSize?: { width: number; height: number };
   };
   viewportDisplaySettings?: ViewportDisplaySettings;
   createdAt?: number;
@@ -69,6 +74,10 @@ const colorMap = {
  export function AssetItem({ asset, onDelete, onMouseDown, onDoubleClick, isSelected, onResize, onEdit, onSelectAndFocus }: AssetItemProps) {
   const Icon = iconMap[asset.type];
   const colorClass = colorMap[asset.type];
+  const { getAssetTags } = useTagStore();
+
+  // Get tags for this asset with their colors
+  const assetTags = React.useMemo(() => getAssetTags(asset.id), [asset.id, getAssetTags]);
 
   const [contextMenu, setContextMenu] = React.useState<{
     visible: boolean;
@@ -213,11 +222,12 @@ const colorMap = {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    onDelete(asset.id);
+                    onEdit?.(asset);
                   }}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-white/20 rounded flex-shrink-0"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-blue-500/20 rounded flex-shrink-0"
+                  title="Edit asset"
                 >
-                  <X className="w-4 h-4 text-white/90" />
+                  <Edit className="w-4 h-4 text-blue-400" />
                 </button>
               </div>
 
@@ -253,18 +263,19 @@ const colorMap = {
                 )}
 
                 {/* Tags */}
-                {asset.tags && asset.tags.length > 0 && (
+                {assetTags.length > 0 && (
                   <div className="flex flex-wrap gap-1">
-                    {asset.tags.slice(0, 3).map((tag, index) => (
+                    {assetTags.slice(0, 3).map((tag, index) => (
                       <div
-                        key={tag}
-                        className="w-2 h-2 rounded-full bg-white/60"
-                        title={tag}
+                        key={tag.id}
+                        className="w-2 h-2 rounded-full border border-white/30"
+                        style={{ backgroundColor: tag.color }}
+                        title={tag.name}
                       />
                     ))}
-                    {asset.tags.length > 3 && (
+                    {assetTags.length > 3 && (
                       <div className="text-xs text-white/80">
-                        +{asset.tags.length - 3}
+                        +{assetTags.length - 3}
                       </div>
                     )}
                   </div>
@@ -285,11 +296,12 @@ const colorMap = {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  onDelete(asset.id);
+                  onEdit?.(asset);
                 }}
-                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/20 rounded"
+                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-blue-500/20 rounded"
+                title="Edit asset"
               >
-                <X className="w-4 h-4 text-destructive" />
+                <Edit className="w-4 h-4 text-blue-400" />
               </button>
             </div>
 
@@ -321,18 +333,19 @@ const colorMap = {
             )}
 
             {/* Tags */}
-            {asset.tags && asset.tags.length > 0 && (
+            {assetTags.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2 flex-shrink-0">
-                {asset.tags.slice(0, 3).map((tag, index) => (
+                {assetTags.slice(0, 3).map((tag, index) => (
                   <div
-                    key={tag}
-                    className="w-2 h-2 rounded-full bg-primary/60"
-                    title={tag}
+                    key={tag.id}
+                    className="w-2 h-2 rounded-full border border-border/50"
+                    style={{ backgroundColor: tag.color }}
+                    title={tag.name}
                   />
                 ))}
-                {asset.tags.length > 3 && (
+                {assetTags.length > 3 && (
                   <div className="text-xs text-muted-foreground">
-                    +{asset.tags.length - 3}
+                    +{assetTags.length - 3}
                   </div>
                 )}
               </div>

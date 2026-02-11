@@ -1,5 +1,5 @@
- import { useState, useCallback, useRef, useEffect } from "react";
-import { Sparkles, ArrowLeft, Plus, PanelRight } from "lucide-react";
+ import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { Sparkles, ArrowLeft, Plus, PanelRight, BookOpen } from "lucide-react";
 import { AssetItem, type Asset } from "./AssetItem";
 import { AssetEditModal } from "./asset/AssetEditModal";
 import { useAssetTree } from "@/hooks/useAssetTree";
@@ -31,7 +31,8 @@ const initialAssets: Omit<Asset, 'id' | 'children'>[] = [
       panY: 30,
     },
     backgroundConfig: {
-      color: 'hsl(var(--background))',
+      isClear: true,
+      color: undefined,
       gridSize: 30,
     },
   },
@@ -42,9 +43,11 @@ const initialAssets: Omit<Asset, 'id' | 'children'>[] = [
 
 interface AssetPortProps {
   onToggleSidebar?: () => void;
+  currentWorldTitle?: string;
+  onOpenWorldLibrary?: () => void;
 }
 
-export function AssetPort({ onToggleSidebar }: AssetPortProps) {
+export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibrary }: AssetPortProps) {
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -53,11 +56,25 @@ export function AssetPort({ onToggleSidebar }: AssetPortProps) {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [newAssetId, setNewAssetId] = useState<string | null>(null);
   const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
+  const [viewportSize, setViewportSize] = useState({ width: 800, height: 600 });
+  const [backgroundRefreshKey, setBackgroundRefreshKey] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const hasInitialized = useRef(false);
 
   // Initialize sample data
   useSampleData();
+
+  // Listen for background save events
+  useEffect(() => {
+    const handleBackgroundSave = () => {
+      setBackgroundRefreshKey(prev => prev + 1);
+    };
+
+    window.addEventListener('backgroundSaved', handleBackgroundSave);
+    return () => {
+      window.removeEventListener('backgroundSaved', handleBackgroundSave);
+    };
+  }, []);
 
   const {
     assets,
@@ -68,13 +85,28 @@ export function AssetPort({ onToggleSidebar }: AssetPortProps) {
     setActiveAsset,
     getRootAssets,
     searchAssets,
+    getAssetPath,
   } = useAssetTree();
   
-  const { createAsset: createStoreAsset, viewportOffset, viewportScale } = useAssetStore();
+  const { createAsset: createStoreAsset, viewportOffset, viewportScale, currentActiveId, setCurrentViewportId, currentViewportId } = useAssetStore();
   
   const handleResize = useCallback((assetId: string, width: number, height: number) => {
     updateAssetSize(assetId, width, height);
   }, [updateAssetSize]);
+
+  // Update viewport size when component mounts or window resizes
+  useEffect(() => {
+    const updateViewportSize = () => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setViewportSize({ width: rect.width, height: rect.height });
+      }
+    };
+
+    updateViewportSize();
+    window.addEventListener('resize', updateViewportSize);
+    return () => window.removeEventListener('resize', updateViewportSize);
+  }, []);
 
   // Initialize with some sample assets on first render
   useEffect(() => {
@@ -124,6 +156,7 @@ export function AssetPort({ onToggleSidebar }: AssetPortProps) {
     // Enter the asset by setting it as the active asset and updating viewport
     setActiveAsset(asset.id);
     setEnteredAssetId(asset.id);
+    setCurrentViewportId(asset.id); // Update current viewport context in store
     
     // Calculate viewport to center the asset
     if (containerRef.current) {
@@ -134,13 +167,14 @@ export function AssetPort({ onToggleSidebar }: AssetPortProps) {
       const newViewport = asset.viewportConfig || centerTransform;
       setCurrentViewport(newViewport);
     }
-  }, [setActiveAsset]);
+  }, [setActiveAsset, setCurrentViewportId]);
 
   const handleExitAsset = useCallback(() => {
     setEnteredAssetId(null);
     setActiveAsset(null);
+    setCurrentViewportId(null); // Clear current viewport context in store
     setCurrentViewport(getDefaultViewportConfig());
-  }, [setActiveAsset]);
+  }, [setActiveAsset, setCurrentViewportId]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent, asset: Asset) => {
     e.preventDefault();
@@ -178,7 +212,7 @@ export function AssetPort({ onToggleSidebar }: AssetPortProps) {
     let finalX = boundedX;
     let finalY = boundedY;
     
-    if (enteredAssetId && assets[enteredAssetId]) {
+    if (enteredAssetId && assets && assets[enteredAssetId]) {
       const parentAsset = assets[enteredAssetId];
       // Convert from local (viewport) to global coordinates
       const globalCoords = localToGlobalCoords(
@@ -222,14 +256,61 @@ export function AssetPort({ onToggleSidebar }: AssetPortProps) {
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
   // Get assets to display based on current context
-  const displayAssets = enteredAssetId 
-    ? assets[enteredAssetId]?.children.map(childId => assets[childId]).filter(Boolean) || []
+  const displayAssets = enteredAssetId && assets && assets[enteredAssetId]
+    ? assets[enteredAssetId].children.map(childId => assets[childId]).filter(Boolean) || []
     : getRootAssets();
 
+  // Build breadcrumb path with asset IDs
+  const getBreadcrumbPath = () => {
+    const path: { name: string; assetId: string | null }[] = [{ name: 'Root', assetId: null }];
+    
+    if (enteredAssetId && assets && assets[enteredAssetId]) {
+      const buildPath = (assetId: string): { name: string; assetId: string | null }[] => {
+        const asset = assets[assetId];
+        if (!asset) return [];
+        
+        if (asset.parentId) {
+          const parentPath = buildPath(asset.parentId);
+          return [...parentPath, { name: asset.name, assetId: asset.id }];
+        }
+        return [{ name: asset.name, assetId: asset.id }];
+      };
+      
+      const fullPath = buildPath(enteredAssetId);
+      return [...path, ...fullPath];
+    }
+    return path;
+  };
+
+  const breadcrumbPath = getBreadcrumbPath();
+
   // Get current background config
-  const currentAsset = enteredAssetId ? assets[enteredAssetId] : null;
-  const backgroundImage = currentAsset?.background;
-  const backgroundColor = currentAsset?.backgroundConfig?.color;
+  const currentAsset = enteredAssetId && assets ? assets[enteredAssetId] : null;
+  const backgroundConfig = currentAsset?.backgroundConfig || (() => {
+    // Try to get root background from localStorage
+    try {
+      const stored = localStorage.getItem('rootBackgroundConfig');
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  })();
+
+  // Force re-render when backgroundRefreshKey changes
+  useMemo(() => {
+    // This empty useMemo will re-run when backgroundRefreshKey changes
+    // forcing the component to re-evaluate the backgroundConfig
+  }, [backgroundRefreshKey]);
+
+  const getRenderedBackgroundImageSize = () => {
+    const scale = typeof backgroundConfig.scale === 'number' ? backgroundConfig.scale : 1;
+    const size = backgroundConfig.imageSize;
+    if (!size || typeof size.width !== 'number' || typeof size.height !== 'number') return null;
+    return {
+      width: Math.round(size.width * scale),
+      height: Math.round(size.height * scale),
+    };
+  };
 
    return (
     <div className="glass-strong cosmic-glow rounded-2xl w-full h-full flex flex-col mx-auto my-auto">
@@ -239,16 +320,61 @@ export function AssetPort({ onToggleSidebar }: AssetPortProps) {
           {enteredAssetId && (
             <button
               onClick={handleExitAsset}
-              className="p-1 hover:bg-muted rounded transition-colors"
+              className="p-1 hover:bg-muted rounded transition-colors self-center"
               title="Exit asset"
             >
               <ArrowLeft className="w-4 h-4 text-muted-foreground" />
             </button>
           )}
+          {currentWorldTitle && onOpenWorldLibrary && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onOpenWorldLibrary}
+              className="gap-2 self-center glass cosmic-glow border-glass-border/40"
+            >
+              <BookOpen className="w-4 h-4" />
+              {currentWorldTitle}
+            </Button>
+          )}
+          {/* Interactive Breadcrumb Path */}
+          <nav className="flex items-center text-xs text-muted-foreground bg-glass/50 px-2 py-1 rounded border border-glass-border/30">
+            {breadcrumbPath.map((segment, index) => {
+              const isLast = index === breadcrumbPath.length - 1;
+              const isRoot = index === 0;
+              
+              return (
+                <div key={index} className="flex items-center">
+                  {index > 0 && (
+                    <span className="mx-1 text-muted-foreground/60">/</span>
+                  )}
+                  <button
+                    onClick={() => {
+                      if (isRoot) {
+                        // Navigate to root
+                        handleExitAsset();
+                      } else if (segment.assetId) {
+                        // Navigate to this asset
+                        handleAssetDoubleClick(assets[segment.assetId]);
+                      }
+                    }}
+                    className={`hover:text-foreground transition-colors ${
+                      isLast 
+                        ? 'text-foreground font-medium cursor-default' 
+                        : 'hover:underline cursor-pointer'
+                    }`}
+                    disabled={isLast}
+                  >
+                    {segment.name}
+                  </button>
+                </div>
+              );
+            })}
+          </nav>
           <Button
             variant="cosmic"
             size="sm"
-            className="gap-2"
+            className="gap-2 self-center"
             onClick={handleCreateAsset}
           >
             <Plus className="w-4 h-4" />
@@ -271,13 +397,35 @@ export function AssetPort({ onToggleSidebar }: AssetPortProps) {
         ref={containerRef}
         onClick={handleContainerClick}
         className="flex-1 relative overflow-hidden cursor-crosshair"
-        style={{
-          backgroundImage: backgroundImage
-            ? `url(${backgroundImage})`
-            : 'none',
-          backgroundColor: backgroundColor || 'transparent',
-        }}
       >
+        <div
+          className={backgroundConfig.isClear ? 'absolute inset-0 glass cosmic-glow' : 'absolute inset-0'}
+          style={{
+            backgroundColor: backgroundConfig.isClear ? 'transparent' : (backgroundConfig.color || 'transparent'),
+          }}
+        />
+
+        {backgroundConfig.image && (
+          <img
+            src={backgroundConfig.image}
+            alt=""
+            draggable={false}
+            className="absolute max-w-none select-none pointer-events-none"
+            style={{
+              left: `${backgroundConfig.position?.x ?? 0}px`,
+              top: `${backgroundConfig.position?.y ?? 0}px`,
+              width: (() => {
+                const rendered = getRenderedBackgroundImageSize();
+                return rendered ? `${rendered.width}px` : 'auto';
+              })(),
+              height: (() => {
+                const rendered = getRenderedBackgroundImageSize();
+                return rendered ? `${rendered.height}px` : 'auto';
+              })(),
+            }}
+          />
+        )}
+
         {/* Viewport transform container */}
         <div
           style={{
@@ -305,7 +453,7 @@ export function AssetPort({ onToggleSidebar }: AssetPortProps) {
             // Convert asset position to local coordinates if we're inside a parent
             let displayAsset = { ...asset };
             
-            if (enteredAssetId && assets[enteredAssetId]) {
+            if (enteredAssetId && assets && assets[enteredAssetId]) {
               const parentAsset = assets[enteredAssetId];
               // Convert from global to local coordinates
               const localCoords = globalToLocalCoords(
@@ -348,7 +496,9 @@ export function AssetPort({ onToggleSidebar }: AssetPortProps) {
         }}
         assetId={editingAssetId || newAssetId}
         isNewAsset={!!newAssetId}
+        viewportSize={viewportSize}
       />
-    </div>
+
+      </div>
   );
 }

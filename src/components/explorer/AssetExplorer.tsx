@@ -1,4 +1,4 @@
-import { Plus, Search, Settings, Tag, Users, Building, Sparkles, Swords, X } from 'lucide-react';
+import { Plus, Search, Settings, Tag, Users, Building, Sparkles, Swords, X, Image } from 'lucide-react';
 import { useState } from 'react';
 import { useAssetStore } from '@/stores/assetStore';
 import { AssetTreeNode } from './AssetTreeNode';
@@ -9,6 +9,7 @@ import { GlobalTagManager } from '@/components/tags/GlobalTagManager';
 import { cn } from '@/lib/utils';
 import { AssetEditModal } from '@/components/asset/AssetEditModal';
 import { SettingsPanel } from '@/components/settings/SettingsPanel';
+import { BackgroundMapEditor } from '@/components/asset/BackgroundMapEditor';
 import { GeneratorModal } from '@/components/generators/GeneratorModal';
 import type { Asset } from '@/components/AssetItem';
 
@@ -18,19 +19,21 @@ interface AssetExplorerProps {
 }
 
 export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerProps) {
-  const { assets, createAsset, updateAsset, currentActiveId } = useAssetStore();
+  const { assets, createAsset, updateAsset, currentActiveId, currentViewportId } = useAssetStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [newAssetId, setNewAssetId] = useState<string | null>(null);
   const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
+  const [backgroundMapModalOpen, setBackgroundMapModalOpen] = useState(false);
+  const [backgroundRefreshTrigger, setBackgroundRefreshTrigger] = useState(0);
   const [generatorModal, setGeneratorModal] = useState<{
     isOpen: boolean;
     path: string;
     title: string;
   }>({ isOpen: false, path: '', title: '' });
   
-  const rootAssets = Object.values(assets).filter(asset => !asset.parentId);
+  const rootAssets = assets ? Object.values(assets).filter(asset => !asset.parentId) : [];
   
   const handleCreateAsset = () => {
     const newAsset = createAsset({
@@ -61,11 +64,16 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
     const { setActiveAsset } = useAssetStore.getState();
     setActiveAsset(asset.id);
   };
+
+  const handleBackgroundSave = () => {
+    // Force re-render of components that depend on background config
+    setBackgroundRefreshTrigger(prev => prev + 1);
+  };
   
   // Get breadcrumb path to active asset
-  const activeAsset = currentActiveId ? assets[currentActiveId] : null;
+  const activeAsset = currentActiveId && assets ? assets[currentActiveId] : null;
   const breadcrumbs: string[] = [];
-  if (activeAsset) {
+  if (activeAsset && assets) {
     let current = activeAsset;
     while (current) {
       breadcrumbs.unshift(current.name);
@@ -83,6 +91,15 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
       <div className="flex-shrink-0 px-3 py-3 border-b border-sidebar-border">
         {/* Top right buttons */}
         <div className="flex justify-end gap-2 mb-3">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 w-6 p-0"
+            onClick={() => setBackgroundMapModalOpen(true)}
+            title="Background Map"
+          >
+            <Image className="w-3.5 h-3.5" />
+          </Button>
           <Button
             size="sm"
             variant="ghost"
@@ -267,6 +284,15 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
           setGeneratorModal({ ...generatorModal, isOpen: false });
         }}
       />
+
+      {/* Background Map Editor */}
+      <BackgroundMapEditor
+        isOpen={backgroundMapModalOpen}
+        onClose={() => setBackgroundMapModalOpen(false)}
+        assetId={currentViewportId} // Use current viewport context from store
+        onSave={handleBackgroundSave} // Trigger background refresh on save
+      />
+
     </div>
   );
 }

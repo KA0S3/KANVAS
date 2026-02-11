@@ -263,10 +263,19 @@ export const AssetTreeNode: React.FC<AssetTreeNodeProps> = ({
         {/* Tags */}
         {assetTags.length > 0 && (
           <div className="flex items-center gap-1 flex-shrink-0">
-            <TagIcon className="w-3 h-3 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">
-              {assetTags.length}
-            </span>
+            {assetTags.slice(0, 3).map((tag) => (
+              <div
+                key={tag.id}
+                className="w-2 h-2 rounded-full border border-border/30"
+                style={{ backgroundColor: tag.color }}
+                title={tag.name}
+              />
+            ))}
+            {assetTags.length > 3 && (
+              <span className="text-xs text-muted-foreground">
+                +{assetTags.length - 3}
+              </span>
+            )}
           </div>
         )}
 

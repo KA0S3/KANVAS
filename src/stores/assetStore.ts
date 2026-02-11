@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { subscribeWithSelector } from 'zustand/middleware';
 import type { Asset } from '@/components/AssetItem';
 import type { CustomField, CustomFieldValue, GlobalCustomField, ViewportDisplaySettings } from '@/types/extendedAsset';
 import { DEFAULT_VIEWPORT_DISPLAY_SETTINGS } from '@/types/extendedAsset';
@@ -10,6 +11,7 @@ interface AssetStore {
   
   // Active asset state
   currentActiveId: string | null;
+  currentViewportId: string | null; // Current viewport context (enteredAssetId)
   
   // Global custom fields
   globalCustomFields: GlobalCustomField[];
@@ -31,6 +33,7 @@ interface AssetStore {
   updateAssetSize: (assetId: string, width: number, height: number) => void;
   updateAsset: (assetId: string, updates: Partial<Omit<Asset, 'id' | 'children' | 'parentId'>>) => void;
   setActiveAsset: (assetId: string | null) => void;
+  setCurrentViewportId: (assetId: string | null) => void;
   getActiveAsset: () => Asset | null;
   getRootAssets: () => Asset[];
   getAssetChildren: (parentId: string) => Asset[];
@@ -56,13 +59,15 @@ interface AssetStore {
   setViewportScale: (scale: number) => void;
 }
 
-export const useAssetStore = create<AssetStore>((set, get) => ({
-  // Initial state
-  assets: {},
-  currentActiveId: null,
-  globalCustomFields: [],
-  viewportOffset: { x: -45, y: -20 },
-  viewportScale: 1,
+export const useAssetStore = create<AssetStore>()(
+  subscribeWithSelector((set, get) => ({
+    // Initial state
+    assets: {},
+    currentActiveId: null,
+    currentViewportId: null,
+    globalCustomFields: [],
+    viewportOffset: { x: -45, y: -20 },
+    viewportScale: 1,
 
   // Create a new asset
   createAsset: (assetData: Omit<Asset, 'id' | 'children'>, parentId?: string) => {
@@ -252,6 +257,11 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
   // Set the active asset
   setActiveAsset: (assetId: string | null) => {
     set({ currentActiveId: assetId });
+  },
+
+  // Set the current viewport context
+  setCurrentViewportId: (assetId: string | null) => {
+    set({ currentViewportId: assetId });
   },
 
   // Get the active asset object
@@ -485,6 +495,7 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
       set({
         assets: worldData.assets || {},
         currentActiveId: null,
+        currentViewportId: null,
         globalCustomFields: worldData.globalCustomFields || [],
         viewportOffset: worldData.viewportOffset || { x: -45, y: -20 },
         viewportScale: worldData.viewportScale || 1,
@@ -506,9 +517,39 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
     set({
       assets: {},
       currentActiveId: null,
+      currentViewportId: null,
       globalCustomFields: [],
       viewportOffset: { x: -45, y: -20 },
       viewportScale: 1,
     });
   },
-}));
+})));
+
+// Auto-save functionality: subscribe to store changes and save to book store
+useAssetStore.subscribe(
+  (state) => state,
+  (state) => {
+    const bookStore = useBookStore.getState();
+    if (bookStore.currentBookId) {
+      const worldData = {
+        assets: state.assets,
+        globalCustomFields: state.globalCustomFields,
+        viewportOffset: state.viewportOffset,
+        viewportScale: state.viewportScale,
+      };
+      bookStore.updateWorldData(bookStore.currentBookId, worldData);
+    }
+  },
+  {
+    equalityFn: (a, b) => {
+      // Only trigger auto-save for relevant changes
+      return (
+        a.assets === b.assets &&
+        a.globalCustomFields === b.globalCustomFields &&
+        a.viewportOffset.x === b.viewportOffset.x &&
+        a.viewportOffset.y === b.viewportOffset.y &&
+        a.viewportScale === b.viewportScale
+      );
+    },
+  }
+);

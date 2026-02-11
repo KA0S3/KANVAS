@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
-import { BookOpen, ChevronLeft } from "lucide-react";
+import { BookOpen, ChevronLeft, Database, Trash2 } from "lucide-react";
 import cosmicBackground from "@/assets/cosmic-background.png";
 import lightBackground from "@/assets/BG-light.png";
 import { AssetPort } from "@/components/AssetPort";
 import { AssetExplorer } from "@/components/explorer/AssetExplorer";
 import { Button } from "@/components/ui/button";
+import WorldCreationDialog from "@/components/WorldCreationDialog";
+import DataManager from "@/components/DataManager";
 import { useAssetStore } from "@/stores/assetStore";
 import { useBookStore } from "@/stores/bookStoreSimple";
 import { useThemeStore } from "@/stores/themeStore";
@@ -14,7 +16,7 @@ const Index = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [bookLibraryOpen, setBookLibraryOpen] = useState(true);
   const { currentActiveId, loadWorldData } = useAssetStore();
-  const { currentBookId, setCurrentBook, getAllBooks } = useBookStore();
+  const { currentBookId, setCurrentBook, getAllBooks, deleteBook } = useBookStore();
   const { theme } = useThemeStore();
 
   useEffect(() => {
@@ -29,6 +31,14 @@ const Index = () => {
 
   const handleOpenBookLibrary = () => {
     setBookLibraryOpen(true);
+  };
+
+  const handleDeleteWorld = (bookId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    
+    if (window.confirm('Are you sure you want to delete this world? This action cannot be undone.')) {
+      deleteBook(bookId);
+    }
   };
 
   const backgroundStyle = {
@@ -50,35 +60,56 @@ const Index = () => {
               {getAllBooks().length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-lg text-white mb-4">No worlds yet. Create your first world!</p>
-                  <Button onClick={() => {
-                    const newBookId = useBookStore.getState().createBook({
-                      title: `World ${getAllBooks().length + 1}`,
-                      description: 'A new world',
-                      color: '#3b82f6',
-                      worldData: { assets: {}, tags: {}, globalCustomFields: [], viewportOffset: { x: -45, y: -20 }, viewportScale: 1 }
-                    });
-                    setCurrentBook(newBookId);
-                  }} className="mb-4">
-                    ✨ Create First World
-                  </Button>
+                  <WorldCreationDialog onWorldCreated={(worldId) => setCurrentBook(worldId)}>
+                    <Button className="mb-4">
+                      ✨ Create First World
+                    </Button>
+                  </WorldCreationDialog>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                  {getAllBooks().map((book) => (
-                    <div 
-                      key={book.id}
-                      className="p-4 border border-gray-600 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors"
-                      onClick={() => handleBookSelect(book)}
-                    >
-                      <h3 className="font-bold text-lg text-white">{book.title}</h3>
-                      <p className="text-sm text-gray-400">{book.description}</p>
-                    </div>
-                  ))}
-                </div>
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                    {getAllBooks().map((book) => (
+                      <div 
+                        key={book.id}
+                        className="p-4 border border-gray-600 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors relative group"
+                        onClick={() => handleBookSelect(book)}
+                      >
+                        <button
+                          onClick={(e) => handleDeleteWorld(book.id, e)}
+                          className="absolute top-2 right-2 p-2 rounded-md bg-red-600/80 hover:bg-red-600 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Delete world"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                        
+                        <div className="pr-8">
+                          <h3 className="font-bold text-lg text-white">{book.title}</h3>
+                          <p className="text-sm text-gray-400">{book.description}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <div className="flex justify-center">
+                    <WorldCreationDialog>
+                      <Button>
+                        ✨ Create New World
+                      </Button>
+                    </WorldCreationDialog>
+                  </div>
+                </>
               )}
             </div>
             
-            <div className="flex justify-end mt-6">
+            <div className="flex justify-between items-center mt-6">
+              <DataManager>
+                <Button variant="outline" size="sm" className="border-gray-600 text-gray-200 hover:bg-gray-800">
+                  <Database className="w-4 h-4 mr-2" />
+                  Backup/Restore
+                </Button>
+              </DataManager>
+              
               <Button variant="outline" onClick={() => setBookLibraryOpen(false)}>
                 ✖️ Close Library
               </Button>
@@ -92,35 +123,15 @@ const Index = () => {
         <div className="flex h-screen">
           {/* Main Content Area */}
           <div className="flex-1 flex flex-col relative">
-            {/* World Library Button */}
-            <div className="absolute top-4 right-4 z-20">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleOpenBookLibrary}
-                className="glass cosmic-glow border-glass-border/40 gap-2"
-              >
-                <BookOpen className="w-4 h-4" />
-                {getAllBooks().find(b => b.id === currentBookId)?.title || 'Current World'}
-              </Button>
-            </div>
-            
             {/* Asset Port */}
             <div className="flex-1 p-4">
-              <AssetPort onToggleSidebar={() => setSidebarOpen(prev => !prev)} />
+              <AssetPort 
+                onToggleSidebar={() => setSidebarOpen(prev => !prev)} 
+                currentWorldTitle={getAllBooks().find(b => b.id === currentBookId)?.title || 'Current World'}
+                onOpenWorldLibrary={handleOpenBookLibrary}
+              />
             </div>
           </div>
-
-          {/* Discrete Expand Button - Only visible when sidebar is collapsed */}
-          {!sidebarOpen && (
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="fixed right-4 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full glass-strong cosmic-glow border border-glass-border/40 hover:scale-110 transition-all duration-200 shadow-lg"
-              title="Expand Sidebar"
-            >
-              <ChevronLeft className="w-4 h-4 text-foreground" />
-            </button>
-          )}
 
           {/* Fantasy Sidebar */}
       <aside className={`fantasy-overlay ${sidebarOpen ? "is-open" : ""}`} aria-hidden={!sidebarOpen}>

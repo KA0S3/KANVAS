@@ -17,6 +17,7 @@ import {
   File
 } from 'lucide-react';
 import { useAssetStore } from '@/stores/assetStore';
+import { DeleteAssetDialog } from '@/components/DeleteAssetDialog';
 import type { Asset } from '@/components/AssetItem';
 
 interface AssetContextMenuProps {
@@ -35,8 +36,8 @@ export const AssetContextMenu: React.FC<AssetContextMenuProps> = ({
   onSelectAndFocus,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const {
-    deleteAsset,
     updateAsset,
     setActiveAsset,
     createAsset,
@@ -92,20 +93,20 @@ export const AssetContextMenu: React.FC<AssetContextMenuProps> = ({
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('click', handleClickOutside);
     document.addEventListener('keydown', handleEscape);
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('click', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
     };
   }, [onClose]);
 
   const handleDelete = () => {
-    if (confirm(`Are you sure you want to delete "${asset.name}"? This will also delete all contained assets.`)) {
-      deleteAsset(asset.id);
-      onClose();
-    }
+    console.log('Delete button clicked for asset:', asset.name);
+    // Don't close the context menu - let the dialog appear over it
+    setShowDeleteDialog(true);
+    console.log('Dialog state set to true, current state:', showDeleteDialog);
   };
 
   const handleEdit = () => {
@@ -174,93 +175,103 @@ export const AssetContextMenu: React.FC<AssetContextMenuProps> = ({
 
   const AssetIcon = getAssetIcon(asset.type);
   const hasChildren = getAssetChildren(asset.id).length > 0;
-
-  return createPortal(
-    <div
-      ref={menuRef}
-      className="fixed glass-strong cosmic-glow border border-glass-border/40 rounded-lg shadow-2xl z-[9999] py-2 min-w-[200px]"
-      style={{
-        left: `${adjustedPosition.x}px`,
-        top: `${adjustedPosition.y}px`,
-      }}
-    >
-      {/* Asset Info Header */}
-      <div className="px-3 py-2 border-b border-glass-border/20">
-        <div className="flex items-center gap-2">
-          <AssetIcon className="w-4 h-4 text-primary" />
-          <span className="text-sm font-medium text-foreground truncate">{asset.name}</span>
-        </div>
-        <div className="text-xs text-muted-foreground mt-1">
-          Type: {asset.type} {hasChildren && `• ${getAssetChildren(asset.id).length} children`}
-        </div>
-      </div>
-
-      {/* Menu Items */}
-      <div className="py-1">
-        {/* Edit */}
-        <button
-          onClick={handleEdit}
-          className="w-full px-3 py-2 flex items-center gap-2 text-sm text-foreground hover:bg-glass-border/20 transition-colors"
+  
+  return (
+    <>
+      <DeleteAssetDialog
+        asset={asset}
+        isOpen={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
+      />
+      
+      {createPortal(
+        <div
+          ref={menuRef}
+          className="fixed glass-strong cosmic-glow border border-glass-border/40 rounded-lg shadow-2xl z-[9999] py-2 min-w-[200px]"
+          style={{
+            left: `${adjustedPosition.x}px`,
+            top: `${adjustedPosition.y}px`,
+          }}
         >
-          <Edit className="w-4 h-4" />
-          Edit Asset
-        </button>
+          {/* Asset Info Header */}
+          <div className="px-3 py-2 border-b border-glass-border/20">
+            <div className="flex items-center gap-2">
+              <AssetIcon className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium text-foreground truncate">{asset.name}</span>
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Type: {asset.type} {hasChildren && `• ${getAssetChildren(asset.id).length} children`}
+            </div>
+          </div>
 
-        {/* Select */}
-        <button
-          onClick={handleSelect}
-          className="w-full px-3 py-2 flex items-center gap-2 text-sm text-foreground hover:bg-glass-border/20 transition-colors"
-        >
-          <Eye className="w-4 h-4" />
-          Select & Focus
-        </button>
+          {/* Menu Items */}
+          <div className="py-1">
+            {/* Edit */}
+            <button
+              onClick={handleEdit}
+              className="w-full px-3 py-2 flex items-center gap-2 text-sm text-foreground hover:bg-glass-border/20 transition-colors"
+            >
+              <Edit className="w-4 h-4" />
+              Edit Asset
+            </button>
 
-        {/* Duplicate */}
-        <button
-          onClick={handleDuplicate}
-          className="w-full px-3 py-2 flex items-center gap-2 text-sm text-foreground hover:bg-glass-border/20 transition-colors"
-        >
-          <Copy className="w-4 h-4" />
-          Duplicate
-        </button>
+            {/* Select */}
+            <button
+              onClick={handleSelect}
+              className="w-full px-3 py-2 flex items-center gap-2 text-sm text-foreground hover:bg-glass-border/20 transition-colors"
+            >
+              <Eye className="w-4 h-4" />
+              Select & Focus
+            </button>
 
-        {/* Create Child */}
-        <button
-          onClick={handleCreateChild}
-          className="w-full px-3 py-2 flex items-center gap-2 text-sm text-foreground hover:bg-glass-border/20 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Create Child Asset
-        </button>
+            {/* Duplicate */}
+            <button
+              onClick={handleDuplicate}
+              className="w-full px-3 py-2 flex items-center gap-2 text-sm text-foreground hover:bg-glass-border/20 transition-colors"
+            >
+              <Copy className="w-4 h-4" />
+              Duplicate
+            </button>
 
-        {/* Toggle Lock */}
-        <button
-          onClick={handleToggleLock}
-          className="w-full px-3 py-2 flex items-center gap-2 text-sm text-foreground hover:bg-glass-border/20 transition-colors"
-        >
-          {asset.isLocked ? (
-            <>
-              <Unlock className="w-4 h-4" />
-              Unlock Asset
-            </>
-          ) : (
-            <>
-              <Lock className="w-4 h-4" />
-              Lock Asset
-            </>
-          )}
-        </button>
+            {/* Create Child */}
+            <button
+              onClick={handleCreateChild}
+              className="w-full px-3 py-2 flex items-center gap-2 text-sm text-foreground hover:bg-glass-border/20 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Create Child Asset
+            </button>
 
-        {/* Delete */}
-        <button
-          onClick={handleDelete}
-          className="w-full px-3 py-2 flex items-center gap-2 text-sm text-destructive hover:bg-destructive/20 transition-colors"
-        >
-          <Trash2 className="w-4 h-4" />
-          Delete Asset
-        </button>
-      </div>
-    </div>,
-    document.body
+            {/* Toggle Lock */}
+            <button
+              onClick={handleToggleLock}
+              className="w-full px-3 py-2 flex items-center gap-2 text-sm text-foreground hover:bg-glass-border/20 transition-colors"
+            >
+              {asset.isLocked ? (
+                <>
+                  <Unlock className="w-4 h-4" />
+                  Unlock Asset
+                </>
+              ) : (
+                <>
+                  <Lock className="w-4 h-4" />
+                  Lock Asset
+                </>
+              )}
+            </button>
+
+            {/* Delete */}
+            <button
+              onClick={handleDelete}
+              className="w-full px-3 py-2 flex items-center gap-2 text-sm text-destructive hover:bg-destructive/20 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete Asset
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
   );
 };

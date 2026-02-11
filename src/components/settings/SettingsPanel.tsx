@@ -117,24 +117,26 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl glass cosmic-glow border-glass-border/40">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[80vh] glass cosmic-glow border-glass-border/40 flex flex-col overflow-y-auto scrollbar-thin scrollbar-thumb-glass-border/40 scrollbar-track-transparent hover:scrollbar-thumb-glass-border/60">
+        <DialogHeader className="flex-shrink-0 sticky top-0 bg-glass/90 backdrop-blur-sm z-10 pb-4">
           <DialogTitle className="flex items-center gap-2">
             <SettingsIcon className="w-5 h-5" />
             Settings
           </DialogTitle>
         </DialogHeader>
         
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="general">General</TabsTrigger>
-            <TabsTrigger value="worlds">Worlds</TabsTrigger>
-            <TabsTrigger value="data">Data Management</TabsTrigger>
-            <TabsTrigger value="about">About</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="general" className="space-y-4 mt-4">
-            <Card className="glass cosmic-glow border-glass-border/40">
+        <div className="flex-1">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col">
+            <TabsList className="grid w-full grid-cols-4 flex-shrink-0 sticky top-16 bg-glass/90 backdrop-blur-sm z-10">
+              <TabsTrigger value="general">General</TabsTrigger>
+              <TabsTrigger value="worlds">Worlds</TabsTrigger>
+              <TabsTrigger value="data">Data Management</TabsTrigger>
+              <TabsTrigger value="about">About</TabsTrigger>
+            </TabsList>
+            
+            <div className="mt-4">
+              <TabsContent value="general" className="space-y-4">
+                <Card className="glass cosmic-glow border-glass-border/40">
               <CardHeader>
                 <CardTitle className="text-lg">Display Settings</CardTitle>
               </CardHeader>
@@ -266,7 +268,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
             </Card>
           </TabsContent>
           
-          <TabsContent value="worlds" className="space-y-4 mt-4">
+          <TabsContent value="worlds" className="space-y-4">
             <Card className="glass cosmic-glow border-glass-border/40">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
@@ -383,7 +385,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
             </Card>
           </TabsContent>
           
-          <TabsContent value="data" className="space-y-4 mt-4">
+          <TabsContent value="data" className="space-y-4">
             <Card className="glass cosmic-glow border-glass-border/40">
               <CardHeader>
                 <CardTitle className="text-lg">Data Statistics</CardTitle>
@@ -451,7 +453,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
             </Card>
           </TabsContent>
           
-          <TabsContent value="about" className="space-y-4 mt-4">
+          <TabsContent value="about" className="space-y-4">
             <Card className="glass cosmic-glow border-glass-border/40">
               <CardHeader>
                 <CardTitle className="text-lg">About KANVAS</CardTitle>
@@ -493,7 +495,9 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
               </CardContent>
             </Card>
           </TabsContent>
-        </Tabs>
+            </div>
+          </Tabs>
+        </div>
       </DialogContent>
     </Dialog>
   );
