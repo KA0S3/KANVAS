@@ -95,7 +95,7 @@ const BookShelf: React.FC<BookShelfProps> = ({
     <div 
       className={`relative h-full ${className}`}
       style={{
-        backgroundImage: 'url(/src/assets/pedestal-dark.png)',
+        backgroundImage: 'url(/pedestal-dark.png)',
         backgroundSize: '150%',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'

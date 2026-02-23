@@ -41,6 +41,7 @@ const IntroVideo = () => {
   video.addEventListener('ended', handleEnded);
 
   // Auto-play video with sound
+  video.volume = 0.3; // Set volume to 30%
   video.play().catch(error => {
     console.error('Video autoplay failed:', error);
   });
@@ -56,6 +57,7 @@ useEffect(() => {
   const video = videoRef.current;
   if (video) {
     video.muted = !videoSoundsEnabled;
+    video.volume = 0.3; // Ensure volume stays at 30%
   }
 }, [videoSoundsEnabled]);
 
