@@ -188,6 +188,37 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
     }
   }, [setActiveAsset, setCurrentViewportId]);
 
+  // Listen for navigation events from sidebar
+  useEffect(() => {
+    const handleNavigateToAsset = (event: CustomEvent) => {
+      const { assetId } = event.detail;
+      const asset = assets[assetId];
+      
+      if (asset) {
+        // Navigate to parent viewport without moving the viewport
+        if (asset.parentId) {
+          // Exit current asset and go to parent
+          setEnteredAssetId(asset.parentId);
+          setCurrentViewportId(asset.parentId);
+          setActiveAsset(asset.parentId);
+        } else {
+          // Asset is at root level, exit to root
+          setEnteredAssetId(null);
+          setCurrentViewportId(null);
+          setActiveAsset(null);
+        }
+        
+        // Set the target asset as active for highlighting
+        setActiveAsset(assetId);
+      }
+    };
+
+    window.addEventListener('navigateToAsset', handleNavigateToAsset as EventListener);
+    return () => {
+      window.removeEventListener('navigateToAsset', handleNavigateToAsset as EventListener);
+    };
+  }, [assets, setActiveAsset]);
+
   const handleExitAsset = useCallback(() => {
     setEnteredAssetId(null);
     setActiveAsset(null);

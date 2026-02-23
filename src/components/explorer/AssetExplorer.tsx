@@ -55,11 +55,14 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
   };
 
   const handleSelectAndFocus = (asset: Asset) => {
-    // Navigate to the asset's viewport (same as double-click)
-    // We need to implement viewport navigation in the sidebar context
-    // For now, just set the asset as active
+    // Set the asset as active
     const { setActiveAsset } = useAssetStore.getState();
     setActiveAsset(asset.id);
+    
+    // Dispatch event to trigger viewport navigation
+    window.dispatchEvent(new CustomEvent('navigateToAsset', {
+      detail: { assetId: asset.id }
+    }));
   };
   
   // Get breadcrumb path to active asset

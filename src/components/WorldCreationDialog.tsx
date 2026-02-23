@@ -38,11 +38,16 @@ const WorldCreationDialog = ({ children, onWorldCreated }: WorldCreationDialogPr
 
     const defaultLeatherColor = leatherPresets[0];
     const leatherColorToUse = selectedLeatherColor || defaultLeatherColor;
+    
+    // Find the gradient for the selected color
+    const colorOption = colorOptions.find(option => option.value === selectedColor);
+    const gradient = colorOption ? colorOption.gradient : undefined;
 
     const newBookId = createBook({
       title: title.trim(),
       description: description.trim() || 'A new world',
       color: selectedColor,
+      gradient: gradient,
       isLeatherMode: isLeatherMode,
       leatherColor: isLeatherMode ? leatherColorToUse.color : undefined,
       coverImage: customCoverImage || undefined,

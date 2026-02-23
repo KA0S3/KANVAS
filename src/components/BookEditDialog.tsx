@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChevronDown, ChevronUp, Type, Palette } from "lucide-react";
 import { useBookStore } from "@/stores/bookStoreSimple";
 import LeatherColorPicker from "./books/LeatherColorPicker";
@@ -28,6 +29,7 @@ const BookEditDialog = ({ book, open, onOpenChange, onBookUpdated }: BookEditDia
   const [isLeatherMode, setIsLeatherMode] = useState(true);
   const [selectedLeatherColor, setSelectedLeatherColor] = useState<LeatherColorPreset | null>(null);
   const [customCoverImage, setCustomCoverImage] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('cover');
   
   // Typography settings for title
   const [titleTextSettingsOpen, setTitleTextSettingsOpen] = useState(false);
@@ -127,12 +129,17 @@ const BookEditDialog = ({ book, open, onOpenChange, onBookUpdated }: BookEditDia
     if (!book || !title.trim()) return;
 
     const leatherColorToUse = selectedLeatherColor || (isLeatherMode ? leatherPresets[0] : null);
+    
+    // Find the gradient for the selected color
+    const colorOption = colorOptions.find(option => option.value === selectedColor);
+    const gradient = colorOption ? colorOption.gradient : undefined;
 
     const updatedBook: Book = {
       ...book,
       title: title.trim(),
       description: description.trim() || 'A new world',
       color: selectedColor,
+      gradient: gradient,
       isLeatherMode: isLeatherMode,
       leatherColor: isLeatherMode ? leatherColorToUse?.color : undefined,
       coverImage: customCoverImage || undefined,
@@ -202,496 +209,514 @@ const BookEditDialog = ({ book, open, onOpenChange, onBookUpdated }: BookEditDia
           </div>
         ) : (
           <div className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="title" className="text-sm font-medium text-gray-200">
-                World Title *
-              </Label>
-              <Input
-                id="title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Enter world title..."
-                className="bg-gray-800 border-gray-600 text-white placeholder-gray-400"
-                maxLength={50}
-              />
-              
-              {/* Title Text Settings */}
-              <Collapsible open={titleTextSettingsOpen} onOpenChange={setTitleTextSettingsOpen}>
-                <CollapsibleTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full justify-between bg-gray-800/50 hover:bg-gray-800/70 border border-gray-600/50 text-gray-300 mt-2"
-                  >
-                    <span className="flex items-center gap-2">
-                      <Type className="w-4 h-4" />
-                      Text Settings
-                    </span>
-                    {titleTextSettingsOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-3 mt-2 p-3 bg-gray-800/30 border border-gray-600/30 rounded-md">
-                  <div>
-                    <Label className="text-xs text-gray-400">Font Family</Label>
-                    <Select value={titleFontFamily} onValueChange={setTitleFontFamily}>
-                      <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="serif">Serif</SelectItem>
-                        <SelectItem value="sans-serif">Sans-serif</SelectItem>
-                        <SelectItem value="monospace">Monospace</SelectItem>
-                        <SelectItem value="cursive">Cursive</SelectItem>
-                        <SelectItem value="fantasy">Fantasy</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-xs text-gray-400">Font Size: {titleFontSize[0]}px</Label>
-                    <Slider
-                      value={titleFontSize}
-                      onValueChange={setTitleFontSize}
-                      max={48}
-                      min={12}
-                      step={1}
-                      className="mt-2"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-gray-400">Text Color</Label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <input
-                        type="color"
-                        value={titleTextColor}
-                        onChange={(e) => setTitleTextColor(e.target.value)}
-                        className="w-8 h-8 rounded border border-gray-600 bg-gray-700 cursor-pointer"
-                      />
-                      <input
-                        type="text"
-                        value={titleTextColor}
-                        onChange={(e) => setTitleTextColor(e.target.value)}
-                        className="flex-1 bg-gray-700 border border-gray-600 text-white text-xs px-2 py-1 rounded"
-                        placeholder="#ffffff"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-xs text-gray-400">Outline Color</Label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <input
-                        type="color"
-                        value={titleOutlineColor}
-                        onChange={(e) => setTitleOutlineColor(e.target.value)}
-                        className="w-8 h-8 rounded border border-gray-600 bg-gray-700 cursor-pointer"
-                      />
-                      <input
-                        type="text"
-                        value={titleOutlineColor}
-                        onChange={(e) => setTitleOutlineColor(e.target.value)}
-                        className="flex-1 bg-gray-700 border border-gray-600 text-white text-xs px-2 py-1 rounded"
-                        placeholder="#000000"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-xs text-gray-400">Outline Thickness: {titleOutlineThickness[0]}px</Label>
-                    <Slider
-                      value={titleOutlineThickness}
-                      onValueChange={setTitleOutlineThickness}
-                      max={10}
-                      min={0}
-                      step={0.5}
-                      className="mt-2"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-gray-400">Text Shadow</Label>
-                    <div className="mt-1">
-                      <button
-                        type="button"
-                        onClick={() => setTitleShadowEnabled(!titleShadowEnabled)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          titleShadowEnabled ? 'bg-blue-600' : 'bg-gray-600'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            titleShadowEnabled ? 'translate-x-6' : 'translate-x-1'
-                          }`}
-                        />
-                      </button>
-                    </div>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            </div>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-2 bg-gray-800 border border-gray-700">
+                <TabsTrigger value="cover" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white flex items-center gap-2">
+                  <Palette className="w-4 h-4" />
+                  Cover Settings
+                </TabsTrigger>
+                <TabsTrigger value="text" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white flex items-center gap-2">
+                  <Type className="w-4 h-4" />
+                  Text Settings
+                </TabsTrigger>
+              </TabsList>
 
-            <div className="space-y-2">
-              <Label htmlFor="subheading" className="text-sm font-medium text-gray-200">
-                Subheading
-              </Label>
-              <Input
-                id="subheading"
-                value={subheading}
-                onChange={(e) => setSubheading(e.target.value)}
-                placeholder="Enter subheading..."
-                className="bg-gray-800 border-gray-600 text-white placeholder-gray-400"
-                maxLength={100}
-              />
-              
-              {/* Subheading Text Settings */}
-              <Collapsible open={subheadingTextSettingsOpen} onOpenChange={setSubheadingTextSettingsOpen}>
-                <CollapsibleTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full justify-between bg-gray-800/50 hover:bg-gray-800/70 border border-gray-600/50 text-gray-300 mt-2"
-                  >
-                    <span className="flex items-center gap-2">
-                      <Type className="w-4 h-4" />
-                      Text Settings
-                    </span>
-                    {subheadingTextSettingsOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-3 mt-2 p-3 bg-gray-800/30 border border-gray-600/30 rounded-md">
-                  <div>
-                    <Label className="text-xs text-gray-400">Font Family</Label>
-                    <Select value={subheadingFontFamily} onValueChange={setSubheadingFontFamily}>
-                      <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="serif">Serif</SelectItem>
-                        <SelectItem value="sans-serif">Sans-serif</SelectItem>
-                        <SelectItem value="monospace">Monospace</SelectItem>
-                        <SelectItem value="cursive">Cursive</SelectItem>
-                        <SelectItem value="fantasy">Fantasy</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-xs text-gray-400">Font Size: {subheadingFontSize[0]}px</Label>
-                    <Slider
-                      value={subheadingFontSize}
-                      onValueChange={setSubheadingFontSize}
-                      max={36}
-                      min={10}
-                      step={1}
-                      className="mt-2"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-gray-400">Text Color</Label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <input
-                        type="color"
-                        value={subheadingTextColor}
-                        onChange={(e) => setSubheadingTextColor(e.target.value)}
-                        className="w-8 h-8 rounded border border-gray-600 bg-gray-700 cursor-pointer"
-                      />
-                      <input
-                        type="text"
-                        value={subheadingTextColor}
-                        onChange={(e) => setSubheadingTextColor(e.target.value)}
-                        className="flex-1 bg-gray-700 border border-gray-600 text-white text-xs px-2 py-1 rounded"
-                        placeholder="#ffffff"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-xs text-gray-400">Outline Color</Label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <input
-                        type="color"
-                        value={subheadingOutlineColor}
-                        onChange={(e) => setSubheadingOutlineColor(e.target.value)}
-                        className="w-8 h-8 rounded border border-gray-600 bg-gray-700 cursor-pointer"
-                      />
-                      <input
-                        type="text"
-                        value={subheadingOutlineColor}
-                        onChange={(e) => setSubheadingOutlineColor(e.target.value)}
-                        className="flex-1 bg-gray-700 border border-gray-600 text-white text-xs px-2 py-1 rounded"
-                        placeholder="#000000"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-xs text-gray-400">Outline Thickness: {subheadingOutlineThickness[0]}px</Label>
-                    <Slider
-                      value={subheadingOutlineThickness}
-                      onValueChange={setSubheadingOutlineThickness}
-                      max={10}
-                      min={0}
-                      step={0.5}
-                      className="mt-2"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-gray-400">Text Shadow</Label>
-                    <div className="mt-1">
-                      <button
-                        type="button"
-                        onClick={() => setSubheadingShadowEnabled(!subheadingShadowEnabled)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          subheadingShadowEnabled ? 'bg-blue-600' : 'bg-gray-600'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            subheadingShadowEnabled ? 'translate-x-6' : 'translate-x-1'
-                          }`}
-                        />
-                      </button>
-                    </div>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            </div>
-
-            {/* Position Viewports */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium text-gray-200">
-                Text Position Viewports
-              </Label>
-              <div className="grid grid-cols-2 gap-4">
-                {/* Name Position Viewport */}
+              {/* COVER SETTINGS TAB */}
+              <TabsContent value="cover" className="space-y-4 mt-6">
                 <div className="space-y-2">
-                  <Label className="text-xs text-gray-400">Name Position</Label>
-                  <div className="relative w-full" style={{ aspectRatio: '2/3' }}>
-                    <div className="absolute inset-0 p-4 bg-gray-700/50 border border-gray-600 rounded-lg">
-                      <div
-                        className="absolute cursor-move select-none"
-                        style={{
-                          left: `${titlePosition.x}%`,
-                          top: `${titlePosition.y}%`,
-                          transform: 'translate(-50%, -50%)',
-                          fontSize: `${Math.min(titleFontSize[0] / 2, 16)}px`,
-                          color: titleTextColor,
-                          fontFamily: titleFontFamily,
-                          WebkitTextStroke: titleOutlineThickness[0] > 0 ? `${titleOutlineThickness[0]}px ${titleOutlineColor}` : 'none',
-                          textShadow: titleShadowEnabled ? '2px 2px 4px rgba(0,0,0,0.8)' : 'none'
-                        }}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          const container = e.currentTarget.parentElement;
-                          if (!container) return;
-                          
-                          const rect = container.getBoundingClientRect();
-                          const startX = e.clientX;
-                          const startY = e.clientY;
-                          const startLeft = titlePosition.x;
-                          const startTop = titlePosition.y;
-                          
-                          const handleMouseMove = (moveEvent: MouseEvent) => {
-                            const deltaX = ((moveEvent.clientX - startX) / rect.width) * 100;
-                            const deltaY = ((moveEvent.clientY - startY) / rect.height) * 100;
-                            
-                            const newX = Math.max(0, Math.min(100, startLeft + deltaX));
-                            const newY = Math.max(0, Math.min(100, startTop + deltaY));
-                            
-                            setTitlePosition({ x: newX, y: newY });
-                          };
-                          
-                          const handleMouseUp = () => {
-                            document.removeEventListener('mousemove', handleMouseMove);
-                            document.removeEventListener('mouseup', handleMouseUp);
-                          };
-                          
-                          document.addEventListener('mousemove', handleMouseMove);
-                          document.addEventListener('mouseup', handleMouseUp);
-                        }}
-                      >
-                        {title || 'Title'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Subheading Position Viewport */}
-                <div className="space-y-2">
-                  <Label className="text-xs text-gray-400">Subheading Position</Label>
-                  <div className="relative w-full" style={{ aspectRatio: '2/3' }}>
-                    <div className="absolute inset-0 p-4 bg-gray-700/50 border border-gray-600 rounded-lg">
-                      <div
-                        className="absolute cursor-move select-none"
-                        style={{
-                          left: `${subheadingPosition.x}%`,
-                          top: `${subheadingPosition.y}%`,
-                          transform: 'translate(-50%, -50%)',
-                          fontSize: `${Math.min(subheadingFontSize[0] / 2, 14)}px`,
-                          color: subheadingTextColor,
-                          fontFamily: subheadingFontFamily,
-                          WebkitTextStroke: subheadingOutlineThickness[0] > 0 ? `${subheadingOutlineThickness[0]}px ${subheadingOutlineColor}` : 'none',
-                          textShadow: subheadingShadowEnabled ? '2px 2px 4px rgba(0,0,0,0.8)' : 'none'
-                        }}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          const container = e.currentTarget.parentElement;
-                          if (!container) return;
-                          
-                          const rect = container.getBoundingClientRect();
-                          const startX = e.clientX;
-                          const startY = e.clientY;
-                          const startLeft = subheadingPosition.x;
-                          const startTop = subheadingPosition.y;
-                          
-                          const handleMouseMove = (moveEvent: MouseEvent) => {
-                            const deltaX = ((moveEvent.clientX - startX) / rect.width) * 100;
-                            const deltaY = ((moveEvent.clientY - startY) / rect.height) * 100;
-                            
-                            const newX = Math.max(0, Math.min(100, startLeft + deltaX));
-                            const newY = Math.max(0, Math.min(100, startTop + deltaY));
-                            
-                            setSubheadingPosition({ x: newX, y: newY });
-                          };
-                          
-                          const handleMouseUp = () => {
-                            document.removeEventListener('mousemove', handleMouseMove);
-                            document.removeEventListener('mouseup', handleMouseUp);
-                          };
-                          
-                          document.addEventListener('mousemove', handleMouseMove);
-                          document.addEventListener('mouseup', handleMouseUp);
-                        }}
-                      >
-                        {subheading || 'Subtitle'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="description" className="text-sm font-medium text-gray-200">
-                Description
-              </Label>
-              <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Describe your world..."
-                className="bg-gray-800 border-gray-600 text-white placeholder-gray-400 resize-none"
-                rows={3}
-                maxLength={200}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-sm font-medium text-gray-200">
-                Cover Style
-              </Label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => setIsLeatherMode(true)}
-                  className={`p-3 rounded-lg border-2 transition-all ${
-                    isLeatherMode
-                      ? 'border-blue-500 bg-blue-500/10'
-                      : 'border-gray-600 hover:border-gray-500'
-                  }`}
-                >
-                  <div className="text-sm font-medium text-white">Leather Bound</div>
-                  <div className="text-xs text-gray-400">Classic leather look</div>
-                </button>
-                <button
-                  onClick={() => setIsLeatherMode(false)}
-                  className={`p-3 rounded-lg border-2 transition-all ${
-                    !isLeatherMode
-                      ? 'border-blue-500 bg-blue-500/10'
-                      : 'border-gray-600 hover:border-gray-500'
-                  }`}
-                >
-                  <div className="text-sm font-medium text-white">Color Gradient</div>
-                  <div className="text-xs text-gray-400">Modern gradient style</div>
-                </button>
-              </div>
-            </div>
-
-            {isLeatherMode ? (
-              <div className="space-y-2">
-                <LeatherColorPicker
-                  selectedColor={selectedLeatherColor?.color}
-                  onColorSelect={setSelectedLeatherColor}
-                />
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <Label className="text-sm font-medium text-gray-200">
-                  World Color
-                </Label>
-                <div className="grid grid-cols-3 gap-2">
-                  {colorOptions.map((color) => (
+                  <Label className="text-sm font-medium text-gray-200">
+                    Cover Style
+                  </Label>
+                  <div className="grid grid-cols-2 gap-3">
                     <button
-                      key={color.value}
-                      onClick={() => setSelectedColor(color.value)}
+                      onClick={() => setIsLeatherMode(true)}
                       className={`p-3 rounded-lg border-2 transition-all ${
-                        selectedColor === color.value
-                          ? 'border-blue-500 scale-105'
+                        isLeatherMode
+                          ? 'border-blue-500 bg-blue-500/10'
                           : 'border-gray-600 hover:border-gray-500'
                       }`}
-                      style={{ background: color.gradient }}
-                      title={color.label}
                     >
-                      <div className="w-full h-8 rounded" style={{ background: color.gradient }} />
-                      <span className="text-xs text-white mt-1 block">{color.label}</span>
+                      <div className="text-sm font-medium text-white">Leather Bound</div>
+                      <div className="text-xs text-gray-400">Classic leather look</div>
                     </button>
-                  ))}
+                    <button
+                      onClick={() => setIsLeatherMode(false)}
+                      className={`p-3 rounded-lg border-2 transition-all ${
+                        !isLeatherMode
+                          ? 'border-blue-500 bg-blue-500/10'
+                          : 'border-gray-600 hover:border-gray-500'
+                      }`}
+                    >
+                      <div className="text-sm font-medium text-white">Color Gradient</div>
+                      <div className="text-xs text-gray-400">Modern gradient style</div>
+                    </button>
+                  </div>
+                </div>
+
+                {isLeatherMode ? (
+                  <div className="space-y-2">
+                    <LeatherColorPicker
+                      selectedColor={selectedLeatherColor?.color}
+                      onColorSelect={setSelectedLeatherColor}
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-gray-200">
+                      World Color
+                    </Label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {colorOptions.map((color) => (
+                        <button
+                          key={color.value}
+                          onClick={() => setSelectedColor(color.value)}
+                          className={`p-3 rounded-lg border-2 transition-all ${
+                            selectedColor === color.value
+                              ? 'border-blue-500 scale-105'
+                              : 'border-gray-600 hover:border-gray-500'
+                          }`}
+                          style={{ background: color.gradient }}
+                          title={color.label}
+                        >
+                          <div className="w-full h-8 rounded" style={{ background: color.gradient }} />
+                          <span className="text-xs text-white mt-1 block">{color.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-200">
+                    Custom Cover Image
+                  </Label>
+                  {customCoverImage ? (
+                    <div className="space-y-2">
+                      <div className="relative rounded-lg overflow-hidden border-2 border-gray-600">
+                        <img 
+                          src={customCoverImage} 
+                          alt="Cover preview" 
+                          className="w-full h-32 object-cover"
+                        />
+                        <button
+                          onClick={handleRemoveImage}
+                          className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 text-xs"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <p className="text-xs text-green-400">✓ Custom image will override leather/gradient</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="border-2 border-dashed border-gray-600 rounded-lg p-4 text-center">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          className="hidden"
+                          id="edit-cover-image-upload"
+                        />
+                        <label 
+                          htmlFor="edit-cover-image-upload"
+                          className="cursor-pointer text-gray-400 hover:text-white transition-colors"
+                        >
+                          <div className="text-2xl mb-1">📷</div>
+                          <div className="text-sm">Click to upload image</div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            Recommended size: 192x288px (2:3 ratio)
+                          </div>
+                        </label>
+                      </div>
+                      <p className="text-xs text-gray-400">
+                        If no image is uploaded, leather/gradient will be used
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
+              {/* TEXT SETTINGS TAB */}
+              <TabsContent value="text" className="space-y-4 mt-6">
+            <div className="space-y-2">
+                <Label htmlFor="title" className="text-sm font-medium text-gray-200">
+                  World Title *
+                </Label>
+                <Input
+                  id="title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Enter world title..."
+                  className="bg-gray-800 border-gray-600 text-white placeholder-gray-400"
+                  maxLength={50}
+                />
+                
+                {/* Title Text Settings */}
+                <Collapsible open={titleTextSettingsOpen} onOpenChange={setTitleTextSettingsOpen}>
+                  <CollapsibleTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-between bg-gray-800/50 hover:bg-gray-800/70 border border-gray-600/50 text-gray-300 mt-2"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Type className="w-4 h-4" />
+                        Text Settings
+                      </span>
+                      {titleTextSettingsOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-3 mt-2 p-3 bg-gray-800/30 border border-gray-600/30 rounded-md">
+                    <div>
+                      <Label className="text-xs text-gray-400">Font Family</Label>
+                      <Select value={titleFontFamily} onValueChange={setTitleFontFamily}>
+                        <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="serif">Serif</SelectItem>
+                          <SelectItem value="sans-serif">Sans-serif</SelectItem>
+                          <SelectItem value="monospace">Monospace</SelectItem>
+                          <SelectItem value="cursive">Cursive</SelectItem>
+                          <SelectItem value="fantasy">Fantasy</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-400">Font Size: {titleFontSize[0]}px</Label>
+                      <Slider
+                        value={titleFontSize}
+                        onValueChange={setTitleFontSize}
+                        max={48}
+                        min={12}
+                        step={1}
+                        className="mt-2"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-400">Text Color</Label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <input
+                          type="color"
+                          value={titleTextColor}
+                          onChange={(e) => setTitleTextColor(e.target.value)}
+                          className="w-8 h-8 rounded border border-gray-600 bg-gray-700 cursor-pointer"
+                        />
+                        <input
+                          type="text"
+                          value={titleTextColor}
+                          onChange={(e) => setTitleTextColor(e.target.value)}
+                          className="flex-1 bg-gray-700 border border-gray-600 text-white text-xs px-2 py-1 rounded"
+                          placeholder="#ffffff"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-400">Outline Color</Label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <input
+                          type="color"
+                          value={titleOutlineColor}
+                          onChange={(e) => setTitleOutlineColor(e.target.value)}
+                          className="w-8 h-8 rounded border border-gray-600 bg-gray-700 cursor-pointer"
+                        />
+                        <input
+                          type="text"
+                          value={titleOutlineColor}
+                          onChange={(e) => setTitleOutlineColor(e.target.value)}
+                          className="flex-1 bg-gray-700 border border-gray-600 text-white text-xs px-2 py-1 rounded"
+                          placeholder="#000000"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-400">Outline Thickness: {titleOutlineThickness[0]}px</Label>
+                      <Slider
+                        value={titleOutlineThickness}
+                        onValueChange={setTitleOutlineThickness}
+                        max={10}
+                        min={0}
+                        step={0.5}
+                        className="mt-2"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-400">Text Shadow</Label>
+                      <div className="mt-1">
+                        <button
+                          type="button"
+                          onClick={() => setTitleShadowEnabled(!titleShadowEnabled)}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                            titleShadowEnabled ? 'bg-blue-600' : 'bg-gray-600'
+                          }`}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              titleShadowEnabled ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="subheading" className="text-sm font-medium text-gray-200">
+                  Subheading
+                </Label>
+                <Input
+                  id="subheading"
+                  value={subheading}
+                  onChange={(e) => setSubheading(e.target.value)}
+                  placeholder="Enter subheading..."
+                  className="bg-gray-800 border-gray-600 text-white placeholder-gray-400"
+                  maxLength={100}
+                />
+                
+                {/* Subheading Text Settings */}
+                <Collapsible open={subheadingTextSettingsOpen} onOpenChange={setSubheadingTextSettingsOpen}>
+                  <CollapsibleTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-between bg-gray-800/50 hover:bg-gray-800/70 border border-gray-600/50 text-gray-300 mt-2"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Type className="w-4 h-4" />
+                        Text Settings
+                      </span>
+                      {subheadingTextSettingsOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-3 mt-2 p-3 bg-gray-800/30 border border-gray-600/30 rounded-md">
+                    <div>
+                      <Label className="text-xs text-gray-400">Font Family</Label>
+                      <Select value={subheadingFontFamily} onValueChange={setSubheadingFontFamily}>
+                        <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="serif">Serif</SelectItem>
+                          <SelectItem value="sans-serif">Sans-serif</SelectItem>
+                          <SelectItem value="monospace">Monospace</SelectItem>
+                          <SelectItem value="cursive">Cursive</SelectItem>
+                          <SelectItem value="fantasy">Fantasy</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-400">Font Size: {subheadingFontSize[0]}px</Label>
+                      <Slider
+                        value={subheadingFontSize}
+                        onValueChange={setSubheadingFontSize}
+                        max={36}
+                        min={10}
+                        step={1}
+                        className="mt-2"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-400">Text Color</Label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <input
+                          type="color"
+                          value={subheadingTextColor}
+                          onChange={(e) => setSubheadingTextColor(e.target.value)}
+                          className="w-8 h-8 rounded border border-gray-600 bg-gray-700 cursor-pointer"
+                        />
+                        <input
+                          type="text"
+                          value={subheadingTextColor}
+                          onChange={(e) => setSubheadingTextColor(e.target.value)}
+                          className="flex-1 bg-gray-700 border border-gray-600 text-white text-xs px-2 py-1 rounded"
+                          placeholder="#ffffff"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-400">Outline Color</Label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <input
+                          type="color"
+                          value={subheadingOutlineColor}
+                          onChange={(e) => setSubheadingOutlineColor(e.target.value)}
+                          className="w-8 h-8 rounded border border-gray-600 bg-gray-700 cursor-pointer"
+                        />
+                        <input
+                          type="text"
+                          value={subheadingOutlineColor}
+                          onChange={(e) => setSubheadingOutlineColor(e.target.value)}
+                          className="flex-1 bg-gray-700 border border-gray-600 text-white text-xs px-2 py-1 rounded"
+                          placeholder="#000000"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-400">Outline Thickness: {subheadingOutlineThickness[0]}px</Label>
+                      <Slider
+                        value={subheadingOutlineThickness}
+                        onValueChange={setSubheadingOutlineThickness}
+                        max={10}
+                        min={0}
+                        step={0.5}
+                        className="mt-2"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-400">Text Shadow</Label>
+                      <div className="mt-1">
+                        <button
+                          type="button"
+                          onClick={() => setSubheadingShadowEnabled(!subheadingShadowEnabled)}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                            subheadingShadowEnabled ? 'bg-blue-600' : 'bg-gray-600'
+                          }`}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              subheadingShadowEnabled ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              </div>
+
+              {/* Position Viewports */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-200">
+                  Text Position Viewports
+                </Label>
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Name Position Viewport */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-gray-400">Name Position</Label>
+                    <div className="relative w-full" style={{ aspectRatio: '2/3' }}>
+                      <div className="absolute inset-0 p-4 bg-gray-700/50 border border-gray-600 rounded-lg">
+                        <div
+                          className="absolute cursor-move select-none"
+                          style={{
+                            left: `${titlePosition.x}%`,
+                            top: `${titlePosition.y}%`,
+                            transform: 'translate(-50%, -50%)',
+                            fontSize: `${Math.min(titleFontSize[0] / 2, 16)}px`,
+                            color: titleTextColor,
+                            fontFamily: titleFontFamily,
+                            WebkitTextStroke: titleOutlineThickness[0] > 0 ? `${titleOutlineThickness[0]}px ${titleOutlineColor}` : 'none',
+                            textShadow: titleShadowEnabled ? '2px 2px 4px rgba(0,0,0,0.8)' : 'none'
+                          }}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            const container = e.currentTarget.parentElement;
+                            if (!container) return;
+                            
+                            const rect = container.getBoundingClientRect();
+                            const startX = e.clientX;
+                            const startY = e.clientY;
+                            const startLeft = titlePosition.x;
+                            const startTop = titlePosition.y;
+                            
+                            const handleMouseMove = (moveEvent: MouseEvent) => {
+                              const deltaX = ((moveEvent.clientX - startX) / rect.width) * 100;
+                              const deltaY = ((moveEvent.clientY - startY) / rect.height) * 100;
+                              
+                              const newX = Math.max(0, Math.min(100, startLeft + deltaX));
+                              const newY = Math.max(0, Math.min(100, startTop + deltaY));
+                              
+                              setTitlePosition({ x: newX, y: newY });
+                            };
+                            
+                            const handleMouseUp = () => {
+                              document.removeEventListener('mousemove', handleMouseMove);
+                              document.removeEventListener('mouseup', handleMouseUp);
+                            };
+                            
+                            document.addEventListener('mousemove', handleMouseMove);
+                            document.addEventListener('mouseup', handleMouseUp);
+                          }}
+                        >
+                          {title || 'Title'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Subheading Position Viewport */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-gray-400">Subheading Position</Label>
+                    <div className="relative w-full" style={{ aspectRatio: '2/3' }}>
+                      <div className="absolute inset-0 p-4 bg-gray-700/50 border border-gray-600 rounded-lg">
+                        <div
+                          className="absolute cursor-move select-none"
+                          style={{
+                            left: `${subheadingPosition.x}%`,
+                            top: `${subheadingPosition.y}%`,
+                            transform: 'translate(-50%, -50%)',
+                            fontSize: `${Math.min(subheadingFontSize[0] / 2, 14)}px`,
+                            color: subheadingTextColor,
+                            fontFamily: subheadingFontFamily,
+                            WebkitTextStroke: subheadingOutlineThickness[0] > 0 ? `${subheadingOutlineThickness[0]}px ${subheadingOutlineColor}` : 'none',
+                            textShadow: subheadingShadowEnabled ? '2px 2px 4px rgba(0,0,0,0.8)' : 'none'
+                          }}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            const container = e.currentTarget.parentElement;
+                            if (!container) return;
+                            
+                            const rect = container.getBoundingClientRect();
+                            const startX = e.clientX;
+                            const startY = e.clientY;
+                            const startLeft = subheadingPosition.x;
+                            const startTop = subheadingPosition.y;
+                            
+                            const handleMouseMove = (moveEvent: MouseEvent) => {
+                              const deltaX = ((moveEvent.clientX - startX) / rect.width) * 100;
+                              const deltaY = ((moveEvent.clientY - startY) / rect.height) * 100;
+                              
+                              const newX = Math.max(0, Math.min(100, startLeft + deltaX));
+                              const newY = Math.max(0, Math.min(100, startTop + deltaY));
+                              
+                              setSubheadingPosition({ x: newX, y: newY });
+                            };
+                            
+                            const handleMouseUp = () => {
+                              document.removeEventListener('mousemove', handleMouseMove);
+                              document.removeEventListener('mouseup', handleMouseUp);
+                            };
+                            
+                            document.addEventListener('mousemove', handleMouseMove);
+                            document.addEventListener('mouseup', handleMouseUp);
+                          }}
+                        >
+                          {subheading || 'Subtitle'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-            )}
 
-            <div className="space-y-2">
-              <Label className="text-sm font-medium text-gray-200">
-                Custom Cover Image
-              </Label>
-              {customCoverImage ? (
-                <div className="space-y-2">
-                  <div className="relative rounded-lg overflow-hidden border-2 border-gray-600">
-                    <img 
-                      src={customCoverImage} 
-                      alt="Cover preview" 
-                      className="w-full h-32 object-cover"
-                    />
-                    <button
-                      onClick={handleRemoveImage}
-                      className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 text-xs"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <p className="text-xs text-green-400">✓ Custom image will override leather/gradient</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <div className="border-2 border-dashed border-gray-600 rounded-lg p-4 text-center">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="hidden"
-                      id="edit-cover-image-upload"
-                    />
-                    <label 
-                      htmlFor="edit-cover-image-upload"
-                      className="cursor-pointer text-gray-400 hover:text-white transition-colors"
-                    >
-                      <div className="text-2xl mb-1">📷</div>
-                      <div className="text-sm">Click to upload image</div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        Recommended size: 192x288px (2:3 ratio)
-                      </div>
-                    </label>
-                  </div>
-                  <p className="text-xs text-gray-400">
-                    If no image is uploaded, leather/gradient will be used
-                  </p>
-                </div>
-              )}
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="description" className="text-sm font-medium text-gray-200">
+                  Description
+                </Label>
+                <Textarea
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Describe your world..."
+                  className="bg-gray-800 border-gray-600 text-white placeholder-gray-400 resize-none"
+                  rows={3}
+                  maxLength={200}
+                />
+              </div>
+            </TabsContent>
+            </Tabs>
 
-            
             <div className="flex gap-3 pt-4">
               <Button
                 variant="outline"

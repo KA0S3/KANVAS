@@ -179,6 +179,25 @@
       0 0 30px hsl(var(--glow-secondary) / 0.1);
   }
 
+  .tag-glow {
+    position: relative;
+  }
+
+  .tag-glow::before {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: inherit;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  .tag-glow.has-glow::before {
+    opacity: 1;
+  }
+
   .asset-item {
     @apply glass rounded-lg p-3 cursor-grab active:cursor-grabbing transition-all duration-200;
   }

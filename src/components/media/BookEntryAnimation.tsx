@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import entryVideo from '@/assets/book-trans-sound.mp4';
 import { useMediaStore } from '@/stores/mediaStore';
 
@@ -9,6 +9,7 @@ interface BookEntryAnimationProps {
 const BookEntryAnimation = ({ onEntryComplete }: BookEntryAnimationProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const { enterBookView, videosEnabled, videoSoundsEnabled } = useMediaStore();
+  const [clickCount, setClickCount] = useState(0);
 
   useEffect(() => {
   // If videos are disabled, just fade to black and complete immediately
@@ -48,6 +49,14 @@ useEffect(() => {
   }
 }, [videoSoundsEnabled]);
 
+  const handleVideoClick = () => {
+    setClickCount(prev => prev + 1);
+    if (clickCount >= 1) { // Skip on second click
+      enterBookView();
+      onEntryComplete();
+    }
+  };
+
   return (
     <div 
       className="fixed inset-0 w-full h-screen bg-black"
@@ -56,10 +65,11 @@ useEffect(() => {
       {videosEnabled ? (
         <video
           ref={videoRef}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover cursor-pointer"
           playsInline
           muted={!videoSoundsEnabled}
           autoPlay
+          onClick={handleVideoClick}
         >
           <source src={entryVideo} type="video/mp4" />
           Your browser does not support the video tag.

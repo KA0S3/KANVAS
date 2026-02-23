@@ -181,31 +181,19 @@ export function AssetEditModal({ isOpen, onClose, assetId, isNewAsset = false, v
           height: 150,
         });
         
-        // Add tag associations for new asset
-        formData.tags.forEach(tagId => {
-          addTagToAsset(newAssetId, tagId);
-        });
+        // Add tag associations for new asset only
+        // (Existing assets are already updated in real-time via handleTagToggle)
+        if (isNewAsset) {
+          formData.tags.forEach(tagId => {
+            addTagToAsset(newAssetId, tagId);
+          });
+        }
       } else {
         // Update existing asset
         updateAsset(asset.id, assetData);
         
-        // Update tag associations
-        const currentTags = asset.tags || [];
-        const newTags = formData.tags;
-        
-        // Remove tags that are no longer selected
-        currentTags.forEach(tagId => {
-          if (!newTags.includes(tagId)) {
-            removeTagFromAsset(asset.id, tagId);
-          }
-        });
-        
-        // Add new tags
-        newTags.forEach(tagId => {
-          if (!currentTags.includes(tagId)) {
-            addTagToAsset(asset.id, tagId);
-          }
-        });
+        // Tag associations are already handled in real-time via handleTagToggle
+        // No need to re-process them here to avoid duplicates
       }
       
       onClose();
@@ -227,12 +215,24 @@ export function AssetEditModal({ isOpen, onClose, assetId, isNewAsset = false, v
   };
 
   const handleTagToggle = (tagId: string) => {
+    const isCurrentlySelected = formData.tags.includes(tagId);
+    
+    // Update form state immediately
     setFormData(prev => ({
       ...prev,
-      tags: prev.tags.includes(tagId)
+      tags: isCurrentlySelected
         ? prev.tags.filter(id => id !== tagId)
         : [...prev.tags, tagId]
     }));
+    
+    // For existing assets, also update the tag store immediately for visual feedback
+    if (asset && !isNewAsset) {
+      if (isCurrentlySelected) {
+        removeTagFromAsset(asset.id, tagId);
+      } else {
+        addTagToAsset(asset.id, tagId);
+      }
+    }
   };
 
   const handleBackgroundSave = () => {
@@ -272,21 +272,27 @@ export function AssetEditModal({ isOpen, onClose, assetId, isNewAsset = false, v
               <div className="space-y-2">
                 <Label htmlFor="asset-tags">Tags</Label>
                 <div className="flex flex-wrap gap-2 p-2 border border-glass-border/40 rounded-md bg-glass/30 min-h-[40px]">
-                  {availableTags.map((tag) => (
-                    <Badge
-                      key={tag.id}
-                      variant={formData.tags.includes(tag.id) ? "default" : "outline"}
-                      className="cursor-pointer"
-                      style={{ 
-                        backgroundColor: formData.tags.includes(tag.id) ? tag.color : undefined,
-                        borderColor: tag.color,
-                        color: formData.tags.includes(tag.id) ? 'white' : tag.color
-                      }}
-                      onClick={() => handleTagToggle(tag.id)}
-                    >
-                      {tag.name}
-                    </Badge>
-                  ))}
+                  {availableTags.map((tag) => {
+                    // Ensure tag has a valid color, fallback to gray if not
+                    const tagColor = tag.color && tag.color.trim() !== '' ? tag.color : '#6b7280';
+                    
+                    return (
+                      <Badge
+                        key={tag.id}
+                        variant={formData.tags.includes(tag.id) ? "default" : "outline"}
+                        className="cursor-pointer"
+                        style={{ 
+                          backgroundColor: formData.tags.includes(tag.id) ? tagColor : 'transparent',
+                          borderColor: tagColor,
+                          color: formData.tags.includes(tag.id) ? 'white' : tagColor,
+                          borderWidth: '2px'
+                        }}
+                        onClick={() => handleTagToggle(tag.id)}
+                      >
+                        {tag.name}
+                      </Badge>
+                    );
+                  })}
                 </div>
               </div>
             </div>

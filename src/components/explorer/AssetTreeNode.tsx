@@ -46,6 +46,12 @@ export function AssetTreeNode({ asset, depth, searchQuery = '', level = 0, onEdi
     setActiveAsset(asset.id);
   };
 
+  const handleDoubleClick = () => {
+    if (onSelectAndFocus) {
+      onSelectAndFocus(asset);
+    }
+  };
+
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -90,6 +96,7 @@ export function AssetTreeNode({ asset, depth, searchQuery = '', level = 0, onEdi
           })
         }} 
         onClick={handleSelect}
+        onDoubleClick={handleDoubleClick}
         onContextMenu={handleContextMenu}
       >
         {hasChildren && (

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { X, Save, Upload, Maximize2 } from 'lucide-react';
 import { useAssetStore } from '@/stores/assetStore';
 import { useBookStore } from '@/stores/bookStoreSimple';
@@ -80,12 +80,15 @@ export function BackgroundMapEditor({ isOpen, onClose, assetId, viewportSize: _v
   
   const actualViewportSize = windowSize;
 
+  // Memoize background config to prevent infinite re-renders
+  const memoizedBackgroundConfig = useMemo(() => backgroundConfig, [backgroundConfig.mode, backgroundConfig.color, backgroundConfig.imageUrl, backgroundConfig.position?.x, backgroundConfig.position?.y, backgroundConfig.scale, backgroundConfig.gridSize, backgroundConfig.edgeOpacity, backgroundConfig.innerRadius, backgroundConfig.outerRadius, backgroundConfig.imageSize?.width, backgroundConfig.imageSize?.height]);
+  
   // Initialize local config when background config changes
   useEffect(() => {
-    setLocalConfig(backgroundConfig);
-    setImageOffset(backgroundConfig.position || { x: 0, y: 0 });
+    setLocalConfig(memoizedBackgroundConfig);
+    setImageOffset(memoizedBackgroundConfig.position || { x: 0, y: 0 });
     setHasUnsavedChanges(false);
-  }, [backgroundConfig]);
+  }, [memoizedBackgroundConfig]);
 
   // Handle image loading for natural size detection
   useEffect(() => {

@@ -78,10 +78,11 @@ const ViewModeSelector: React.FC<ViewModeSelectorProps> = ({
       {enableEditing && (
         <button
           onClick={onEditBook}
-          className="p-2 rounded-full bg-blue-600 hover:bg-blue-700 transition-colors"
+          className="flex items-center gap-2 px-3 py-2 rounded-full bg-blue-600 hover:bg-blue-700 transition-colors"
           title="Edit book"
         >
           <Edit className="w-4 h-4 text-white" />
+          <span className="text-white text-sm font-medium">Edit</span>
         </button>
       )}
     </div>

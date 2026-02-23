@@ -61,14 +61,47 @@ const BookCover: React.FC<BookCoverProps> = ({
     const leatherColor = book.leatherColor || '#8B4513';
     const isDark = theme === 'dark';
     
+    // Calculate appropriate darkening based on color
+    const getDarkeningAmount = (color: string) => {
+      const num = parseInt(color.replace('#', ''), 16);
+      const r = num >> 16;
+      const g = (num >> 8) & 0x00FF;
+      const b = num & 0x0000FF;
+      
+      // Brown colors - darken less to keep leather look
+      if (r > 100 && g > 50 && g < 150 && b < 100) return 50;
+      // Green colors - darken much less to maintain green visibility
+      if (g > r && g > b) return 20;
+      // Grey colors - darken less to maintain grey visibility
+      if (Math.abs(r - g) < 30 && Math.abs(g - b) < 30) return 30;
+      // Default for other colors
+      return 40;
+    };
+    
+    const darkeningAmount = getDarkeningAmount(leatherColor);
+    
+    const darkenColor = (color: string, amount: number) => {
+      const num = parseInt(color.replace('#', ''), 16);
+      const r = Math.max(0, (num >> 16) - amount);
+      const g = Math.max(0, ((num >> 8) & 0x00FF) - amount);
+      const b = Math.max(0, (num & 0x0000FF) - amount);
+      return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+    };
+    
+    const darkLeather = darkenColor(leatherColor, darkeningAmount);
+    
     return {
-      background: isDark 
-        ? `linear-gradient(135deg, ${leatherColor}dd, ${leatherColor}99)`
-        : `linear-gradient(135deg, ${leatherColor}, ${leatherColor}cc)`,
-      border: `1px solid ${isDark ? leatherColor : `${leatherColor}88`}`,
+      backgroundColor: darkLeather,
+      backgroundImage: `
+        repeating-linear-gradient(90deg, transparent, transparent 3px, rgba(0,0,0,0.04) 3px, rgba(0,0,0,0.04) 6px),
+        repeating-linear-gradient(0deg, transparent, transparent 4px, rgba(0,0,0,0.03) 4px, rgba(0,0,0,0.03) 8px)
+      `,
+      backgroundBlend: 'multiply' as const,
+      border: `2px solid ${darkenColor(leatherColor, darkeningAmount + 20)}`,
       boxShadow: isDark 
-        ? `inset 0 1px 0 ${leatherColor}44, 0 4px 8px rgba(0,0,0,0.3)`
-        : `inset 0 1px 0 ${leatherColor}66, 0 4px 8px rgba(0,0,0,0.1)`
+        ? `inset 0 2px 4px rgba(0,0,0,0.7), inset 0 -1px 2px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.5)`
+        : `inset 0 2px 4px rgba(0,0,0,0.5), inset 0 -1px 2px rgba(0,0,0,0.4), 0 4px 8px rgba(0,0,0,0.3)`,
+      position: 'relative' as const
     };
   };
 
@@ -98,7 +131,9 @@ const BookCover: React.FC<BookCoverProps> = ({
       
       if (baseStyle === 'gradient' && book.gradient && !showBack) {
         return {
-          background: book.gradient
+          background: book.gradient.replace(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/g, (match, r, g, b) => {
+            return `rgba(${r}, ${g}, ${b}, 0.95)`;
+          })
         };
       }
       
@@ -107,10 +142,34 @@ const BookCover: React.FC<BookCoverProps> = ({
       }
     }
     
-    // Fallback to original logic
+    // Fallback to original logic with gradient presets
     if (book.gradient && !showBack) {
       return {
-        background: book.gradient
+        background: book.gradient.replace(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/g, (match, r, g, b) => {
+          return `rgba(${r}, ${g}, ${b}, 0.95)`;
+        })
+      };
+    }
+    
+    // Use gradient presets based on book color
+    const colorOptions = [
+      { value: '#3b82f6', gradient: 'linear-gradient(135deg, #3b82f6, #8b5cf6)' },
+      { value: '#10b981', gradient: 'linear-gradient(135deg, #10b981, #06b6d4)' },
+      { value: '#8b5cf6', gradient: 'linear-gradient(135deg, #8b5cf6, #ec4899)' },
+      { value: '#f97316', gradient: 'linear-gradient(135deg, #f97316, #ef4444)' },
+      { value: '#1f2937', gradient: 'linear-gradient(135deg, #1f2937, #374151)' },
+      { value: '#f43f5e', gradient: 'linear-gradient(135deg, #f43f5e, #ec4899)' },
+    ];
+    
+    const colorOption = colorOptions.find(option => option.value === book.color);
+    if (colorOption && !showBack) {
+      return {
+        background: colorOption.gradient.replace(/#[0-9a-fA-F]{6}/g, (match) => {
+          const r = parseInt(match.substr(1, 2), 16);
+          const g = parseInt(match.substr(3, 2), 16);
+          const b = parseInt(match.substr(5, 2), 16);
+          return `rgba(${r}, ${g}, ${b}, 0.95)`;
+        })
       };
     }
     

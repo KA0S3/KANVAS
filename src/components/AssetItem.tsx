@@ -75,20 +75,17 @@ const colorMap = {
   other: "text-muted-foreground",
 };
 
- export function AssetItem({ asset, onDelete, onMouseDown, onDoubleClick, isSelected, onResize, onEdit, onSelectAndFocus, isEditingBackground = false }: AssetItemProps) {
+export function AssetItem({ asset, onDelete, onMouseDown, onDoubleClick, isSelected, onResize, onEdit, onSelectAndFocus, isEditingBackground = false }: AssetItemProps) {
   const Icon = iconMap[asset.type];
   const colorClass = colorMap[asset.type];
   const { getAssetTags } = useTagStore();
 
   // Get tags for this asset with their colors
-  const assetTags = React.useMemo(() => getAssetTags(asset.id), [asset.id, getAssetTags]);
+  const assetTags = getAssetTags(asset.id);
 
-  // Determine tag border color
-  const tagBorderColor = React.useMemo(() => {
-    if (!asset.showTagBorder || assetTags.length === 0) return null;
-    // Use the first tag's color for the border
-    return assetTags[0].color;
-  }, [asset.showTagBorder, assetTags]);
+  // Simple border logic - show if asset has tags
+  const hasTags = assetTags && assetTags.length > 0;
+  const firstTagColor = hasTags ? assetTags[0]?.color : null;
 
   const [contextMenu, setContextMenu] = React.useState<{
     visible: boolean;
@@ -194,10 +191,16 @@ const colorMap = {
         width: asset.width || 200,
         height: asset.height || 150,
         transform: isSelected ? "scale(1.05)" : "scale(1)",
-        borderColor: tagBorderColor || undefined,
-        borderWidth: tagBorderColor ? '3px' : undefined,
-        borderStyle: tagBorderColor ? 'solid' : undefined,
         overflow: 'visible',
+        ...(hasTags && firstTagColor && {
+          boxShadow: `
+            0 0 8px ${firstTagColor}40,
+            0 0 16px ${firstTagColor}30,
+            0 0 24px ${firstTagColor}20,
+            0 0 32px ${firstTagColor}10,
+            inset 0 1px 0 hsl(var(--glass-border) / 0.3)
+          `.trim()
+        })
       }}
       className={`asset-item group select-none transition-transform duration-100 relative ${
         isSelected ? "cosmic-glow z-20 border-primary/60" : "z-10"
