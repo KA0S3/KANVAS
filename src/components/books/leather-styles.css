@@ -1,0 +1,232 @@
+/* Leather Book Styles - Clean and Minimal */
+
+/* 3D Transform Utilities */
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+}
+
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+/* Leather Texture Effects - Minimal and Clean */
+.leather-texture {
+  position: relative;
+  overflow: hidden;
+}
+
+.leather-texture::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.02) 50%, transparent 70%),
+    linear-gradient(-45deg, transparent 30%, rgba(255,255,255,0.01) 50%, transparent 70%);
+  background-size: 4px 4px;
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.leather-spine {
+  position: relative;
+  overflow: hidden;
+}
+
+.leather-spine::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    rgba(255,255,255,0.03) 50%, 
+    transparent 100%);
+  background-size: 2px 100%;
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* Book Flip Animation - Smooth and Elegant */
+.book-flip-enter {
+  transform: rotateY(0deg);
+}
+
+.book-flip-enter-active {
+  transform: rotateY(180deg);
+  transition: transform 0.6s ease-in-out;
+}
+
+.book-flip-exit {
+  transform: rotateY(180deg);
+}
+
+.book-flip-exit-active {
+  transform: rotateY(0deg);
+  transition: transform 0.6s ease-in-out;
+}
+
+/* Hover Effects - Subtle and Clean */
+.book-card-hover {
+  transition: all 0.2s ease-in-out;
+}
+
+.book-card-hover:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.05);
+}
+
+/* Spine Hover Effects */
+.spine-hover {
+  transition: all 0.2s ease-in-out;
+}
+
+.spine-hover:hover {
+  transform: translateX(-2px) scale(1.02);
+  filter: brightness(1.1);
+}
+
+/* Grid Animations */
+.grid-item-enter {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+.grid-item-enter-active {
+  opacity: 1;
+  transform: scale(1);
+  transition: all 0.3s ease-out;
+}
+
+/* Focus Mode Animations */
+.focus-book-enter {
+  opacity: 0;
+  transform: scale(0.8) rotateY(-10deg);
+}
+
+.focus-book-enter-active {
+  opacity: 1;
+  transform: scale(1) rotateY(0deg);
+  transition: all 0.5s ease-out;
+}
+
+/* Navigation Dots */
+.nav-dot {
+  transition: all 0.2s ease-in-out;
+}
+
+.nav-dot:hover {
+  transform: scale(1.2);
+}
+
+.nav-dot.active {
+  animation: pulse-dot 2s infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.1);
+  }
+}
+
+/* Shelf Effects */
+.shelf-shadow {
+  box-shadow: 
+    0 4px 8px rgba(0,0,0,0.1),
+    0 2px 4px rgba(0,0,0,0.06);
+}
+
+.shelf-wood {
+  background: linear-gradient(180deg, #8B4513 0%, #654321 100%);
+  position: relative;
+}
+
+.shelf-wood::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent,
+    transparent 10px,
+    rgba(0,0,0,0.03) 10px,
+    rgba(0,0,0,0.03) 20px
+  );
+  pointer-events: none;
+}
+
+/* Dark Mode Adaptations */
+@media (prefers-color-scheme: dark) {
+  .leather-texture::before {
+    opacity: 0.2;
+  }
+  
+  .leather-spine::before {
+    opacity: 0.3;
+  }
+}
+
+/* Light Mode Adaptations */
+@media (prefers-color-scheme: light) {
+  .leather-texture::before {
+    opacity: 0.4;
+  }
+  
+  .leather-spine::before {
+    opacity: 0.5;
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .book-card-hover:hover {
+    transform: none;
+  }
+  
+  .spine-hover:hover {
+    transform: none;
+  }
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .book-flip-enter-active,
+  .book-flip-exit-active,
+  .book-card-hover,
+  .spine-hover,
+  .grid-item-enter-active,
+  .focus-book-enter-active,
+  .nav-dot {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  .leather-texture::before,
+  .leather-spine::before {
+    opacity: 0;
+  }
+  
+  .book-card-hover:hover,
+  .spine-hover:hover {
+    filter: contrast(1.2);
+  }
+}
