@@ -29,6 +29,7 @@ interface AssetContextMenuProps {
   onClose: () => void;
   onEdit?: (asset: Asset) => void;
   onSelectAndFocus?: (asset: Asset) => void;
+  isViewportAsset?: boolean;
 }
 
 export const AssetContextMenu: React.FC<AssetContextMenuProps> = ({
@@ -37,6 +38,7 @@ export const AssetContextMenu: React.FC<AssetContextMenuProps> = ({
   onClose,
   onEdit,
   onSelectAndFocus,
+  isViewportAsset = false,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -165,13 +167,13 @@ export const AssetContextMenu: React.FC<AssetContextMenuProps> = ({
   };
 
   const handleSelect = () => {
-    setActiveAsset(asset.id);
-    
-    // If this asset has children and we have the callback, trigger viewport navigation
-    if (getAssetChildren(asset.id).length > 0 && onSelectAndFocus) {
-      onSelectAndFocus(asset);
+    if (isViewportAsset) {
+      // For viewport assets, just select the asset
+      setActiveAsset(asset.id);
+    } else {
+      // For sidebar assets, do the same as double-clicking (open parent viewport)
+      onSelectAndFocus?.(asset);
     }
-    
     onClose();
   };
 
@@ -229,14 +231,16 @@ export const AssetContextMenu: React.FC<AssetContextMenuProps> = ({
               Edit Asset
             </button>
 
-            {/* Select */}
-            <button
-              onClick={handleSelect}
-              className="w-full px-3 py-2 flex items-center gap-2 text-sm text-foreground hover:bg-glass-border/20 transition-colors"
-            >
-              <Eye className="w-4 h-4" />
-              Select & Focus
-            </button>
+            {/* Select - Only show for sidebar assets */}
+            {!isViewportAsset && (
+              <button
+                onClick={handleSelect}
+                className="w-full px-3 py-2 flex items-center gap-2 text-sm text-foreground hover:bg-glass-border/20 transition-colors"
+              >
+                <Eye className="w-4 h-4" />
+                Select & Focus
+              </button>
+            )}
 
             {/* Duplicate */}
             <button

@@ -15,9 +15,9 @@ const defaultLeatherPresets: LeatherColorPreset[] = [
   { id: 'classic-brown', name: 'Classic Brown', color: '#8B4513', darkVariant: '#654321', lightVariant: '#A0522D' },
   { id: 'rich-black', name: 'Rich Black', color: '#1a1a1a', darkVariant: '#0d0d0d', lightVariant: '#2d2d2d' },
   { id: 'navy-blue', name: 'Navy Blue', color: '#1e3a8a', darkVariant: '#1e2f5a', lightVariant: '#2563eb' },
-  { id: 'burgundy', name: 'Burgundy', color: '#722f37', darkVariant: '#5a1f24', lightVariant: '#88333c' },
+  { id: 'royal-purple', name: 'Royal Purple', color: '#6b46c1', darkVariant: '#553c9a', lightVariant: '#8b5cf6' },
   { id: 'forest-green', name: 'Forest Green', color: '#2d5016', darkVariant: '#1f3a0f', lightVariant: '#3a6b1e' },
-  { id: 'charcoal-gray', name: 'Charcoal Gray', color: '#36454f', darkVariant: '#2c3a42', lightVariant: '#4a5568' },
+  { id: 'arctic-white', name: 'Arctic White', color: '#f5f5f0', darkVariant: '#e8e8e0', lightVariant: '#fafaf5' },
 ];
 
 interface BookStore {

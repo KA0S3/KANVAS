@@ -1,6 +1,16 @@
 import React, { useState, useMemo } from 'react';
+import { X, Calendar, Tag, Image } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import type { Book } from '@/types/book';
 import { useThemeStore } from '@/stores/themeStore';
+
+// Import book cover images
+import BlackBook from '@/assets/Book-Covers/Black_book.png';
+import BlueBook from '@/assets/Book-Covers/Blue_book.png';
+import BrownBook from '@/assets/Book-Covers/brown_book.png';
+import GreenBook from '@/assets/Book-Covers/Green_book.png';
+import PurpleBook from '@/assets/Book-Covers/purple_book.png';
+import WhiteBook from '@/assets/Book-Covers/White_book.png';
 
 interface BookCoverProps {
   book: Book;
@@ -17,6 +27,13 @@ const BookCover: React.FC<BookCoverProps> = ({
 }) => {
   const { theme } = useThemeStore();
   const [isHovered, setIsHovered] = useState(false);
+  const [isFlipped, setIsFlipped] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+
+  const handleBookClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsFlipped(!isFlipped);
+  };
   
   const sizeClasses = {
     small: 'w-16 h-24 text-xs',
@@ -58,49 +75,43 @@ const BookCover: React.FC<BookCoverProps> = ({
   const getLeatherStyle = () => {
     if (!book.isLeatherMode || book.coverImage) return null;
     
-    const leatherColor = book.leatherColor || '#8B4513';
-    const isDark = theme === 'dark';
-    
-    // Calculate appropriate darkening based on color
-    const getDarkeningAmount = (color: string) => {
-      const num = parseInt(color.replace('#', ''), 16);
-      const r = num >> 16;
-      const g = (num >> 8) & 0x00FF;
-      const b = num & 0x0000FF;
+    // Map leather colors to book cover images based on preset names
+    const getBookCoverImage = (leatherColor: string) => {
+      const colorLower = leatherColor.toLowerCase();
       
-      // Brown colors - darken less to keep leather look
-      if (r > 100 && g > 50 && g < 150 && b < 100) return 50;
-      // Green colors - darken much less to maintain green visibility
-      if (g > r && g > b) return 20;
-      // Grey colors - darken less to maintain grey visibility
-      if (Math.abs(r - g) < 30 && Math.abs(g - b) < 30) return 30;
-      // Default for other colors
-      return 40;
+      // Match based on leather preset names and hex values
+      if (colorLower.includes('rich black') || colorLower === '#1a1a1a' || colorLower === '#0d0d0d' || colorLower === '#2d2d2d') {
+        return BlackBook;
+      }
+      if (colorLower.includes('navy blue') || colorLower === '#1e3a8a' || colorLower === '#1e2f5a' || colorLower === '#2563eb') {
+        return BlueBook;
+      }
+      if (colorLower.includes('classic brown') || colorLower === '#8b4513' || colorLower === '#654321' || colorLower === '#a0522d') {
+        return BrownBook;
+      }
+      if (colorLower.includes('forest green') || colorLower === '#2d5016' || colorLower === '#1f3a0f' || colorLower === '#3a6b1e') {
+        return GreenBook;
+      }
+      if (colorLower.includes('royal purple') || colorLower === '#6b46c1' || colorLower === '#553c9a' || colorLower === '#8b5cf6') {
+        return PurpleBook;
+      }
+      if (colorLower.includes('arctic white') || colorLower === '#f5f5f0' || colorLower === '#e8e8e0' || colorLower === '#fafaf5') {
+        return WhiteBook;
+      }
+      
+      // Default fallback
+      return BrownBook;
     };
     
-    const darkeningAmount = getDarkeningAmount(leatherColor);
-    
-    const darkenColor = (color: string, amount: number) => {
-      const num = parseInt(color.replace('#', ''), 16);
-      const r = Math.max(0, (num >> 16) - amount);
-      const g = Math.max(0, ((num >> 8) & 0x00FF) - amount);
-      const b = Math.max(0, (num & 0x0000FF) - amount);
-      return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
-    };
-    
-    const darkLeather = darkenColor(leatherColor, darkeningAmount);
+    const coverImage = getBookCoverImage(book.leatherColor || '#8B4513');
     
     return {
-      backgroundColor: darkLeather,
-      backgroundImage: `
-        repeating-linear-gradient(90deg, transparent, transparent 3px, rgba(0,0,0,0.04) 3px, rgba(0,0,0,0.04) 6px),
-        repeating-linear-gradient(0deg, transparent, transparent 4px, rgba(0,0,0,0.03) 4px, rgba(0,0,0,0.03) 8px)
-      `,
-      backgroundBlend: 'multiply' as const,
-      border: `2px solid ${darkenColor(leatherColor, darkeningAmount + 20)}`,
-      boxShadow: isDark 
-        ? `inset 0 2px 4px rgba(0,0,0,0.7), inset 0 -1px 2px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.5)`
-        : `inset 0 2px 4px rgba(0,0,0,0.5), inset 0 -1px 2px rgba(0,0,0,0.4), 0 4px 8px rgba(0,0,0,0.3)`,
+      backgroundImage: `url(${coverImage})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
+      border: '2px solid rgba(0,0,0,0.2)',
+      boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
       position: 'relative' as const
     };
   };
@@ -245,16 +256,13 @@ const BookCover: React.FC<BookCoverProps> = ({
       const { title, description } = book.coverPageSettings;
       
       if (isHovered) {
-        // Show stats overlay on hover
+        // Show description overlay on hover instead of stats
         return (
-          <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center p-2 text-center">
-            <div className="font-bold text-white mb-1 text-xs">{book.title}</div>
-            <div className="text-white text-xs space-y-1">
-              <div>📦 {worldStats.assetCount} assets</div>
-              <div>🏷️ {worldStats.tagCount} tags</div>
-              <div>💾 {worldStats.estimatedSize}</div>
-              <div>📁 {worldStats.storageLocation}</div>
-              <div>📅 {worldStats.lastModified}</div>
+          <div className="absolute inset-0 bg-amber-100/80 flex items-center justify-center p-3 transition-opacity duration-200 ease-in-out">
+            <div className="text-amber-900 text-center">
+              <p className="text-xs leading-relaxed">
+                {book.description || 'No description available'}
+              </p>
             </div>
           </div>
         );
@@ -303,34 +311,28 @@ const BookCover: React.FC<BookCoverProps> = ({
 
     if (book.coverImage) {
       if (isHovered) {
-        // Show stats overlay on hover for image covers
+        // Show description overlay on hover for image covers
         return (
-          <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center p-2 text-center">
-            <div className="font-bold text-white mb-1 text-xs">{book.title}</div>
-            <div className="text-white text-xs space-y-1">
-              <div>📦 {worldStats.assetCount} assets</div>
-              <div>🏷️ {worldStats.tagCount} tags</div>
-              <div>💾 {worldStats.estimatedSize}</div>
-              <div>📁 {worldStats.storageLocation}</div>
-              <div>📅 {worldStats.lastModified}</div>
+          <div className="absolute inset-0 bg-amber-100/80 flex items-center justify-center p-3 transition-opacity duration-200 ease-in-out">
+            <div className="text-amber-900 text-center">
+              <p className="text-xs leading-relaxed">
+                {book.description || 'No description available'}
+              </p>
             </div>
           </div>
         );
       }
-      return null; // Image covers the entire area when not hovered
+      return null; // Image covers entire area when not hovered
     }
 
     if (isHovered) {
-      // Show stats on hover
+      // Show description on hover instead of stats
       return (
-        <div className="flex flex-col items-center justify-center h-full p-2 text-center">
-          <div className="font-bold text-white mb-2 text-xs">{book.title}</div>
-          <div className="text-white text-xs space-y-1 opacity-90">
-            <div>📦 {worldStats.assetCount} assets</div>
-            <div>🏷️ {worldStats.tagCount} tags</div>
-            <div>💾 {worldStats.estimatedSize}</div>
-            <div>📁 {worldStats.storageLocation}</div>
-            <div>📅 {worldStats.lastModified}</div>
+        <div className="absolute inset-0 bg-amber-100/80 flex items-center justify-center p-3 transition-opacity duration-200 ease-in-out">
+          <div className="text-amber-900 text-center">
+            <p className="text-xs leading-relaxed">
+              {book.description || 'No description available'}
+            </p>
           </div>
         </div>
       );
@@ -364,8 +366,71 @@ const BookCover: React.FC<BookCoverProps> = ({
       style={getCoverStyle()}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      onClick={handleBookClick}
     >
-      {renderContent()}
+      {/* Front Content */}
+      <div className={`absolute inset-0 transition-opacity duration-300 ${isFlipped ? 'opacity-0' : 'opacity-100'}`}>
+        {renderContent()}
+      </div>
+
+      {/* Back Content (Stats) */}
+      <div 
+        className={`absolute inset-0 transition-opacity duration-300 ${isFlipped ? 'opacity-100' : 'opacity-0'}`}
+      >
+        {/* Flipped background */}
+        <div 
+          className="absolute inset-0"
+          style={{
+            ...getCoverStyle(),
+            transform: 'rotateX(180deg)'
+          }}
+        ></div>
+        
+        {/* Semi-transparent overlay for text readability */}
+        <div className="absolute inset-0 bg-black/40"></div>
+        
+        {/* Close Button */}
+        <div className="absolute top-2 right-2 z-10">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="w-6 h-6 p-0 rounded-full text-white hover:bg-white/20 border border-white/30"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsFlipped(false);
+            }}
+          >
+            <X className="w-3 h-3" />
+          </Button>
+        </div>
+
+        {/* Stats Content - Normal orientation */}
+        <div className="absolute inset-0 p-3 text-white z-0">
+          <div className="space-y-3 text-xs">
+            <div>
+              <h4 className="font-bold text-sm mb-1 text-blue-300">{book.title || 'Untitled World'}</h4>
+              {book.description && (
+                <p className="text-xs opacity-90 line-clamp-2">{book.description}</p>
+              )}
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-white/30">
+              <div className="flex items-center gap-2">
+                <Image className="w-3 h-3 text-green-400 flex-shrink-0" />
+                <span className="text-xs">{worldStats?.assetCount || 0} Assets</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Tag className="w-3 h-3 text-yellow-400 flex-shrink-0" />
+                <span className="text-xs">{worldStats?.tagCount || 0} Tags</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Calendar className="w-3 h-3 text-purple-400 flex-shrink-0" />
+                <span className="text-xs">Created {worldStats?.lastModified || 'Unknown'}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

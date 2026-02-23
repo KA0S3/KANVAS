@@ -194,10 +194,10 @@ export function AssetItem({ asset, onDelete, onMouseDown, onDoubleClick, isSelec
         overflow: 'visible',
         ...(hasTags && firstTagColor && {
           boxShadow: `
-            0 0 8px ${firstTagColor}40,
-            0 0 16px ${firstTagColor}30,
-            0 0 24px ${firstTagColor}20,
-            0 0 32px ${firstTagColor}10,
+            inset 0 0 12px ${firstTagColor}60,
+            inset 0 0 20px ${firstTagColor}50,
+            inset 0 0 28px ${firstTagColor}40,
+            inset 0 0 36px ${firstTagColor}30,
             inset 0 1px 0 hsl(var(--glass-border) / 0.3)
           `.trim()
         })
@@ -591,6 +591,7 @@ export function AssetItem({ asset, onDelete, onMouseDown, onDoubleClick, isSelec
           onClose={closeContextMenu}
           onEdit={onEdit}
           onSelectAndFocus={onSelectAndFocus}
+          isViewportAsset={true}
         />
       )}
     </div>

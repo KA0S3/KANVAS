@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BookOpen, Edit, Trash2 } from 'lucide-react';
+import { BookOpen, Edit, Trash2, X, Calendar, Tag, Image } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import type { Book } from '@/types/book';
@@ -22,6 +22,8 @@ export function BookItem({
   showControls = true 
 }: BookItemProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const [isFlipped, setIsFlipped] = useState(false);
+  const [showStats, setShowStats] = useState(false);
 
   const bookStyle = book.coverImage 
     ? { backgroundImage: `url(${book.coverImage})` }
@@ -29,28 +31,69 @@ export function BookItem({
       ? { background: book.gradient }
       : { backgroundColor: book.color };
 
+  const handleBookClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isFlipped) {
+      setIsFlipped(true);
+      setTimeout(() => {
+        setShowStats(true);
+      }, 300); // Wait for flip animation to complete
+    } else {
+      setShowStats(false);
+      setTimeout(() => {
+        setIsFlipped(false);
+      }, 150);
+    }
+  };
+
+  const handleBookSelect = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onClick?.();
+  };
+
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onClick?.();
+  };
+
+  const getAssetCount = () => {
+    return Object.keys(book.worldData.assets || {}).length;
+  };
+
+  const getTagCount = () => {
+    return Object.keys(book.worldData.tags || {}).length;
+  };
+
+  const formatDate = (timestamp: number) => {
+    return new Date(timestamp).toLocaleDateString();
+  };
+
   return (
     <div 
       className="relative group cursor-pointer transition-all duration-300"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      onClick={onClick}
+      onDoubleClick={handleDoubleClick}
     >
       {/* 3D Book Container */}
       <div 
         className={`
-          relative preserve-3d transition-transform duration-300
-          ${isHovered ? 'transform-gpu scale-105 rotate-y-12' : ''}
+          relative preserve-3d transition-all duration-300
           ${isSelected ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}
         `}
         style={{
           transformStyle: 'preserve-3d',
-          transform: isHovered ? 'scale(1.05) rotateY(12deg)' : 'scale(1) rotateY(0deg)',
+          transform: isFlipped 
+            ? 'scale(1) rotateY(180deg)' 
+            : isHovered 
+              ? 'scale(1.05) rotateY(12deg)' 
+              : 'scale(1) rotateY(0deg)',
         }}
+        onClick={handleBookClick}
       >
         {/* Book Cover */}
         <Card 
-          className="relative w-32 h-48 md:w-40 md:h-56 rounded-sm shadow-2xl overflow-hidden border-0"
+          className="relative w-32 h-48 md:w-40 md:h-56 rounded-sm shadow-2xl overflow-hidden border-0 backface-hidden"
           style={bookStyle}
         >
           {/* Book Spine Effect */}
@@ -79,15 +122,84 @@ export function BookItem({
             </div>
           </div>
 
-          {/* Hover Overlay */}
-          {isHovered && (
-            <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+          {/* Hover Description Overlay */}
+          {isHovered && !isFlipped && book.description && (
+            <div className="absolute inset-0 bg-black/60 flex items-center justify-center p-3 transition-opacity duration-200 ease-in-out">
               <div className="text-white text-center">
-                <BookOpen className="w-8 h-8 mx-auto mb-2" />
-                <p className="text-xs font-medium">Click to Open</p>
+                <p className="text-xs md:text-sm leading-relaxed">
+                  {book.description}
+                </p>
               </div>
             </div>
           )}
+        </Card>
+
+        {/* Book Back (for flip animation) */}
+        <Card 
+          className="absolute inset-0 w-32 h-48 md:w-40 md:h-56 rounded-sm shadow-2xl overflow-hidden border-0 backface-hidden bg-gradient-to-br from-slate-800 to-slate-900"
+          style={{
+            transform: 'rotateY(180deg)',
+          }}
+        >
+          {/* Stats Panel */}
+          <div className="absolute inset-0 p-3 text-white">
+            {/* Close Button */}
+            <div className="flex justify-end mb-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="w-6 h-6 p-0 rounded-full text-white hover:bg-white/20"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowStats(false);
+                  setTimeout(() => {
+                    setIsFlipped(false);
+                  }, 150);
+                }}
+              >
+                <X className="w-3 h-3" />
+              </Button>
+            </div>
+
+            {/* Stats Content */}
+            <div className="space-y-3 text-xs">
+              <div>
+                <h4 className="font-bold text-sm mb-1 text-blue-300">{book.title}</h4>
+                {book.description && (
+                  <p className="text-xs opacity-80 line-clamp-3">{book.description}</p>
+                )}
+              </div>
+
+              <div className="space-y-2 pt-2 border-t border-white/20">
+                <div className="flex items-center gap-2">
+                  <Image className="w-3 h-3 text-green-400" />
+                  <span className="text-xs">{getAssetCount()} Assets</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Tag className="w-3 h-3 text-yellow-400" />
+                  <span className="text-xs">{getTagCount()} Tags</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-3 h-3 text-purple-400" />
+                  <span className="text-xs">Created {formatDate(book.createdAt)}</span>
+                </div>
+              </div>
+
+              {/* Select Button */}
+              <div className="pt-2">
+                <Button
+                  size="sm"
+                  className="w-full text-xs bg-blue-600 hover:bg-blue-700 text-white"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onClick?.();
+                  }}
+                >
+                  Select This World
+                </Button>
+              </div>
+            </div>
+          </div>
         </Card>
 
         {/* Book Shadow */}
@@ -98,7 +210,7 @@ export function BookItem({
       </div>
 
       {/* Controls */}
-      {showControls && isHovered && (
+      {showControls && isHovered && !isFlipped && (
         <div className="absolute -top-2 -right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <Button
             size="sm"

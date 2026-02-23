@@ -2,6 +2,14 @@ import React from 'react';
 import type { Book } from '@/types/book';
 import { useThemeStore } from '@/stores/themeStore';
 
+// Import book cover images
+import BlackBook from '@/assets/Book-Covers/Black_book.png';
+import BlueBook from '@/assets/Book-Covers/Blue_book.png';
+import BrownBook from '@/assets/Book-Covers/brown_book.png';
+import GreenBook from '@/assets/Book-Covers/Green_book.png';
+import PurpleBook from '@/assets/Book-Covers/purple_book.png';
+import WhiteBook from '@/assets/Book-Covers/White_book.png';
+
 interface BookSpineProps {
   book: Book;
   height?: 'small' | 'medium' | 'large';
@@ -24,18 +32,44 @@ const BookSpine: React.FC<BookSpineProps> = ({
   const getLeatherStyle = () => {
     if (!book.isLeatherMode || book.coverImage) return null;
     
-    const leatherColor = book.leatherColor || '#8B4513';
-    const isDark = theme === 'dark';
+    // Map leather colors to book cover images based on preset names
+    const getBookCoverImage = (leatherColor: string) => {
+      const colorLower = leatherColor.toLowerCase();
+      
+      // Match based on leather preset names and hex values
+      if (colorLower.includes('rich black') || colorLower === '#1a1a1a' || colorLower === '#0d0d0d' || colorLower === '#2d2d2d') {
+        return BlackBook;
+      }
+      if (colorLower.includes('navy blue') || colorLower === '#1e3a8a' || colorLower === '#1e2f5a' || colorLower === '#2563eb') {
+        return BlueBook;
+      }
+      if (colorLower.includes('classic brown') || colorLower === '#8b4513' || colorLower === '#654321' || colorLower === '#a0522d') {
+        return BrownBook;
+      }
+      if (colorLower.includes('forest green') || colorLower === '#2d5016' || colorLower === '#1f3a0f' || colorLower === '#3a6b1e') {
+        return GreenBook;
+      }
+      if (colorLower.includes('royal purple') || colorLower === '#6b46c1' || colorLower === '#553c9a' || colorLower === '#8b5cf6') {
+        return PurpleBook;
+      }
+      if (colorLower.includes('arctic white') || colorLower === '#f5f5f0' || colorLower === '#e8e8e0' || colorLower === '#fafaf5') {
+        return WhiteBook;
+      }
+      
+      // Default fallback
+      return BrownBook;
+    };
+    
+    const coverImage = getBookCoverImage(book.leatherColor || '#8B4513');
     
     return {
-      background: `linear-gradient(90deg, 
-        ${isDark ? leatherColor : leatherColor} 0%, 
-        ${isDark ? `${leatherColor}dd` : `${leatherColor}ee`} 50%, 
-        ${isDark ? leatherColor : leatherColor} 100%)`,
-      borderLeft: `1px solid ${isDark ? `${leatherColor}66` : `${leatherColor}99`}`,
-      borderRight: `1px solid ${isDark ? `${leatherColor}44` : `${leatherColor}77`}`,
-      boxShadow: `inset -1px 0 0 ${isDark ? `${leatherColor}33` : `${leatherColor}55`}, 
-                  inset 1px 0 0 ${isDark ? `${leatherColor}55` : `${leatherColor}88`}`
+      backgroundImage: `url(${coverImage})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
+      borderLeft: '1px solid rgba(0,0,0,0.3)',
+      borderRight: '1px solid rgba(0,0,0,0.2)',
+      boxShadow: 'inset -1px 0 0 rgba(0,0,0,0.2), inset 1px 0 0 rgba(0,0,0,0.1)'
     };
   };
 

@@ -463,4 +463,17 @@
   .text-glow-accent {
     text-shadow: 0 0 10px hsl(var(--accent) / 0.6);
   }
+
+  /* 3D Book Flip Animation Classes */
+  .preserve-3d {
+    transform-style: preserve-3d;
+  }
+
+  .backface-hidden {
+    backface-visibility: hidden;
+  }
+
+  .rotate-y-180 {
+    transform: rotateY(180deg);
+  }
 }

@@ -18,19 +18,19 @@ const WorldCreationDialog = ({ children, onWorldCreated }: WorldCreationDialogPr
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [selectedColor, setSelectedColor] = useState('#3b82f6');
+  const [selectedColor, setSelectedColor] = useState('#8B4513');
   const [isLeatherMode, setIsLeatherMode] = useState(true);
   const [selectedLeatherColor, setSelectedLeatherColor] = useState<LeatherColorPreset | null>(null);
   const [customCoverImage, setCustomCoverImage] = useState<string | null>(null);
   const { createBook, leatherPresets } = useBookStore();
 
   const colorOptions = [
-    { value: '#3b82f6', label: 'Cosmic Blue', gradient: 'linear-gradient(135deg, #3b82f6, #8b5cf6)' },
-    { value: '#10b981', label: 'Emerald Green', gradient: 'linear-gradient(135deg, #10b981, #06b6d4)' },
-    { value: '#8b5cf6', label: 'Royal Purple', gradient: 'linear-gradient(135deg, #8b5cf6, #ec4899)' },
-    { value: '#f97316', label: 'Sunset Orange', gradient: 'linear-gradient(135deg, #f97316, #ef4444)' },
-    { value: '#1f2937', label: 'Midnight Dark', gradient: 'linear-gradient(135deg, #1f2937, #374151)' },
-    { value: '#f43f5e', label: 'Rose Pink', gradient: 'linear-gradient(135deg, #f43f5e, #ec4899)' },
+    { value: '#1a1a1a', label: 'Rich Black', gradient: 'linear-gradient(135deg, #1a1a1a, #2d2d2d)' },
+    { value: '#1e3a8a', label: 'Navy Blue', gradient: 'linear-gradient(135deg, #1e3a8a, #2563eb)' },
+    { value: '#8B4513', label: 'Classic Brown', gradient: 'linear-gradient(135deg, #8B4513, #A0522D)' },
+    { value: '#2d5016', label: 'Forest Green', gradient: 'linear-gradient(135deg, #2d5016, #3a6b1e)' },
+    { value: '#722f37', label: 'Royal Purple', gradient: 'linear-gradient(135deg, #722f37, #88333c)' },
+    { value: '#36454f', label: 'Arctic White', gradient: 'linear-gradient(135deg, #36454f, #4a5568)' },
   ];
 
   const handleCreateWorld = () => {

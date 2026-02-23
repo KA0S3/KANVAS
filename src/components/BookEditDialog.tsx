@@ -25,7 +25,7 @@ const BookEditDialog = ({ book, open, onOpenChange, onBookUpdated }: BookEditDia
   const [title, setTitle] = useState('');
   const [subheading, setSubheading] = useState('');
   const [description, setDescription] = useState('');
-  const [selectedColor, setSelectedColor] = useState('#3b82f6');
+  const [selectedColor, setSelectedColor] = useState('#8B4513');
   const [isLeatherMode, setIsLeatherMode] = useState(true);
   const [selectedLeatherColor, setSelectedLeatherColor] = useState<LeatherColorPreset | null>(null);
   const [customCoverImage, setCustomCoverImage] = useState<string | null>(null);
@@ -40,6 +40,7 @@ const BookEditDialog = ({ book, open, onOpenChange, onBookUpdated }: BookEditDia
   const [titleOutlineColor, setTitleOutlineColor] = useState('#000000');
   const [titleOutlineThickness, setTitleOutlineThickness] = useState([0]);
   const [titleShadowEnabled, setTitleShadowEnabled] = useState(false);
+  const [activeTextLayer, setActiveTextLayer] = useState<'title' | 'subheading'>('title');
   
   // Auto-close dropdowns when text settings are opened
   useEffect(() => {
@@ -70,12 +71,12 @@ const BookEditDialog = ({ book, open, onOpenChange, onBookUpdated }: BookEditDia
   const { updateBook, leatherPresets } = useBookStore();
 
   const colorOptions = [
-    { value: '#3b82f6', label: 'Cosmic Blue', gradient: 'linear-gradient(135deg, #3b82f6, #8b5cf6)' },
-    { value: '#10b981', label: 'Emerald Green', gradient: 'linear-gradient(135deg, #10b981, #06b6d4)' },
-    { value: '#8b5cf6', label: 'Royal Purple', gradient: 'linear-gradient(135deg, #8b5cf6, #ec4899)' },
-    { value: '#f97316', label: 'Sunset Orange', gradient: 'linear-gradient(135deg, #f97316, #ef4444)' },
-    { value: '#1f2937', label: 'Midnight Dark', gradient: 'linear-gradient(135deg, #1f2937, #374151)' },
-    { value: '#f43f5e', label: 'Rose Pink', gradient: 'linear-gradient(135deg, #f43f5e, #ec4899)' },
+    { value: '#1a1a1a', label: 'Rich Black', gradient: 'linear-gradient(135deg, #1a1a1a, #2d2d2d)' },
+    { value: '#1e3a8a', label: 'Navy Blue', gradient: 'linear-gradient(135deg, #1e3a8a, #2563eb)' },
+    { value: '#8B4513', label: 'Classic Brown', gradient: 'linear-gradient(135deg, #8B4513, #A0522D)' },
+    { value: '#2d5016', label: 'Forest Green', gradient: 'linear-gradient(135deg, #2d5016, #3a6b1e)' },
+    { value: '#722f37', label: 'Royal Purple', gradient: 'linear-gradient(135deg, #722f37, #88333c)' },
+    { value: '#36454f', label: 'Arctic White', gradient: 'linear-gradient(135deg, #36454f, #4a5568)' },
   ];
 
   // Reset form when book changes
@@ -83,7 +84,7 @@ const BookEditDialog = ({ book, open, onOpenChange, onBookUpdated }: BookEditDia
     if (book) {
       setTitle(book.title);
       setDescription(book.description || '');
-      setSelectedColor(book.color || '#3b82f6');
+      setSelectedColor(book.color || '#8B4513');
       setIsLeatherMode(book.isLeatherMode ?? true);
       setCustomCoverImage(book.coverImage || null);
       
@@ -586,117 +587,138 @@ const BookEditDialog = ({ book, open, onOpenChange, onBookUpdated }: BookEditDia
                 </Collapsible>
               </div>
 
-              {/* Position Viewports */}
+              {/* Shared Position Viewport */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium text-gray-200">
-                  Text Position Viewports
+                  Text Position Editor
                 </Label>
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Name Position Viewport */}
-                  <div className="space-y-2">
-                    <Label className="text-xs text-gray-400">Name Position</Label>
-                    <div className="relative w-full" style={{ aspectRatio: '2/3' }}>
-                      <div className="absolute inset-0 p-4 bg-gray-700/50 border border-gray-600 rounded-lg">
-                        <div
-                          className="absolute cursor-move select-none"
-                          style={{
-                            left: `${titlePosition.x}%`,
-                            top: `${titlePosition.y}%`,
-                            transform: 'translate(-50%, -50%)',
-                            fontSize: `${Math.min(titleFontSize[0] / 2, 16)}px`,
-                            color: titleTextColor,
-                            fontFamily: titleFontFamily,
-                            WebkitTextStroke: titleOutlineThickness[0] > 0 ? `${titleOutlineThickness[0]}px ${titleOutlineColor}` : 'none',
-                            textShadow: titleShadowEnabled ? '2px 2px 4px rgba(0,0,0,0.8)' : 'none'
-                          }}
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            const container = e.currentTarget.parentElement;
-                            if (!container) return;
-                            
-                            const rect = container.getBoundingClientRect();
-                            const startX = e.clientX;
-                            const startY = e.clientY;
-                            const startLeft = titlePosition.x;
-                            const startTop = titlePosition.y;
-                            
-                            const handleMouseMove = (moveEvent: MouseEvent) => {
-                              const deltaX = ((moveEvent.clientX - startX) / rect.width) * 100;
-                              const deltaY = ((moveEvent.clientY - startY) / rect.height) * 100;
-                              
-                              const newX = Math.max(0, Math.min(100, startLeft + deltaX));
-                              const newY = Math.max(0, Math.min(100, startTop + deltaY));
-                              
-                              setTitlePosition({ x: newX, y: newY });
-                            };
-                            
-                            const handleMouseUp = () => {
-                              document.removeEventListener('mousemove', handleMouseMove);
-                              document.removeEventListener('mouseup', handleMouseUp);
-                            };
-                            
-                            document.addEventListener('mousemove', handleMouseMove);
-                            document.addEventListener('mouseup', handleMouseUp);
-                          }}
-                        >
-                          {title || 'Title'}
-                        </div>
-                      </div>
-                    </div>
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setActiveTextLayer('title')}
+                      className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                        activeTextLayer === 'title'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      }`}
+                    >
+                      Title
+                    </button>
+                    <button
+                      onClick={() => setActiveTextLayer('subheading')}
+                      className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                        activeTextLayer === 'subheading'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      }`}
+                    >
+                      Subheading
+                    </button>
                   </div>
+                  <div className="relative w-48 h-72 mx-auto bg-gray-700/50 border border-gray-600 rounded-lg overflow-hidden">
+                    <div className="absolute inset-0 p-2">
+                      {/* Title Text Layer */}
+                      <div
+                        className={`absolute cursor-move select-none ${activeTextLayer === 'title' ? 'ring-2 ring-blue-400 ring-offset-2 ring-offset-gray-800 rounded' : ''}`}
+                        style={{
+                          left: `${titlePosition.x}%`,
+                          top: `${titlePosition.y}%`,
+                          transform: 'translate(-50%, -50%)',
+                          fontSize: `${Math.min(titleFontSize[0] / 3, 12)}px`,
+                          color: titleTextColor,
+                          fontFamily: titleFontFamily,
+                          WebkitTextStroke: titleOutlineThickness[0] > 0 ? `${titleOutlineThickness[0]}px ${titleOutlineColor}` : 'none',
+                          textShadow: titleShadowEnabled ? '2px 2px 4px rgba(0,0,0,0.8)' : 'none'
+                        }}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setActiveTextLayer('title');
+                          const container = e.currentTarget.parentElement;
+                          if (!container) return;
+                          
+                          const rect = container.getBoundingClientRect();
+                          const startX = e.clientX;
+                          const startY = e.clientY;
+                          const startLeft = titlePosition.x;
+                          const startTop = titlePosition.y;
+                          
+                          const handleMouseMove = (moveEvent: MouseEvent) => {
+                            const deltaX = ((moveEvent.clientX - startX) / rect.width) * 100;
+                            const deltaY = ((moveEvent.clientY - startY) / rect.height) * 100;
+                            
+                            const newX = Math.max(0, Math.min(100, startLeft + deltaX));
+                            const newY = Math.max(0, Math.min(100, startTop + deltaY));
+                            
+                            setTitlePosition({ x: newX, y: newY });
+                          };
+                          
+                          const handleMouseUp = () => {
+                            document.removeEventListener('mousemove', handleMouseMove);
+                            document.removeEventListener('mouseup', handleMouseUp);
+                          };
+                          
+                          document.addEventListener('mousemove', handleMouseMove);
+                          document.addEventListener('mouseup', handleMouseUp);
+                        }}
+                        onClick={() => setActiveTextLayer('title')}
+                      >
+                        {title || 'Title'}
+                      </div>
 
-                  {/* Subheading Position Viewport */}
-                  <div className="space-y-2">
-                    <Label className="text-xs text-gray-400">Subheading Position</Label>
-                    <div className="relative w-full" style={{ aspectRatio: '2/3' }}>
-                      <div className="absolute inset-0 p-4 bg-gray-700/50 border border-gray-600 rounded-lg">
-                        <div
-                          className="absolute cursor-move select-none"
-                          style={{
-                            left: `${subheadingPosition.x}%`,
-                            top: `${subheadingPosition.y}%`,
-                            transform: 'translate(-50%, -50%)',
-                            fontSize: `${Math.min(subheadingFontSize[0] / 2, 14)}px`,
-                            color: subheadingTextColor,
-                            fontFamily: subheadingFontFamily,
-                            WebkitTextStroke: subheadingOutlineThickness[0] > 0 ? `${subheadingOutlineThickness[0]}px ${subheadingOutlineColor}` : 'none',
-                            textShadow: subheadingShadowEnabled ? '2px 2px 4px rgba(0,0,0,0.8)' : 'none'
-                          }}
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            const container = e.currentTarget.parentElement;
-                            if (!container) return;
+                      {/* Subheading Text Layer */}
+                      <div
+                        className={`absolute cursor-move select-none ${activeTextLayer === 'subheading' ? 'ring-2 ring-blue-400 ring-offset-2 ring-offset-gray-800 rounded' : ''}`}
+                        style={{
+                          left: `${subheadingPosition.x}%`,
+                          top: `${subheadingPosition.y}%`,
+                          transform: 'translate(-50%, -50%)',
+                          fontSize: `${Math.min(subheadingFontSize[0] / 3, 10)}px`,
+                          color: subheadingTextColor,
+                          fontFamily: subheadingFontFamily,
+                          WebkitTextStroke: subheadingOutlineThickness[0] > 0 ? `${subheadingOutlineThickness[0]}px ${subheadingOutlineColor}` : 'none',
+                          textShadow: subheadingShadowEnabled ? '2px 2px 4px rgba(0,0,0,0.8)' : 'none'
+                        }}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setActiveTextLayer('subheading');
+                          const container = e.currentTarget.parentElement;
+                          if (!container) return;
+                          
+                          const rect = container.getBoundingClientRect();
+                          const startX = e.clientX;
+                          const startY = e.clientY;
+                          const startLeft = subheadingPosition.x;
+                          const startTop = subheadingPosition.y;
+                          
+                          const handleMouseMove = (moveEvent: MouseEvent) => {
+                            const deltaX = ((moveEvent.clientX - startX) / rect.width) * 100;
+                            const deltaY = ((moveEvent.clientY - startY) / rect.height) * 100;
                             
-                            const rect = container.getBoundingClientRect();
-                            const startX = e.clientX;
-                            const startY = e.clientY;
-                            const startLeft = subheadingPosition.x;
-                            const startTop = subheadingPosition.y;
+                            const newX = Math.max(0, Math.min(100, startLeft + deltaX));
+                            const newY = Math.max(0, Math.min(100, startTop + deltaY));
                             
-                            const handleMouseMove = (moveEvent: MouseEvent) => {
-                              const deltaX = ((moveEvent.clientX - startX) / rect.width) * 100;
-                              const deltaY = ((moveEvent.clientY - startY) / rect.height) * 100;
-                              
-                              const newX = Math.max(0, Math.min(100, startLeft + deltaX));
-                              const newY = Math.max(0, Math.min(100, startTop + deltaY));
-                              
-                              setSubheadingPosition({ x: newX, y: newY });
-                            };
-                            
-                            const handleMouseUp = () => {
-                              document.removeEventListener('mousemove', handleMouseMove);
-                              document.removeEventListener('mouseup', handleMouseUp);
-                            };
-                            
-                            document.addEventListener('mousemove', handleMouseMove);
-                            document.addEventListener('mouseup', handleMouseUp);
-                          }}
-                        >
-                          {subheading || 'Subtitle'}
-                        </div>
+                            setSubheadingPosition({ x: newX, y: newY });
+                          };
+                          
+                          const handleMouseUp = () => {
+                            document.removeEventListener('mousemove', handleMouseMove);
+                            document.removeEventListener('mouseup', handleMouseUp);
+                          };
+                          
+                          document.addEventListener('mousemove', handleMouseMove);
+                          document.addEventListener('mouseup', handleMouseUp);
+                        }}
+                        onClick={() => setActiveTextLayer('subheading')}
+                      >
+                        {subheading || 'Subtitle'}
                       </div>
                     </div>
                   </div>
+                  <p className="text-xs text-gray-400 text-center">
+                    Click text to select, drag to reposition • Active: {activeTextLayer === 'title' ? 'Title' : 'Subheading'}
+                  </p>
                 </div>
               </div>
 
