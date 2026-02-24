@@ -57,13 +57,13 @@ const SplashScreen = () => {
         
         {/* Subtitle */}
         <p 
-          className="text-xl md:text-2xl opacity-75 animate-pulse"
+          className="text-xl md:text-2xl opacity-75 animate-pulse -mt-4"
           style={{
             fontFamily: '"MedievalSharp", "Almendra", cursive',
             textShadow: '0 0 10px rgba(255, 255, 255, 0.3)'
           }}
         >
-          Click anywhere Enter
+          Click anywhere to enter
         </p>
 
         {/* Generator Buttons */}

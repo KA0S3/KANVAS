@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useBookStore } from '@/stores/bookStoreSimple';
+import { useThemeStore } from '@/stores/themeStore';
 import { BookCarousel } from './BookCarousel';
 import { BookEditor } from './BookEditor';
 import type { Book } from '@/types/book';
@@ -27,6 +28,7 @@ export function BookLibrary({ isOpen, onClose, onBookSelect }: BookLibraryProps)
     deleteBook,
     getAllBooks 
   } = useBookStore();
+  const { theme } = useThemeStore();
 
   const [editingBook, setEditingBook] = useState<Book | null>(null);
   const [isCreatingBook, setIsCreatingBook] = useState(false);

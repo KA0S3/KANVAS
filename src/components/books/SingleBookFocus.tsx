@@ -4,6 +4,7 @@ import type { Book } from '@/types/book';
 import BookCover from './BookCover';
 import BookEditDialog from '@/components/BookEditDialog';
 import { useBookStore } from '@/stores/bookStoreSimple';
+import { useThemeStore } from '@/stores/themeStore';
 
 interface SingleBookFocusProps {
   books: Book[];
@@ -27,6 +28,7 @@ const SingleBookFocus: React.FC<SingleBookFocusProps> = ({
   enableEditing = false
 }) => {
   const { updateBook } = useBookStore();
+  const { theme } = useThemeStore();
   const [currentIndex, setCurrentIndex] = useState(() => {
     if (selectedBookId) {
       const index = books.findIndex(book => book.id === selectedBookId);
@@ -90,7 +92,7 @@ const SingleBookFocus: React.FC<SingleBookFocusProps> = ({
   if (!currentBook) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-gray-400">No books available</p>
+        <p className={theme === 'dark' ? 'text-gray-400' : 'text-muted-foreground'}>No books available</p>
       </div>
     );
   }
@@ -101,10 +103,16 @@ const SingleBookFocus: React.FC<SingleBookFocusProps> = ({
       <button
         onClick={handlePrevious}
         disabled={books.length <= 1}
-        className="absolute left-8 p-3 rounded-full bg-gray-800 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors z-10"
+        className={`absolute left-8 p-3 rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-colors z-10 ${
+          theme === 'dark'
+            ? 'bg-gray-800 hover:bg-gray-700'
+            : 'bg-card hover:bg-accent border border-border'
+        }`}
         title="Previous book"
       >
-        <ChevronLeft className="w-6 h-6 text-white" />
+        <ChevronLeft className={`w-6 h-6 ${
+          theme === 'dark' ? 'text-white' : 'text-foreground'
+        }`} />
       </button>
 
       {/* Book Display */}
@@ -116,7 +124,9 @@ const SingleBookFocus: React.FC<SingleBookFocusProps> = ({
           >
             <BookCover book={currentBook} size="large" />
             {/* Hover instruction */}
-            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-black/80 text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+            <div className={`absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none ${
+              theme === 'dark' ? 'bg-black/80 text-white' : 'bg-popover text-popover-foreground border border-border'
+            }`}>
               Double-click to enter world
             </div>
           </div>
@@ -133,8 +143,8 @@ const SingleBookFocus: React.FC<SingleBookFocusProps> = ({
               }}
               className={`w-2 h-2 rounded-full transition-colors ${
                 index === currentIndex 
-                  ? 'bg-blue-500' 
-                  : 'bg-gray-600 hover:bg-gray-500'
+                  ? (theme === 'dark' ? 'bg-blue-500' : 'bg-primary')
+                  : (theme === 'dark' ? 'bg-gray-600 hover:bg-gray-500' : 'bg-muted hover:bg-accent')
               }`}
               title={book.title}
             />
@@ -146,10 +156,16 @@ const SingleBookFocus: React.FC<SingleBookFocusProps> = ({
       <button
         onClick={handleNext}
         disabled={books.length <= 1}
-        className="absolute right-8 p-3 rounded-full bg-gray-800 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors z-10"
+        className={`absolute right-8 p-3 rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-colors z-10 ${
+          theme === 'dark'
+            ? 'bg-gray-800 hover:bg-gray-700'
+            : 'bg-card hover:bg-accent border border-border'
+        }`}
         title="Next book"
       >
-        <ChevronRight className="w-6 h-6 text-white" />
+        <ChevronRight className={`w-6 h-6 ${
+          theme === 'dark' ? 'text-white' : 'text-foreground'
+        }`} />
       </button>
 
       {/* Edit Dialog */}

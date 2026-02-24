@@ -1,5 +1,6 @@
 import React from 'react';
 import { Book, Layout, Edit } from 'lucide-react';
+import { useThemeStore } from '@/stores/themeStore';
 
 interface ViewModeSelectorProps {
   currentMode: 'single' | 'spine';
@@ -18,6 +19,7 @@ const ViewModeSelector: React.FC<ViewModeSelectorProps> = ({
   onEditBook,
   enableEditing = false
 }) => {
+  const { theme } = useThemeStore();
   const modes = [
     {
       id: 'single' as const,
@@ -37,7 +39,9 @@ const ViewModeSelector: React.FC<ViewModeSelectorProps> = ({
 
   return (
     <div className={`flex items-center gap-2 ${className}`}>
-      <div className="flex bg-gray-700/50 rounded-lg p-1">
+      <div className={`flex rounded-lg p-1 ${
+        theme === 'dark' ? 'bg-gray-700/50' : 'bg-muted/50'
+      }`}>
         {modes.map((mode) => {
           const Icon = mode.icon;
           const isActive = currentMode === mode.id;
@@ -51,8 +55,8 @@ const ViewModeSelector: React.FC<ViewModeSelectorProps> = ({
                 relative flex items-center gap-2 px-3 py-2 rounded-md
                 transition-all duration-200 ease-in-out
                 ${isActive 
-                  ? 'bg-blue-600 text-white shadow-lg' 
-                  : 'text-gray-300 hover:text-white hover:bg-gray-600'
+                  ? (theme === 'dark' ? 'bg-blue-600 text-white shadow-lg' : 'bg-primary text-primary-foreground shadow-lg')
+                  : (theme === 'dark' ? 'text-gray-300 hover:text-white hover:bg-gray-600' : 'text-muted-foreground hover:text-foreground hover:bg-accent')
                 }
                 ${mode.disabled 
                   ? 'opacity-50 cursor-not-allowed' 
@@ -67,7 +71,9 @@ const ViewModeSelector: React.FC<ViewModeSelectorProps> = ({
               </span>
               
               {isActive && (
-                <div className="absolute inset-0 bg-blue-500 rounded-md opacity-20 animate-pulse"></div>
+                <div className={`absolute inset-0 rounded-md opacity-20 animate-pulse ${
+                  theme === 'dark' ? 'bg-blue-500' : 'bg-primary'
+                }`}></div>
               )}
             </button>
           );
@@ -78,11 +84,19 @@ const ViewModeSelector: React.FC<ViewModeSelectorProps> = ({
       {enableEditing && (
         <button
           onClick={onEditBook}
-          className="flex items-center gap-2 px-3 py-2 rounded-full bg-blue-600 hover:bg-blue-700 transition-colors"
+          className={`flex items-center gap-2 px-3 py-2 rounded-full transition-colors ${
+            theme === 'dark' 
+              ? 'bg-blue-600 hover:bg-blue-700' 
+              : 'bg-primary hover:bg-primary/90'
+          }`}
           title="Edit book"
         >
-          <Edit className="w-4 h-4 text-white" />
-          <span className="text-white text-sm font-medium">Edit</span>
+          <Edit className={`w-4 h-4 ${
+            theme === 'dark' ? 'text-white' : 'text-primary-foreground'
+          }`} />
+          <span className={`text-sm font-medium ${
+            theme === 'dark' ? 'text-white' : 'text-primary-foreground'
+          }`}>Edit</span>
         </button>
       )}
     </div>

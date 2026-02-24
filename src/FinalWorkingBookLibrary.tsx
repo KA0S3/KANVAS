@@ -38,11 +38,19 @@ const FinalWorkingBookLibrary = () => {
   const bookList = getAllBooks();
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className={`min-h-screen ${
+      theme === 'dark' ? 'bg-black text-white' : 'bg-background text-foreground'
+    }`}>
       {/* Book Library */}
       {showLibrary && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90">
-          <div className="bg-gray-900 border border-gray-700 rounded-lg p-8 max-w-4xl max-h-[80vh] overflow-y-auto m-4">
+        <div className={`fixed inset-0 z-50 flex items-center justify-center ${
+          theme === 'dark' ? 'bg-black/90' : 'bg-background/95'
+        }`}>
+          <div className={`border rounded-lg p-8 max-w-4xl max-h-[80vh] overflow-y-auto m-4 ${
+            theme === 'dark' 
+              ? 'bg-gray-900 border-gray-700' 
+              : 'bg-card border-border'
+          }`}>
             <DialogHeader>
               <DialogTitle>📚 World Library</DialogTitle>
             </DialogHeader>
@@ -50,7 +58,9 @@ const FinalWorkingBookLibrary = () => {
             <div className="space-y-4">
               {bookList.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-lg mb-4">No worlds yet. Create your first world!</p>
+                  <p className={`text-lg mb-4 ${
+                    theme === 'dark' ? 'text-white' : 'text-foreground'
+                  }`}>No worlds yet. Create your first world!</p>
                   <Button onClick={handleCreateBook} className="mb-4">
                     ✨ Create First World
                   </Button>
@@ -61,7 +71,11 @@ const FinalWorkingBookLibrary = () => {
                     {bookList.map((book) => (
                       <div 
                         key={book.id}
-                        className="p-4 border border-gray-600 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors"
+                        className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                          theme === 'dark'
+                            ? 'border-gray-600 hover:bg-gray-700'
+                            : 'border-border hover:bg-accent'
+                        }`}
                         onClick={() => handleBookSelect(book)}
                       >
                         <div className="flex items-center gap-3 mb-2">
@@ -70,7 +84,9 @@ const FinalWorkingBookLibrary = () => {
                           </div>
                         </div>
                         <h3 className="font-bold text-lg">{book.title}</h3>
-                        <p className="text-sm text-gray-400">{book.description}</p>
+                        <p className={`text-sm ${
+                          theme === 'dark' ? 'text-gray-400' : 'text-muted-foreground'
+                        }`}>{book.description}</p>
                       </div>
                     ))}
                   </div>
@@ -110,21 +126,39 @@ const FinalWorkingBookLibrary = () => {
           </div>
           
           {/* Asset View - Simple placeholder for now */}
-          <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-gray-900 to-gray-800">
+          <div className={`flex-1 flex items-center justify-center ${
+            theme === 'dark'
+              ? 'bg-gradient-to-br from-gray-900 to-gray-800'
+              : 'bg-gradient-to-br from-background to-muted'
+          }`}>
             <div className="text-center p-8">
               <div className="mb-6">
-                <h1 className="text-4xl font-bold text-white mb-4">🎯 Current World</h1>
-                <h2 className="text-2xl text-blue-400 mb-2">
+                <h1 className={`text-4xl font-bold mb-4 ${
+                  theme === 'dark' ? 'text-white' : 'text-foreground'
+                }`}>🎯 Current World</h1>
+                <h2 className={`text-2xl mb-2 ${
+                  theme === 'dark' ? 'text-blue-400' : 'text-primary'
+                }`}>
                   {bookList.find(b => b.id === currentBookId)?.title || 'No World Selected'}
                 </h2>
               </div>
               
-              <div className="bg-gray-800 border border-gray-600 rounded-lg p-8 max-w-2xl">
-                <h3 className="text-xl font-bold mb-4 text-green-400">✅ Asset Management Ready!</h3>
-                <p className="text-gray-300 mb-4">
+              <div className={`border rounded-lg p-8 max-w-2xl ${
+                theme === 'dark'
+                  ? 'bg-gray-800 border-gray-600'
+                  : 'bg-card border-border'
+              }`}>
+                <h3 className={`text-xl font-bold mb-4 ${
+                  theme === 'dark' ? 'text-green-400' : 'text-primary'
+                }`}>✅ Asset Management Ready!</h3>
+                <p className={`mb-4 ${
+                  theme === 'dark' ? 'text-gray-300' : 'text-foreground'
+                }`}>
                   World "{bookList.find(b => b.id === currentBookId)?.title}" is loaded and ready for asset management.
                 </p>
-                <p className="text-sm text-gray-400">
+                <p className={`text-sm ${
+                  theme === 'dark' ? 'text-gray-400' : 'text-muted-foreground'
+                }`}>
                   The original AssetPort and AssetExplorer components will be integrated here.
                 </p>
                 

@@ -135,12 +135,18 @@ const Index = () => {
       }`}>
       {/* New Book Shelf */}
       {bookLibraryOpen && (
-        <div className="fixed inset-0 z-50 bg-black/95">
+        <div className={`fixed inset-0 z-50 ${
+          theme === 'dark' ? 'bg-black/95' : 'bg-background/95'
+        }`}>
           <div className="relative h-full">
             {/* Close Button */}
             <button
               onClick={() => setBookLibraryOpen(false)}
-              className="absolute top-4 right-4 z-10 p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-white transition-colors"
+              className={`absolute top-4 right-4 z-10 p-2 rounded-lg transition-colors ${
+                theme === 'dark'
+                  ? 'bg-gray-800 hover:bg-gray-700 text-white'
+                  : 'bg-card hover:bg-accent text-foreground border border-border'
+              }`}
               title="Close library"
             >
               ✖️
@@ -159,7 +165,11 @@ const Index = () => {
             {/* Create Book Button */}
             <div className="absolute bottom-6 left-6 z-10">
               <WorldCreationDialog onWorldCreated={handleWorldCreated}>
-                <Button className="bg-blue-600 hover:bg-blue-700">
+                <Button className={`${
+                  theme === 'dark' 
+                    ? 'bg-blue-600 hover:bg-blue-700' 
+                    : 'bg-primary hover:bg-primary/90'
+                }`}>
                   ✨ Create New World
                 </Button>
               </WorldCreationDialog>
@@ -168,7 +178,11 @@ const Index = () => {
             {/* Backup/Restore Button */}
             <div className="absolute bottom-6 right-6 z-10">
               <DataManager>
-                <Button variant="outline" size="sm" className="border-gray-600 text-gray-200 hover:bg-gray-800">
+                <Button variant="outline" size="sm" className={`${
+                  theme === 'dark'
+                    ? 'border-gray-600 text-gray-200 hover:bg-gray-800'
+                    : 'border-border text-foreground hover:bg-accent'
+                }`}>
                   <Database className="w-4 h-4 mr-2" />
                   Backup/Restore
                 </Button>

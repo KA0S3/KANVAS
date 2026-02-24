@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Settings } from 'lucide-react';
 import { useBookStore } from '@/stores/bookStoreSimple';
+import { useThemeStore } from '@/stores/themeStore';
 import { Button } from '@/components/ui/button';
 import { SettingsPanel } from '@/components/settings/SettingsPanel';
 import type { Book } from '@/types/book';
@@ -27,6 +28,7 @@ const BookShelf: React.FC<BookShelfProps> = ({
   enableEditing = false
 }) => {
   const { viewMode, setViewMode, getAllBooks, currentBookId, setCurrentBook, getCurrentBook } = useBookStore();
+  const { theme } = useThemeStore();
   const books = getAllBooks();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -95,7 +97,7 @@ const BookShelf: React.FC<BookShelfProps> = ({
     <div 
       className={`relative h-full ${className}`}
       style={{
-        backgroundImage: 'url(/pedestal-dark.png)',
+        backgroundImage: `url(${theme === 'dark' ? '/pedestal-dark.png' : '/pedestal-light.png'})`,
         backgroundSize: '150%',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
@@ -105,8 +107,12 @@ const BookShelf: React.FC<BookShelfProps> = ({
       <div className="absolute top-0 left-0 right-0 z-10">
         <div className="flex items-center justify-between px-6 py-4">
           <div>
-            <h1 className="text-xl font-bold text-white drop-shadow-lg">World Library</h1>
-            <p className="text-sm text-white/80 drop-shadow">
+            <h1 className={`text-xl font-bold drop-shadow-lg ${
+              theme === 'dark' ? 'text-white' : 'text-foreground'
+            }`}>World Library</h1>
+            <p className={`text-sm drop-shadow ${
+              theme === 'dark' ? 'text-white/80' : 'text-muted-foreground'
+            }`}>
               {books.length} book{books.length !== 1 ? 's' : ''} available
             </p>
           </div>
@@ -116,7 +122,11 @@ const BookShelf: React.FC<BookShelfProps> = ({
               variant="outline"
               size="sm"
               onClick={() => setIsSettingsOpen(true)}
-              className="border-white/20 text-white hover:bg-white/10"
+              className={`${
+                theme === 'dark' 
+                  ? 'border-white/20 text-white hover:bg-white/10' 
+                  : 'border-border text-foreground hover:bg-accent'
+              }`}
             >
               <Settings className="w-4 h-4 mr-2" />
               Settings
@@ -143,11 +153,17 @@ const BookShelf: React.FC<BookShelfProps> = ({
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-center">
             <div className="text-6xl mb-4">📚</div>
-            <h2 className="text-2xl font-bold text-white mb-2">No Books Yet</h2>
-            <p className="text-gray-400 mb-6">
+            <h2 className={`text-2xl font-bold mb-2 ${
+              theme === 'dark' ? 'text-white' : 'text-foreground'
+            }`}>No Books Yet</h2>
+            <p className={`mb-6 ${
+              theme === 'dark' ? 'text-gray-400' : 'text-muted-foreground'
+            }`}>
               Create your first book to get started with your library
             </p>
-            <div className="text-sm text-gray-500">
+            <div className={`text-sm ${
+              theme === 'dark' ? 'text-gray-500' : 'text-muted-foreground'
+            }`}>
               Your books will appear here once you create them
             </div>
           </div>

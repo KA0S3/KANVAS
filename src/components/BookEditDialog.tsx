@@ -10,6 +10,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChevronDown, ChevronUp, Type, Palette } from "lucide-react";
 import { useBookStore } from "@/stores/bookStoreSimple";
+import { useThemeStore } from "@/stores/themeStore";
 import LeatherColorPicker from "./books/LeatherColorPicker";
 import type { LeatherColorPreset } from "@/types/book";
 import type { Book } from "@/types/book";
@@ -22,6 +23,7 @@ interface BookEditDialogProps {
 }
 
 const BookEditDialog = ({ book, open, onOpenChange, onBookUpdated }: BookEditDialogProps) => {
+  const { theme } = useThemeStore();
   const [title, setTitle] = useState('');
   const [subheading, setSubheading] = useState('');
   const [description, setDescription] = useState('');
@@ -201,24 +203,40 @@ const BookEditDialog = ({ book, open, onOpenChange, onBookUpdated }: BookEditDia
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-gray-900 border-gray-700 text-white max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className={`max-w-md max-h-[90vh] overflow-y-auto ${
+        theme === 'dark' 
+          ? 'bg-gray-900 border-gray-700 text-white'
+          : 'bg-white border-gray-300 text-black'
+      }`}>
         <DialogHeader>
           <DialogTitle className="text-xl font-bold">✨ Edit World</DialogTitle>
         </DialogHeader>
         
         {!book ? (
           <div className="text-center py-8">
-            <p className="text-gray-400">No world selected for editing</p>
+            <p className={theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}>No world selected for editing</p>
           </div>
         ) : (
           <div className="space-y-6">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 bg-gray-800 border border-gray-700">
-                <TabsTrigger value="cover" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white flex items-center gap-2">
+              <TabsList className={`grid w-full grid-cols-2 border ${
+                theme === 'dark'
+                  ? 'bg-gray-800 border-gray-700'
+                  : 'bg-gray-100 border-gray-300'
+              }`}>
+                <TabsTrigger value="cover" className={`flex items-center gap-2 ${
+                  theme === 'dark'
+                    ? 'data-[state=active]:bg-blue-600 data-[state=active]:text-white'
+                    : 'data-[state=active]:bg-blue-500 data-[state=active]:text-white'
+                }`}>
                   <Palette className="w-4 h-4" />
                   Cover Settings
                 </TabsTrigger>
-                <TabsTrigger value="text" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white flex items-center gap-2">
+                <TabsTrigger value="text" className={`flex items-center gap-2 ${
+                  theme === 'dark'
+                    ? 'data-[state=active]:bg-blue-600 data-[state=active]:text-white'
+                    : 'data-[state=active]:bg-blue-500 data-[state=active]:text-white'
+                }`}>
                   <Type className="w-4 h-4" />
                   Text Settings
                 </TabsTrigger>
@@ -227,7 +245,9 @@ const BookEditDialog = ({ book, open, onOpenChange, onBookUpdated }: BookEditDia
               {/* COVER SETTINGS TAB */}
               <TabsContent value="cover" className="space-y-4 mt-6">
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-200">
+                  <Label className={`text-sm font-medium ${
+                    theme === 'dark' ? 'text-gray-200' : 'text-black'
+                  }`}>
                     Cover Style
                   </Label>
                   <div className="grid grid-cols-2 gap-3">
@@ -235,23 +255,39 @@ const BookEditDialog = ({ book, open, onOpenChange, onBookUpdated }: BookEditDia
                       onClick={() => setIsLeatherMode(true)}
                       className={`p-3 rounded-lg border-2 transition-all ${
                         isLeatherMode
-                          ? 'border-blue-500 bg-blue-500/10'
-                          : 'border-gray-600 hover:border-gray-500'
+                          ? (theme === 'dark'
+                              ? 'border-blue-500 bg-blue-500/20'
+                              : 'border-primary bg-primary/10')
+                          : (theme === 'dark'
+                              ? 'border-gray-600 hover:border-gray-500'
+                              : 'border-border hover:border-accent')
                       }`}
                     >
-                      <div className="text-sm font-medium text-white">Leather Bound</div>
-                      <div className="text-xs text-gray-400">Classic leather look</div>
+                      <div className={`text-sm font-medium ${
+                        theme === 'dark' ? 'text-white' : 'text-black'
+                      }`}>Leather Bound</div>
+                      <div className={`text-xs ${
+                        theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+                      }`}>Classic leather look</div>
                     </button>
                     <button
                       onClick={() => setIsLeatherMode(false)}
                       className={`p-3 rounded-lg border-2 transition-all ${
                         !isLeatherMode
-                          ? 'border-blue-500 bg-blue-500/10'
-                          : 'border-gray-600 hover:border-gray-500'
+                          ? (theme === 'dark'
+                              ? 'border-blue-500 bg-blue-500/10'
+                              : 'border-primary bg-primary/10')
+                          : (theme === 'dark'
+                              ? 'border-gray-600 hover:border-gray-500'
+                              : 'border-border hover:border-accent')
                       }`}
                     >
-                      <div className="text-sm font-medium text-white">Color Gradient</div>
-                      <div className="text-xs text-gray-400">Modern gradient style</div>
+                      <div className={`text-sm font-medium ${
+                        theme === 'dark' ? 'text-white' : 'text-black'
+                      }`}>Color Gradient</div>
+                      <div className={`text-xs ${
+                        theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+                      }`}>Modern gradient style</div>
                     </button>
                   </div>
                 </div>
@@ -342,7 +378,9 @@ const BookEditDialog = ({ book, open, onOpenChange, onBookUpdated }: BookEditDia
               {/* TEXT SETTINGS TAB */}
               <TabsContent value="text" className="space-y-4 mt-6">
             <div className="space-y-2">
-                <Label htmlFor="title" className="text-sm font-medium text-gray-200">
+                <Label htmlFor="title" className={`text-sm font-medium ${
+                    theme === 'dark' ? 'text-gray-200' : 'text-black'
+                  }`}>
                   World Title *
                 </Label>
                 <Input
@@ -350,7 +388,9 @@ const BookEditDialog = ({ book, open, onOpenChange, onBookUpdated }: BookEditDia
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Enter world title..."
-                  className="bg-gray-800 border-gray-600 text-white placeholder-gray-400"
+                  className={`bg-gray-800 border-gray-600 text-white placeholder-gray-400 ${
+                    theme === 'dark' ? '' : 'bg-white border-gray-300 text-black placeholder-gray-500'
+                  }`}
                   maxLength={50}
                 />
                 

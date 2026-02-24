@@ -152,7 +152,10 @@ const BookCover: React.FC<BookCoverProps> = ({
       // Use existing gradient or create fallback
       if (book.gradient && !showBack) {
         return {
-          background: book.gradient
+          background: book.gradient,
+          border: '2px solid',
+          borderImage: 'linear-gradient(45deg, #C0C0C0, #E5E5E5, #C0C0C0, #8B8B8B, #C0C0C0) 1',
+          boxShadow: '0 0 10px rgba(192, 192, 192, 0.5), inset 0 0 5px rgba(255, 255, 255, 0.3)'
         };
       }
       
