@@ -31,6 +31,7 @@ interface BookStore {
   createBook: (bookData: Omit<Book, 'id' | 'createdAt' | 'updatedAt'>) => string;
   updateBook: (bookId: string, updates: Partial<Book>) => void;
   deleteBook: (bookId: string) => void;
+  reorderBooks: (fromIndex: number, toIndex: number) => void;
   setCurrentBook: (bookId: string | null) => void;
   getCurrentBook: () => Book | null;
   getAllBooks: () => Book[];
@@ -120,6 +121,25 @@ export const useBookStore = create<BookStore>()(
           });
         },
 
+        reorderBooks: (fromIndex, toIndex) => {
+          set((state) => {
+            const currentBooks = Object.values(state.books);
+            const reorderedBooks = [...currentBooks];
+            const [movedBook] = reorderedBooks.splice(fromIndex, 1);
+            reorderedBooks.splice(toIndex, 0, movedBook);
+
+            // Reconstruct the books object with new order
+            const newBooks: Record<string, Book> = {};
+            reorderedBooks.forEach((book, index) => {
+              newBooks[book.id] = { ...book, order: index };
+            });
+
+            return {
+              books: newBooks,
+            };
+          });
+        },
+
         setCurrentBook: (bookId) => {
           set({ currentBookId: bookId });
         },
@@ -131,7 +151,7 @@ export const useBookStore = create<BookStore>()(
 
         getAllBooks: () => {
           const state = get();
-          return Object.values(state.books);
+          return Object.values(state.books).sort((a, b) => (a.order || 0) - (b.order || 0));
         },
 
         updateWorldData: (bookId, worldDataUpdates) => {

@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import type { Book } from '@/types/book';
 import { useThemeStore } from '@/stores/themeStore';
+import useImageColorExtractor from '@/hooks/useImageColorExtractor';
 
 // Import book cover images
 import BlackBook from '@/assets/Book-Covers/Black_book.png';
@@ -22,12 +23,38 @@ const BookSpine: React.FC<BookSpineProps> = ({
   className = ''
 }) => {
   const { theme } = useThemeStore();
+  const { extractColor, getColor } = useImageColorExtractor();
+  const [extractedSpineColor, setExtractedSpineColor] = useState<string | null>(null);
   
   const heightClasses = {
     small: 'h-24',
     medium: 'h-36',
     large: 'h-48'
   };
+
+  // Extract color from cover image when it changes
+  useEffect(() => {
+    if (book.coverImage) {
+      console.log('BookSpine: Extracting color for book:', book.title);
+      // Check cache first
+      const cachedColor = getColor(book.coverImage);
+      if (cachedColor) {
+        console.log('BookSpine: Using cached color:', cachedColor);
+        setExtractedSpineColor(cachedColor);
+      } else {
+        console.log('BookSpine: Extracting new color...');
+        // Extract color asynchronously
+        extractColor(book.coverImage).then((color) => {
+          if (color) {
+            console.log('BookSpine: Color extracted:', color);
+            setExtractedSpineColor(color);
+          }
+        });
+      }
+    } else {
+      setExtractedSpineColor(null);
+    }
+  }, [book.coverImage, extractColor, getColor]);
 
   const getLeatherStyle = () => {
     if (!book.isLeatherMode || book.coverImage) return null;
@@ -74,7 +101,26 @@ const BookSpine: React.FC<BookSpineProps> = ({
   };
 
   const getSpineStyle = () => {
-    if (book.coverImage) {
+    if (book.coverImage && extractedSpineColor) {
+      // Use extracted color with vertical gradient for depth
+      return {
+        background: `
+          linear-gradient(135deg, 
+            ${extractedSpineColor} 0%, 
+            ${extractedSpineColor}cc 30%, 
+            ${extractedSpineColor}99 50%, 
+            ${extractedSpineColor}cc 70%, 
+            ${extractedSpineColor} 100%
+          )
+        `,
+        borderLeft: '1px solid rgba(0,0,0,0.3)',
+        borderRight: '1px solid rgba(0,0,0,0.2)',
+        boxShadow: 'inset -1px 0 0 rgba(0,0,0,0.2), inset 1px 0 0 rgba(0,0,0,0.1)'
+      };
+    }
+    
+    if (book.coverImage && !extractedSpineColor) {
+      // Fallback while color is being extracted
       return {
         backgroundColor: book.color || '#3b82f6'
       };

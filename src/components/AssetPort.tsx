@@ -2,10 +2,13 @@
 import { Sparkles, ArrowLeft, Plus, PanelRight, BookOpen } from "lucide-react";
 import { AssetItem, type Asset } from "./AssetItem";
 import { AssetEditModal } from "./asset/AssetEditModal";
+import { EmptySpaceContextMenu } from "./EmptySpaceContextMenu";
 import { useAssetTree } from "@/hooks/useAssetTree";
 import { useAssetStore } from "@/stores/assetStore";
 import { useBookStore } from "@/stores/bookStoreSimple";
 import { useBackgroundStore } from "@/stores/backgroundStore";
+import { SettingsPanel } from "@/components/settings/SettingsPanel";
+import { BackgroundControls } from "@/components/asset/BackgroundControls";
 import { Button } from "@/components/ui/button";
 import { useSampleData } from "@/hooks/useSampleData";
 import { 
@@ -63,6 +66,9 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
   const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
   const [viewportSize, setViewportSize] = useState({ width: 800, height: 600 });
   const [backgroundRefreshKey, setBackgroundRefreshKey] = useState(0);
+  const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showBackgroundControls, setShowBackgroundControls] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const hasInitialized = useRef(false);
   
@@ -109,6 +115,18 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
   const bookViewportOffset = bookWorldData?.viewportOffset || { x: -45, y: -20 };
   const bookViewportScale = bookWorldData?.viewportScale || 1;
   
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenuPosition(null);
+  }, []);
+
+  const handleOpenSettings = useCallback(() => {
+    setShowSettings(true);
+  }, []);
+
+  const handleOpenBackgroundSettings = useCallback(() => {
+    setShowBackgroundControls(true);
+  }, []);
+
   const handleResize = useCallback((assetId: string, width: number, height: number) => {
     updateAssetSize(assetId, width, height);
   }, [updateAssetSize]);
@@ -283,16 +301,37 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
    }, []);
 
   const handleContainerClick = useCallback((e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
+    const target = e.target as HTMLElement;
+    
+    // Check if click is on empty space (not on an asset or its children)
+    const isAssetClick = target.classList.contains('asset-item') || target.closest('.asset-item');
+    
+    if (!isAssetClick) {
       setSelectedAsset(null);
-      // Exit asset if we're inside one
+      setActiveAsset(null);
+      
+      // Exit asset if we're inside one and clicked on empty space
       if (enteredAssetId) {
         handleExitAsset();
-      } else {
-        setActiveAsset(null);
       }
     }
   }, [enteredAssetId, handleExitAsset, setActiveAsset]);
+
+  const handleContainerContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    
+    // Check if the click is on empty space
+    const target = e.target as HTMLElement;
+    const isContainer = target === containerRef.current;
+    const isViewportContainer = target.classList.contains('viewport-container');
+    const isBackgroundElement = target.classList.contains('absolute') && 
+      !target.classList.contains('asset-item') &&
+      !target.closest('.asset-item');
+    
+    if (isContainer || isViewportContainer || isBackgroundElement) {
+      setContextMenuPosition({ x: e.clientX, y: e.clientY });
+    }
+  }, []);
 
   useEffect(() => {
     if (isDragging) {
@@ -566,6 +605,7 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
       <div
         ref={containerRef}
         onClick={handleContainerClick}
+        onContextMenu={handleContainerContextMenu}
         onMouseDown={handleBackgroundMouseDown}
         className={`flex-1 relative overflow-hidden ${
           isEditingBackground && backgroundConfig?.imageUrl ? 'cursor-move' : 'cursor-crosshair'
@@ -675,6 +715,7 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
 
         {/* Viewport transform container */}
         <div
+          className="viewport-container"
           style={{
             transform: `scale(${currentViewport.zoom * bookViewportScale}) translate(${currentViewport.panX + bookViewportOffset.x}px, ${currentViewport.panY + bookViewportOffset.y}px)`,
             transformOrigin: '0 0',
@@ -746,6 +787,32 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
         isNewAsset={!!newAssetId}
         viewportSize={viewportSize}
       />
+
+      {/* Empty Space Context Menu */}
+      {contextMenuPosition && (
+        <EmptySpaceContextMenu
+          position={contextMenuPosition}
+          onClose={handleCloseContextMenu}
+          enteredAssetId={enteredAssetId}
+          onCreateAsset={handleCreateAsset}
+          onOpenSettings={handleOpenSettings}
+          onOpenBackgroundSettings={handleOpenBackgroundSettings}
+        />
+      )}
+
+      {/* Settings Panel */}
+      <SettingsPanel
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+      />
+
+      {/* Background Controls */}
+      {showBackgroundControls && (
+        <BackgroundControls
+          assetId={enteredAssetId}
+          onSave={() => setShowBackgroundControls(false)}
+        />
+      )}
 
       </div>
   );

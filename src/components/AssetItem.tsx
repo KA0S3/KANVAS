@@ -87,6 +87,21 @@ export function AssetItem({ asset, onDelete, onMouseDown, onDoubleClick, isSelec
   const hasTags = assetTags && assetTags.length > 0;
   const firstTagColor = hasTags ? assetTags[0]?.color : null;
 
+  // Calculate z-index based on asset size (smaller = higher z-index)
+  const calculateZIndex = React.useCallback(() => {
+    const area = (asset.width || 200) * (asset.height || 150);
+    // Map area to z-index: smaller assets get higher z-index
+    // Range: 1000 (smallest) to 100 (largest)
+    const maxArea = 500 * 400; // Maximum expected area
+    const minArea = 50 * 50;   // Minimum expected area
+    const normalizedArea = Math.max(minArea, Math.min(maxArea, area));
+    const zIndexRange = 900;
+    const zIndex = 1000 - Math.floor(((normalizedArea - minArea) / (maxArea - minArea)) * zIndexRange);
+    return zIndex;
+  }, [asset.width, asset.height]);
+
+  const dynamicZIndex = calculateZIndex();
+
   const [contextMenu, setContextMenu] = React.useState<{
     visible: boolean;
     x: number;
@@ -157,8 +172,8 @@ export function AssetItem({ asset, onDelete, onMouseDown, onDoubleClick, isSelec
     const deltaX = e.clientX - resizeStart.x;
     const deltaY = e.clientY - resizeStart.y;
     
-    const newWidth = Math.max(100, resizeStart.width + deltaX);
-    const newHeight = Math.max(80, resizeStart.height + deltaY);
+    const newWidth = Math.max(25, resizeStart.width + deltaX);
+    const newHeight = Math.max(25, resizeStart.height + deltaY);
     
     onResize(asset.id, newWidth, newHeight);
   }, [isResizing, resizeStart, asset.id, onResize]);
@@ -192,7 +207,8 @@ export function AssetItem({ asset, onDelete, onMouseDown, onDoubleClick, isSelec
         height: asset.height || 150,
         transform: isSelected ? "scale(1.05)" : "scale(1)",
         overflow: 'visible',
-        ...(hasTags && firstTagColor && {
+        zIndex: isSelected ? dynamicZIndex + 100 : dynamicZIndex,
+        ...(hasTags && firstTagColor && asset.showTagBorder && {
           boxShadow: `
             inset 0 0 12px ${firstTagColor}60,
             inset 0 0 20px ${firstTagColor}50,
@@ -203,12 +219,12 @@ export function AssetItem({ asset, onDelete, onMouseDown, onDoubleClick, isSelec
         })
       }}
       className={`asset-item group select-none transition-transform duration-100 relative ${
-        isSelected ? "cosmic-glow z-20 border-primary/60" : "z-10"
+        isSelected ? "cosmic-glow border-primary/60" : ""
       } ${
         isEditingBackground ? "pointer-events-none opacity-50 cursor-not-allowed" : "cursor-grab active:cursor-grabbing"
       } ${
         asset.borderShape === 'circle' ? 'rounded-full' : ''
-      } ${showExternalText ? 'z-25' : ''}`}
+      } ${showExternalText ? 'z-50' : ''}`}
     >
       {asset.borderShape === 'circle' ? (
         /* Circular Asset Layout */

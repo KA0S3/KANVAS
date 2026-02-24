@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Slider } from '@/components/ui/slider';
 import {
   Dialog,
   DialogContent,
@@ -17,6 +18,7 @@ import { useTagStore } from '@/stores/tagStore';
 import { useThemeStore } from '@/stores/themeStore';
 import { useBookStore } from '@/stores/bookStoreSimple';
 import { useMediaStore } from '@/stores/mediaStore';
+import { audioEngine } from '@/services/AudioEngine';
 import { toast } from 'sonner';
 import type { Book } from '@/types/book';
 
@@ -75,7 +77,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     getWorldData,
     updateWorldData
   } = useBookStore();
-  const { videosEnabled, setVideosEnabled, audioEnabled, setAudioEnabled, videoSoundsEnabled, setVideoSoundsEnabled } = useMediaStore();
+  const { videosEnabled, setVideosEnabled, audioEnabled, setAudioEnabled, videoSoundsEnabled, setVideoSoundsEnabled, audioVolume, setAudioVolume } = useMediaStore();
   
   // Get book-specific viewport settings
   const currentBook = getCurrentBook();
@@ -378,6 +380,26 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                       checked={videoSoundsEnabled}
                       onCheckedChange={setVideoSoundsEnabled}
                     />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="audio-volume">Music Volume: {Math.round(audioVolume * 100)}%</Label>
+                    <Slider
+                      id="audio-volume"
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={[audioVolume * 100]}
+                      onValueChange={(value) => {
+                        setAudioVolume(value[0] / 100);
+                        audioEngine.updateVolume(); // Update real-time volume
+                      }}
+                      className="w-full"
+                      disabled={!audioEnabled}
+                    />
+                    <div className="text-xs text-muted-foreground">
+                      Control background music volume
+                    </div>
                   </div>
                 </CardContent>
               </Card>

@@ -1,9 +1,30 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import type { Book } from '@/types/book';
 import BookCard from './BookCard';
 import EditableBook from './EditableBook';
 import { useBookStore } from '@/stores/bookStoreSimple';
 import { useThemeStore } from '@/stores/themeStore';
+import useImageColorExtractor from '@/hooks/useImageColorExtractor';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  horizontalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import {
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface BookSpineViewProps {
   books: Book[];
@@ -24,13 +45,59 @@ const BookSpineView: React.FC<BookSpineViewProps> = ({
   className = '',
   enableEditing = false
 }) => {
-  const { updateBook, leatherPresets } = useBookStore();
+  const { updateBook, leatherPresets, reorderBooks } = useBookStore();
   const { theme } = useThemeStore();
+  const { extractColor, getColor } = useImageColorExtractor();
+  const [extractedColors, setExtractedColors] = useState<Map<string, string>>(new Map());
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (active.id !== over?.id) {
+      const oldIndex = books.findIndex((book) => book.id === active.id);
+      const newIndex = books.findIndex((book) => book.id === over?.id);
+      
+      if (oldIndex !== -1 && newIndex !== -1) {
+        reorderBooks(oldIndex, newIndex);
+      }
+    }
+  };
 
   const handleBookUpdate = (updatedBook: Book) => {
     updateBook(updatedBook.id, updatedBook);
     onBookSelect(updatedBook);
   };
+
+  // Extract colors for books with cover images
+  useEffect(() => {
+    console.log('BookSpineView: Processing books for color extraction...');
+    books.forEach(async (book) => {
+      if (book.coverImage) {
+        console.log('BookSpineView: Processing book:', book.title);
+        // Check cache first
+        const cachedColor = getColor(book.coverImage);
+        if (cachedColor) {
+          console.log('BookSpineView: Using cached color for', book.title, ':', cachedColor);
+          setExtractedColors(prev => new Map(prev.set(book.id, cachedColor)));
+        } else {
+          console.log('BookSpineView: Extracting new color for', book.title);
+          // Extract color asynchronously
+          const color = await extractColor(book.coverImage);
+          if (color) {
+            console.log('BookSpineView: Color extracted for', book.title, ':', color);
+            setExtractedColors(prev => new Map(prev.set(book.id, color)));
+          }
+        }
+      }
+    });
+  }, [books, extractColor, getColor]);
 
   // Arrange books in reading order: top row first, then bottom row
   const booksPerRow = 8;
@@ -38,6 +105,16 @@ const BookSpineView: React.FC<BookSpineViewProps> = ({
   const bottomRowBooks = books.length > booksPerRow ? books.slice(booksPerRow) : [];
 
   const generateSpineColor = (book: Book) => {
+    // First priority: custom cover image with extracted color
+    if (book.coverImage) {
+      const extractedColor = extractedColors.get(book.id);
+      if (extractedColor) {
+        return extractedColor;
+      }
+      // Fallback to book color while extraction is in progress
+      return book.color || '#3b82f6';
+    }
+    
     // Priority: coverPageSettings baseStyle color, then book.color, then gradient, then leather
     if (book.coverPageSettings) {
       const settings = book.coverPageSettings;
@@ -83,24 +160,44 @@ const BookSpineView: React.FC<BookSpineViewProps> = ({
     return '#3b82f6';
   };
 
-  const SpineBook: React.FC<{ book: Book; index: number }> = ({ book, index }) => {
+  const SortableSpineBook: React.FC<{ book: Book; index: number }> = ({ book, index }) => {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: book.id });
+
     const spineColor = generateSpineColor(book);
     const isSelected = selectedBookId === book.id;
 
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+    };
+
     return (
       <div
+        ref={setNodeRef}
         className={`
           spineview-spine-wrapper
           relative group cursor-pointer
           transition-all duration-300 ease-out
           hover:translate-x-1 hover:-translate-y-1
           ${isSelected ? 'spineview-selected z-20' : 'z-10'}
+          ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}
         `}
-        onClick={() => onBookSelect(book)}
+        onClick={() => !isDragging && onBookSelect(book)}
+        {...attributes}
+        {...listeners}
         style={{
+          ...style,
           width: '40px',
           height: '180px',
-          marginRight: index % 8 === 7 ? '10px' : '1px', // Wider gap every 8 books
+          marginRight: index % 8 === 7 ? '10px' : '1px',
         }}
       >
         {/* Book spine with 3D effect */}
@@ -212,89 +309,99 @@ const BookSpineView: React.FC<BookSpineViewProps> = ({
   }
 
   return (
-    <div className={`spineview-container h-full overflow-y-auto ${className}`}>
-      <div className="spineview-bookcase flex flex-col items-center justify-center min-h-full py-6 px-4">
-        
-        {/* Top shelf row */}
-        <div className="spineview-shelf-row flex items-end mb-4 relative">
-          {/* Invisible shelf effect */}
-          <div
-            className="spineview-shelf-shadow absolute -bottom-3 left-0 right-0 h-1 rounded-full"
-            style={{
-              background: 'linear-gradient(90deg, transparent, rgba(0,0,0,0.2), transparent)',
-              filter: 'blur(3px)',
-            }}
-          />
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleDragEnd}
+    >
+      <div className={`spineview-container h-full overflow-y-auto ${className}`}>
+        <div className="spineview-bookcase flex flex-col items-center justify-center min-h-full py-6 px-4">
           
-          {topRowBooks.map((book, index) => (
-            <SpineBook key={book.id} book={book} index={index} />
-          ))}
-          
-          {/* Fill empty spaces for visual balance */}
-          {topRowBooks.length < 8 && (
-            <>
-              {Array.from({ length: Math.max(0, 8 - topRowBooks.length) }).map((_, index) => (
-                <div
-                  key={`top-filler-${index}`}
-                  className="spineview-filler-spine"
-                  style={{
-                    width: '40px',
-                    height: '180px',
-                    marginRight: index === 7 - topRowBooks.length ? '10px' : '1px',
-                    background: 'linear-gradient(135deg, rgba(156,163,175,0.15) 0%, rgba(107,114,128,0.08) 50%, rgba(75,85,99,0.15) 100%)',
-                    borderRadius: '2px',
-                    border: '1px solid rgba(0,0,0,0.08)',
-                  }}
-                />
+          {/* Top shelf row */}
+          <div className="spineview-shelf-row flex items-end mb-4 relative">
+            {/* Invisible shelf effect */}
+            <div
+              className="spineview-shelf-shadow absolute -bottom-3 left-0 right-0 h-1 rounded-full"
+              style={{
+                background: 'linear-gradient(90deg, transparent, rgba(0,0,0,0.2), transparent)',
+                filter: 'blur(3px)',
+              }}
+            />
+            
+            <SortableContext items={topRowBooks.map(book => book.id)} strategy={horizontalListSortingStrategy}>
+              {topRowBooks.map((book, index) => (
+                <SortableSpineBook key={book.id} book={book} index={index} />
               ))}
-            </>
-          )}
-        </div>
+            </SortableContext>
+            
+            {/* Fill empty spaces for visual balance */}
+            {topRowBooks.length < 8 && (
+              <>
+                {Array.from({ length: Math.max(0, 8 - topRowBooks.length) }).map((_, index) => (
+                  <div
+                    key={`top-filler-${index}`}
+                    className="spineview-filler-spine"
+                    style={{
+                      width: '40px',
+                      height: '180px',
+                      marginRight: index === 7 - topRowBooks.length ? '10px' : '1px',
+                      background: 'linear-gradient(135deg, rgba(156,163,175,0.15) 0%, rgba(107,114,128,0.08) 50%, rgba(75,85,99,0.15) 100%)',
+                      borderRadius: '2px',
+                      border: '1px solid rgba(0,0,0,0.08)',
+                    }}
+                  />
+                ))}
+              </>
+            )}
+          </div>
 
-        {/* Bottom shelf row */}
-        <div className="spineview-shelf-row flex items-end relative">
-          {/* Invisible shelf effect */}
-          <div
-            className="spineview-shelf-shadow absolute -bottom-3 left-0 right-0 h-1 rounded-full"
-            style={{
-              background: 'linear-gradient(90deg, transparent, rgba(0,0,0,0.2), transparent)',
-              filter: 'blur(3px)',
-            }}
-          />
-          
-          {bottomRowBooks.map((book, index) => (
-            <SpineBook key={book.id} book={book} index={index} />
-          ))}
-          
-          {/* Fill empty spaces for visual balance */}
-          {bottomRowBooks.length < 8 && (
-            <>
-              {Array.from({ length: Math.max(0, 8 - bottomRowBooks.length) }).map((_, index) => (
-                <div
-                  key={`bottom-filler-${index}`}
-                  className="spineview-filler-spine"
-                  style={{
-                    width: '40px',
-                    height: '180px',
-                    marginRight: index === 7 - bottomRowBooks.length ? '10px' : '1px',
-                    background: 'linear-gradient(135deg, rgba(156,163,175,0.15) 0%, rgba(107,114,128,0.08) 50%, rgba(75,85,99,0.15) 100%)',
-                    borderRadius: '2px',
-                    border: '1px solid rgba(0,0,0,0.08)',
-                  }}
-                />
+          {/* Bottom shelf row */}
+          <div className="spineview-shelf-row flex items-end relative">
+            {/* Invisible shelf effect */}
+            <div
+              className="spineview-shelf-shadow absolute -bottom-3 left-0 right-0 h-1 rounded-full"
+              style={{
+                background: 'linear-gradient(90deg, transparent, rgba(0,0,0,0.2), transparent)',
+                filter: 'blur(3px)',
+              }}
+            />
+            
+            <SortableContext items={bottomRowBooks.map(book => book.id)} strategy={horizontalListSortingStrategy}>
+              {bottomRowBooks.map((book, index) => (
+                <SortableSpineBook key={book.id} book={book} index={index} />
               ))}
-            </>
-          )}
+            </SortableContext>
+            
+            {/* Fill empty spaces for visual balance */}
+            {bottomRowBooks.length < 8 && (
+              <>
+                {Array.from({ length: Math.max(0, 8 - bottomRowBooks.length) }).map((_, index) => (
+                  <div
+                    key={`bottom-filler-${index}`}
+                    className="spineview-filler-spine"
+                    style={{
+                      width: '40px',
+                      height: '180px',
+                      marginRight: index === 7 - bottomRowBooks.length ? '10px' : '1px',
+                      background: 'linear-gradient(135deg, rgba(156,163,175,0.15) 0%, rgba(107,114,128,0.08) 50%, rgba(75,85,99,0.15) 100%)',
+                      borderRadius: '2px',
+                      border: '1px solid rgba(0,0,0,0.08)',
+                    }}
+                  />
+                ))}
+              </>
+            )}
+          </div>
+        </div>
+        
+        {/* Book count */}
+        <div className="spineview-book-count text-center mt-8">
+          <p className="text-gray-500 text-sm">
+            {books.length} book{books.length !== 1 ? 's' : ''} on shelf
+          </p>
         </div>
       </div>
-      
-      {/* Book count */}
-      <div className="spineview-book-count text-center mt-8">
-        <p className="text-gray-500 text-sm">
-          {books.length} book{books.length !== 1 ? 's' : ''} on shelf
-        </p>
-      </div>
-    </div>
+    </DndContext>
   );
 };
 

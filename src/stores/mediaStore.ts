@@ -11,6 +11,7 @@ interface MediaState {
   videosEnabled: boolean;
   audioEnabled: boolean;
   videoSoundsEnabled: boolean;
+  audioVolume: number;
   
   // Actions
   setAppPhase: (phase: AppPhase) => void;
@@ -20,6 +21,7 @@ interface MediaState {
   setVideosEnabled: (enabled: boolean) => void;
   setAudioEnabled: (enabled: boolean) => void;
   setVideoSoundsEnabled: (enabled: boolean) => void;
+  setAudioVolume: (volume: number) => void;
   
   // Phase transitions
   startIntro: () => void;
@@ -38,6 +40,7 @@ export const useMediaStore = create<MediaState>()(
       videosEnabled: true,
       audioEnabled: true,
       videoSoundsEnabled: true,
+      audioVolume: 0.08, // Default to 8% for background music
 
       setAppPhase: (phase) => set({ appPhase: phase }),
       setAudioPlaying: (playing) => set({ isAudioPlaying: playing }),
@@ -46,6 +49,7 @@ export const useMediaStore = create<MediaState>()(
       setVideosEnabled: (enabled) => set({ videosEnabled: enabled }),
       setAudioEnabled: (enabled) => set({ audioEnabled: enabled }),
       setVideoSoundsEnabled: (enabled) => set({ videoSoundsEnabled: enabled }),
+      setAudioVolume: (volume) => set({ audioVolume: Math.max(0, Math.min(1, volume)) }),
 
       startIntro: () => set({ appPhase: 'INTRO_VIDEO' }),
       showLibrary: () => set({ appPhase: 'LIBRARY' }),
@@ -57,7 +61,8 @@ export const useMediaStore = create<MediaState>()(
       partialize: (state) => ({ 
         videosEnabled: state.videosEnabled,
         audioEnabled: state.audioEnabled,
-        videoSoundsEnabled: state.videoSoundsEnabled
+        videoSoundsEnabled: state.videoSoundsEnabled,
+        audioVolume: state.audioVolume
       }),
     }
   )

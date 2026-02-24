@@ -7,6 +7,7 @@ export interface Book {
   gradient?: string;
   leatherColor?: string;
   isLeatherMode?: boolean;
+  order?: number;
   createdAt: number;
   updatedAt: number;
   worldData: WorldData;

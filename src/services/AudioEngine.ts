@@ -9,10 +9,15 @@ class AudioEngine {
   private tracks = [S1, S2, S3, S4];
   private currentTrackIndex = 0;
   private isPlaying = false;
-  private volume = 0.3; // Background level set to 30% as requested
+  private volume = 0.08; // Default to 8% for barely audible background music
 
   constructor() {
     // Audio will be initialized when needed
+  }
+
+  private getCurrentVolume(): number {
+    const { audioVolume } = useMediaStore.getState();
+    return audioVolume;
   }
 
   public async startWithUserInteraction(): Promise<void> {
@@ -28,7 +33,7 @@ class AudioEngine {
     try {
       console.log('Starting audio engine with user interaction');
       this.audio = new Audio(this.tracks[this.currentTrackIndex]);
-      this.audio.volume = this.volume;
+      this.audio.volume = this.getCurrentVolume();
       this.audio.loop = false; // We'll handle looping manually
       
       this.audio.addEventListener('ended', () => {
@@ -64,7 +69,7 @@ class AudioEngine {
     try {
       console.log('Starting audio engine with track:', this.tracks[this.currentTrackIndex]);
       this.audio = new Audio(this.tracks[this.currentTrackIndex]);
-      this.audio.volume = this.volume;
+      this.audio.volume = this.getCurrentVolume();
       this.audio.loop = false; // We'll handle looping manually
       
       this.audio.addEventListener('ended', () => {
@@ -108,9 +113,19 @@ class AudioEngine {
   }
 
   public setVolume(volume: number): void {
-    this.volume = Math.max(0, Math.min(1, volume));
+    // Update the store instead of internal volume
+    const { setAudioVolume } = useMediaStore.getState();
+    setAudioVolume(Math.max(0, Math.min(1, volume)));
+    
     if (this.audio) {
-      this.audio.volume = this.volume;
+      this.audio.volume = this.getCurrentVolume();
+    }
+  }
+
+  public updateVolume(): void {
+    // Update the volume of currently playing audio to match store
+    if (this.audio && this.isPlaying) {
+      this.audio.volume = this.getCurrentVolume();
     }
   }
 
