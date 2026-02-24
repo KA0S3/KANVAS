@@ -115,6 +115,22 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     });
   };
 
+  const handleAudioToggle = async (enabled: boolean) => {
+    setAudioEnabled(enabled);
+    
+    if (enabled) {
+      // Start music with user interaction
+      try {
+        await audioEngine.startWithUserInteraction();
+      } catch (error) {
+        console.log('Audio start failed:', error);
+      }
+    } else {
+      // Stop music immediately
+      audioEngine.stop();
+    }
+  };
+
   const handleExportData = () => {
     try {
       const data = {
@@ -350,7 +366,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                     <Switch
                       id="audio-enabled"
                       checked={audioEnabled}
-                      onCheckedChange={setAudioEnabled}
+                      onCheckedChange={handleAudioToggle}
                     />
                   </div>
                   
