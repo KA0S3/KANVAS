@@ -71,12 +71,12 @@ const BookEditDialog = ({ book, open, onOpenChange, onBookUpdated }: BookEditDia
   const { updateBook, leatherPresets } = useBookStore();
 
   const colorOptions = [
-    { value: '#1a1a1a', label: 'Rich Black', gradient: 'linear-gradient(135deg, #1a1a1a, #2d2d2d)' },
-    { value: '#1e3a8a', label: 'Navy Blue', gradient: 'linear-gradient(135deg, #1e3a8a, #2563eb)' },
-    { value: '#8B4513', label: 'Classic Brown', gradient: 'linear-gradient(135deg, #8B4513, #A0522D)' },
-    { value: '#2d5016', label: 'Forest Green', gradient: 'linear-gradient(135deg, #2d5016, #3a6b1e)' },
-    { value: '#722f37', label: 'Royal Purple', gradient: 'linear-gradient(135deg, #722f37, #88333c)' },
-    { value: '#36454f', label: 'Arctic White', gradient: 'linear-gradient(135deg, #36454f, #4a5568)' },
+    { value: '#00D9FF', label: 'Electric Azure', gradient: 'linear-gradient(135deg, rgba(0,217,255,0.6), rgba(0,149,255,0.4)), radial-gradient(circle at 30% 30%, rgba(255,255,255,0.7), transparent 50%)' },
+    { value: '#FF006E', label: 'Neon Magenta', gradient: 'linear-gradient(135deg, rgba(255,0,110,0.6), rgba(255,0,150,0.4)), radial-gradient(circle at 70% 70%, rgba(255,255,255,0.8), transparent 50%)' },
+    { value: '#FFBE0B', label: 'Solar Flare', gradient: 'linear-gradient(135deg, rgba(255,190,11,0.6), rgba(255,223,0,0.4)), radial-gradient(circle at 40% 60%, rgba(255,255,255,0.7), transparent 50%)' },
+    { value: '#8338EC', label: 'Cosmic Purple', gradient: 'linear-gradient(135deg, rgba(131,56,236,0.6), rgba(175,82,222,0.4)), radial-gradient(circle at 60% 40%, rgba(255,255,255,0.8), transparent 50%)' },
+    { value: '#06FFB4', label: 'Quantum Teal', gradient: 'linear-gradient(135deg, rgba(6,255,180,0.6), rgba(0,255,195,0.4)), radial-gradient(circle at 30% 70%, rgba(255,255,255,0.7), transparent 50%)' },
+    { value: '#FB5607', label: 'Plasma Orange', gradient: 'linear-gradient(135deg, rgba(251,86,7,0.6), rgba(255,119,48,0.4)), radial-gradient(circle at 50% 50%, rgba(255,255,255,0.8), transparent 50%)' },
   ];
 
   // Reset form when book changes
@@ -84,7 +84,7 @@ const BookEditDialog = ({ book, open, onOpenChange, onBookUpdated }: BookEditDia
     if (book) {
       setTitle(book.title);
       setDescription(book.description || '');
-      setSelectedColor(book.color || '#8B4513');
+      setSelectedColor(book.color || '#00D9FF');
       setIsLeatherMode(book.isLeatherMode ?? true);
       setCustomCoverImage(book.coverImage || null);
       
@@ -95,7 +95,7 @@ const BookEditDialog = ({ book, open, onOpenChange, onBookUpdated }: BookEditDia
       const titleSettings = book.coverPageSettings?.title;
       if (titleSettings) {
         setTitleFontFamily(titleSettings.style.type);
-        setTitleFontSize([parseInt(titleSettings.style.size) || 24]);
+        setTitleFontSize([titleSettings.style.sizePx || parseInt(titleSettings.style.size) || 24]);
         setTitlePosition(titleSettings.position?.x && titleSettings.position?.y 
           ? { x: titleSettings.position.x, y: titleSettings.position.y }
           : { x: 50, y: 40 });
@@ -108,7 +108,7 @@ const BookEditDialog = ({ book, open, onOpenChange, onBookUpdated }: BookEditDia
       const descSettings = book.coverPageSettings?.description;
       if (descSettings) {
         setSubheadingFontFamily(descSettings.style.type);
-        setSubheadingFontSize([parseInt(descSettings.style.size) || 18]);
+        setSubheadingFontSize([descSettings.style.sizePx || parseInt(descSettings.style.size) || 18]);
         setSubheadingPosition(descSettings.position?.x && descSettings.position?.y
           ? { x: descSettings.position.x, y: descSettings.position.y }
           : { x: 50, y: 60 });
@@ -131,9 +131,9 @@ const BookEditDialog = ({ book, open, onOpenChange, onBookUpdated }: BookEditDia
 
     const leatherColorToUse = selectedLeatherColor || (isLeatherMode ? leatherPresets[0] : null);
     
-    // Find the gradient for the selected color
+    // Find gradient for selected color, or create fallback gradient if color not found
     const colorOption = colorOptions.find(option => option.value === selectedColor);
-    const gradient = colorOption ? colorOption.gradient : undefined;
+    const gradient = colorOption ? colorOption.gradient : `linear-gradient(135deg, ${selectedColor}dd, ${selectedColor}99), radial-gradient(circle at 50% 50%, rgba(255,255,255,0.6), transparent 50%)`;
 
     const updatedBook: Book = {
       ...book,
@@ -155,6 +155,7 @@ const BookEditDialog = ({ book, open, onOpenChange, onBookUpdated }: BookEditDia
             type: titleFontFamily as any,
             color: titleTextColor,
             size: titleFontSize[0] <= 12 ? 'small' : titleFontSize[0] <= 18 ? 'medium' : titleFontSize[0] <= 24 ? 'large' : 'extra-large',
+            sizePx: titleFontSize[0],
             outlineColor: titleOutlineColor,
             outlineThickness: titleOutlineThickness[0],
             shadowEnabled: titleShadowEnabled
@@ -167,6 +168,7 @@ const BookEditDialog = ({ book, open, onOpenChange, onBookUpdated }: BookEditDia
             type: subheadingFontFamily as any,
             color: subheadingTextColor,
             size: subheadingFontSize[0] <= 12 ? 'small' : subheadingFontSize[0] <= 18 ? 'medium' : subheadingFontSize[0] <= 24 ? 'large' : 'extra-large',
+            sizePx: subheadingFontSize[0],
             outlineColor: subheadingOutlineColor,
             outlineThickness: subheadingOutlineThickness[0],
             shadowEnabled: subheadingShadowEnabled

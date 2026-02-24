@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dominion Generator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&family=EB+Garamond:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* --- Core Styles & Theming --- */
+        :root {
+            --bg-color: #282c34;
+            --card-bg: rgba(50, 55, 65, 0.8);
+            --border-color: #a88b5c;
+            --text-color: #e6e1d1;
+            --highlight-color: #5c8aa8;
+            --font-header: 'Cinzel Decorative', serif;
+            --font-body: 'EB Garamond', serif;
+            --dropdown-bg: #1e1e1e;
+            --dropdown-border: #666;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-body);
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            background-image: url('data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23323741" fill-opacity="0.2"%3E%3Cpath d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');
+            padding: 20px;
+        }
+
+        h1, h2, h3 {
+            font-family: var(--font-header);
+            color: var(--border-color);
+            text-align: center;
+            margin-bottom: 15px;
+            text-shadow: 1px 1px 2px #000;
+        }
+
+        /* --- Layout --- */
+        .main-container {
+            display: grid;
+            grid-template-columns: 1fr 1.5fr 1fr;
+            grid-template-rows: auto 1fr auto;
+            gap: 20px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            grid-column: 1 / -1;
+        }
+        
+        .footer-card {
+            grid-column: 1 / -1;
+            grid-row: 3;
+        }
+
+        /* --- UI Components --- */
+        .card {
+            background-color: var(--card-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            position: relative; /* Needed for positioning custom dropdowns */
+        }
+        
+        .header-controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        button {
+            font-family: var(--font-body);
+            font-size: 1rem;
+            font-weight: 500;
+            padding: 8px 15px;
+            background-color: #3a3f4a;
+            color: var(--text-color);
+            border: 2px solid var(--border-color);
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            white-space: nowrap;
+        }
+
+        button:hover {
+            background-color: var(--highlight-color);
+            color: white;
+            border-color: white;
+            transform: translateY(-2px);
+        }
+        
+        .small-randomizer-btn {
+            padding: 4px 8px;
+            font-size: 0.8rem;
+            line-height: 1;
+            background-color: #4a3f3a;
+            border-color: #7b6845;
+        }
+        .small-randomizer-btn.list-btn {
+            background-color: #5c6c8a; /* Different color for List button */
+            border-color: #a88b5c;
+        }
+        .small-randomizer-btn:hover {
+            background-color: #9a6d36;
+        }
+        .small-randomizer-btn.list-btn:hover {
+            background-color: #5c8aa8;
+        }
+        
+        .input-group-with-btn {
+            display: flex;
+            gap: 5px;
+        }
+        .input-group-with-btn input,
+        .input-group-with-btn select {
+            flex-grow: 1;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+            position: relative; /* Crucial for custom dropdown positioning */
+        }
+
+        .form-group.flex-grow {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .form-group.flex-grow textarea {
+            flex-grow: 1;
+        }
+
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: var(--border-color);
+        }
+
+        /* Style for all text inputs, textareas, and selects */
+        input[type="text"], input[type="number"], textarea, select {
+            width: 100%;
+            padding: 8px;
+            background-color: rgba(0,0,0,0.3);
+            border: 1px solid #444;
+            border-radius: 4px;
+            color: var(--text-color);
+            font-family: var(--font-body);
+            font-size: 1rem;
+        }
+        
+        /* Custom Select/List Dropdown for Text Fields */
+        .custom-select-list {
+            position: absolute;
+            top: 100%; /* Position below the input-group */
+            left: 0;
+            right: 0;
+            z-index: 50;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.6);
+            margin-top: 2px;
+            display: none; /* Initially hidden */
+        }
+
+        .custom-select-list select {
+            width: 100%;
+            border: none;
+            border-radius: 4px;
+            background-color: var(--dropdown-bg);
+            color: var(--text-color);
+            padding: 8px;
+            height: auto;
+            max-height: 200px;
+        }
+        
+        /* Standard Select Styles (for Dominion Size) */
+        select {
+             /* Hide default select arrow */
+             -webkit-appearance: none;
+             -moz-appearance: none;
+             appearance: none;
+             background-color: var(--dropdown-bg); 
+             border: 1px solid var(--dropdown-border);
+             /* Custom SVG arrow */
+             background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23a88b5c%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-13%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2013l128%20127.9c3.6%203.6%207.8%205.4%2013%205.4s9.4-1.8%2013-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-13%200-5-1.9-9.4-5.4-13z%22/%3E%3C/path%3E%3C/svg%3E');
+             background-repeat: no-repeat;
+             background-position: right 10px top 50%;
+             background-size: .65em auto;
+             padding-right: 30px;
+        }
+        
+        select option {
+            background-color: var(--dropdown-bg);
+            color: var(--text-color);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        
+        #dominion-name {
+            font-size: 2rem;
+            font-family: var(--font-header);
+            text-align: center;
+            padding: 10px;
+            border-width: 2px;
+            border-color: var(--border-color);
+        }
+
+        /* --- NEW PROFICIENCY BONUS STYLES (Requested Change) --- */
+        #top-stats-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px; 
+            align-items: center;
+        }
+
+        #top-stats-controls button {
+            flex-grow: 1;
+            margin: 0;
+            min-height: 40px; /* Match the height of the bonus control */
+        }
+
+        #prof-bonus-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100px; 
+            flex-shrink: 0;
+            padding-top: 5px; /* Adjust spacing to align with button */
+        }
+
+        #prof-bonus-container label {
+            font-size: 0.8rem;
+            color: var(--border-color);
+            margin-bottom: 2px;
+            font-weight: 500;
+        }
+
+        #prof-bonus-container input {
+            width: 100%;
+            text-align: center;
+            padding: 4px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-color: var(--border-color);
+        }
+        /* --- END NEW STYLES --- */
+
+
+        /* --- The rest of the CSS (Proficiencies, Modal, Print) remains unchanged --- */
+        .proficiencies-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            flex-grow: 1;
+        }
+        .proficiency-stat-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .stat-header-wrapper {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+            border: 2px solid var(--border-color);
+            border-radius: 5px;
+            padding: 10px;
+            background-color: rgba(0,0,0,0.2);
+            flex-grow: 1;
+        }
+        .stat-info {
+            flex-grow: 1;
+        }
+        .stat-info h3 {
+            font-family: var(--font-body);
+            font-size: 1.1rem;
+            color: var(--text-color);
+            margin: 0;
+            text-shadow: none;
+            font-weight: bold;
+            text-transform: uppercase;
+            text-align: left;
+        }
+        .stat-info span {
+            font-size: 0.9rem;
+            color: var(--border-color);
+        }
+        .stat-input-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .stat-input-group input {
+            flex: 0 0 70px;
+            text-align: center;
+        }
+        .stat-modifier {
+            flex: 0 0 50px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--highlight-color);
+            text-align: center;
+        }
+
+        .skills-list {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px 20px;
+            padding-left: 15px;
+        }
+        .proficiency-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: space-between;
+        }
+        .proficiency-details {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        input[type="checkbox"] {
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border: 2px solid var(--border-color);
+            border-radius: 3px;
+            cursor: pointer;
+            position: relative;
+            background-color: rgba(0,0,0,0.3);
+            transition: background-color 0.2s;
+        }
+        input[type="checkbox"]:checked {
+            background-color: var(--highlight-color);
+            border-color: var(--text-color);
+        }
+        .proficiency-item label { color: var(--text-color); font-weight: 400; margin-bottom: 0; }
+        .proficiency-bonus-value {
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: var(--text-color);
+            min-width: 30px;
+            text-align: right;
+        }
+
+        /* --- Modal Styles (No Change) --- */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.7); }
+        .modal-content { background-color: var(--bg-color); margin: 10% auto; padding: 30px; border: 2px solid var(--border-color); width: 80%; max-width: 600px; border-radius: 10px; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; }
+        .close-button { color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .saved-dominion-list { list-style: none; margin-top: 20px; }
+        .saved-dominion-list li { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #444; }
+        .saved-dominion-list li:last-child { border-bottom: none; }
+        .dominion-name-modal { font-size: 1.2rem; }
+
+        /* --- PRINT/EXPORT STYLES (The stylized PDF) --- */
+        @media print {
+            body {
+                background: white !important;
+                color: black !important;
+                padding: 0;
+            }
+            .main-container {
+                display: block;
+                max-width: 100%;
+                margin: 0;
+            }
+            .header-controls, #load-modal, #roll-stats-btn, .small-randomizer-btn, #randomize-fields-btn, hr {
+                display: none !important; /* Hide all buttons and UI controls */
+            }
+            h1, h2 {
+                color: #000 !important;
+                text-shadow: none !important;
+                border-bottom: 2px solid #aaa;
+                padding-bottom: 5px;
+            }
+            .card {
+                background: #f8f8f8 !important;
+                border: 1px solid #ccc !important;
+                box-shadow: none !important;
+                margin-bottom: 15px;
+                break-inside: avoid; /* Prevent card breaking across pages */
+            }
+            input[type="text"], input[type="number"], textarea, select {
+                border: none !important;
+                background: none !important;
+                border-bottom: 1px dashed #000 !important;
+                color: black !important;
+                padding: 0 0 2px 0;
+            }
+            /* Hide the actual dropdown arrow in print for select (and datalist input) */
+            select, input[list] {
+                background-image: none !important;
+            }
+            /* Ensure text areas expand to show content */
+            textarea {
+                min-height: 50px !important;
+                height: auto !important;
+            }
+            /* Ensure headers are visible */
+            .header {
+                background: white !important;
+                border: none !important;
+                padding-bottom: 0;
+            }
+            /* Style for Proficiencies in print */
+            .proficiency-stat-group {
+                border: 1px solid #ddd;
+                padding: 5px;
+                margin-bottom: 10px;
+            }
+            .stat-header {
+                border: none !important;
+                background: #e9e9e9 !important;
+                padding: 5px 10px !important;
+                margin-bottom: 5px;
+            }
+            .stat-info h3, .stat-modifier, .proficiency-bonus-value, .proficiency-item label {
+                color: black !important;
+            }
+            .proficiency-details input[type="checkbox"] {
+                border: 1px solid #000;
+                background: white;
+            }
+            /* Show a checkmark in print for checked boxes */
+            .proficiency-details input[type="checkbox"]:checked:after {
+                content: 'X';
+                position: absolute;
+                top: 0;
+                left: 3px;
+                font-size: 12px;
+                color: black;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        <header class="header card">
+            <h1>Dominion Generator & World Manager</h1>
+            <div class="header-controls">
+                <button id="new-btn">New</button>
+                <button id="save-btn">Save</button>
+                <button id="load-btn">Load</button>
+                <button id="export-btn">Export to PDF</button>
+            </div>
+        </header>
+
+        <div class="left-column">
+             <div class="card">
+                <h2>Capabilities & Proficiencies</h2>
+                
+                <div id="top-stats-controls">
+                    <button id="roll-stats-btn">Roll All Stats (3d6)</button>
+                    <div id="prof-bonus-container">
+                        <label for="prof-bonus">Prof. Bonus</label>
+                        <input type="text" id="prof-bonus" value="+2">
+                    </div>
+                </div>
+                
+                <hr style="border-color: #444; margin: 15px 0;">
+                <div class="proficiencies-container" id="proficiencies-list">
+                </div>
+                </div>
+        </div>
+
+        <div class="center-column" style="display: flex; flex-direction: column; gap: 20px;">
+            <div class="card">
+                 <div class="form-group">
+                    <label for="dominion-name">Dominion Name</label>
+                    <div class="input-group-with-btn">
+                        <input type="text" id="dominion-name" placeholder="Enter Dominion Name...">
+                        <button id="randomize-name-btn" class="small-randomizer-btn">🎲</button>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div class="form-group">
+                        <label for="predominant-race">Predominant Race</label>
+                        <div class="input-group-with-btn">
+                            <input type="text" id="predominant-race" placeholder="e.g., Human">
+                            <button id="randomize-race-btn" class="small-randomizer-btn">🎲</button>
+                            <button class="small-randomizer-btn list-btn" data-list-id="race-select">▼</button>
+                        </div>
+                        <div id="race-list-container" class="custom-select-list">
+                            <select id="race-select" size="5"></select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="government">Government</label>
+                        <div class="input-group-with-btn">
+                            <input type="text" id="government" placeholder="e.g., Monarchy">
+                            <button id="randomize-government-btn" class="small-randomizer-btn">🎲</button>
+                            <button class="small-randomizer-btn list-btn" data-list-id="government-select">▼</button>
+                        </div>
+                        <div id="government-list-container" class="custom-select-list">
+                            <select id="government-select" size="5"></select>
+                        </div>
+                    </div>
+                </div>
+                 <div class="form-group">
+                    <label for="alignment">Alignment</label>
+                    <div class="input-group-with-btn">
+                        <input type="text" id="alignment" placeholder="e.g., Lawful Good">
+                        <button id="randomize-alignment-btn" class="small-randomizer-btn">🎲</button>
+                        <button class="small-randomizer-btn list-btn" data-list-id="alignment-select">▼</button>
+                    </div>
+                    <div id="alignment-list-container" class="custom-select-list">
+                        <select id="alignment-select" size="5"></select>
+                    </div>
+                </div>
+                <button id="randomize-fields-btn" style="width: 100%;">Randomize All Fields</button>
+            </div>
+             <div class="card" style="flex-grow: 1;">
+                 <div class="form-group"><label for="districts">Districts</label><textarea id="districts"></textarea></div>
+                 <div class="form-group"><label for="key-buildings">Key Buildings</label><textarea id="key-buildings"></textarea></div>
+                 <div class="form-group"><label for="notable-features">Notable Features</label><textarea id="notable-features"></textarea></div>
+                 <div class="form-group flex-grow"><label for="key-npcs">Key NPCs</label><textarea id="key-npcs"></textarea></div>
+            </div>
+        </div>
+
+        <div class="right-column">
+             <div class="card">
+                <h2>Details & Factions</h2>
+                <div class="form-group">
+                    <label for="dominion-size">Dominion Size</label>
+                    <div class="input-group-with-btn">
+                        <select id="dominion-size"></select>
+                        <button id="randomize-size-btn" class="small-randomizer-btn">🎲</button>
+                    </div>
+                </div>
+                <div class="form-group"><label for="population">Population</label><input type="text" id="population"></div>
+                <div class="form-group"><label for="wealth">Wealth (GP Net Worth)</label><input type="text" id="wealth"></div>
+                <div class="form-group"><label for="influence">Influence</label><textarea id="influence" style="min-height: 40px;"></textarea></div>
+                <div class="form-group"><label for="aesthetics">Aesthetics</label><textarea id="aesthetics"></textarea></div>
+                <div class="form-group"><label for="ideals">Ideals</label><textarea id="ideals"></textarea></div>
+                <div class="form-group"><label for="bonds">Bonds</label><textarea id="bonds"></textarea></div>
+                <div class="form-group"><label for="flaws">Flaws</label><textarea id="flaws"></textarea></div>
+                <div class="form-group flex-grow"><label for="main-factions">Main Factions</label><textarea id="main-factions"></textarea></div>
+            </div>
+        </div>
+
+        <div class="card footer-card">
+            <h2>Relations</h2>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; flex-grow: 1;">
+                <div class="form-group flex-grow"><label for="allies">Allies</label><textarea id="allies"></textarea></div>
+                <div class="form-group flex-grow"><label for="enemies">Enemies</label><textarea id="enemies"></textarea></div>
+            </div>
+        </div>
+        </div>
+
+    <div id="load-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Load Dominion</h2>
+                <span class="close-button">&times;</span>
+            </div>
+            <ul id="saved-dominion-list" class="saved-dominion-list">
+                </ul>
+        </div>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    const DATA = {
+        sizePresets: [
+            { tier: 1, preset: 'Camp', pb: '+0', pop: '<10', wealth: '500 gp', influence: 'Isolated, known only to locals.', profs: ['Fortification', 'Food'] },
+            { tier: 2, preset: 'Tribe', pb: '+1', pop: '10-50', wealth: '2,500 gp', influence: 'Locally recognized by neighbors.', profs: ['Army', 'Food', 'Manufacturing'] },
+            { tier: 3, preset: 'Hamlet', pb: '+1', pop: '50-200', wealth: '10,000 gp', influence: 'Minor regional knowledge.', profs: ['Markets', 'Forestry', 'Agriculture'] },
+            { tier: 4, preset: 'Village', pb: '+2', pop: '200-800', wealth: '50,000 gp', influence: 'Recognized by major towns.', profs: ['Markets', 'Trade', 'Law', 'Agriculture'] },
+            { tier: 5, preset: 'Town', pb: '+2', pop: '800-3K', wealth: '250,000 gp', influence: 'Significant local pull.', profs: ['Banking', 'Trade', 'Law', 'Army', 'Fortification'] },
+            { tier: 6, preset: 'City', pb: '+3', pop: '3K-10K', wealth: '1,000,000 gp', influence: 'Regional political power.', profs: ['Manufacturing', 'Markets', 'Law', 'Army', 'Architecture'] },
+            { tier: 7, preset: 'Metropolis', pb: '+3', pop: '10K-30K', wealth: '4,000,000 gp', influence: 'Major regional capital.', profs: ['Banking', 'Law', 'Arcana', 'History', 'Trade', 'Fortification'] },
+            { tier: 8, preset: 'Free State', pb: '+4', pop: '30K-80K', wealth: '10,000,000 gp', influence: 'Independent, self-governing.', profs: ['Technology', 'Navy', 'Alliances', 'Law', 'Markets', 'Army'] },
+            { tier: 9, preset: 'Kingdom', pb: '+4', pop: '80K-200K', wealth: '30,000,000 gp', influence: 'Controls significant territory.', profs: ['Fortification', 'Army', 'Navy', 'Alliances', 'Religion', 'Trade'] },
+            { tier: 10, preset: 'Imperial City', pb: '+5', pop: '200K-500K', wealth: '80,000,000 gp', influence: 'Global economic weight.', profs: ['Architecture', 'Technology', 'Army', 'Navy', 'Law', 'Markets'] },
+            { tier: 11, preset: 'Empire', pb: '+5', pop: '500K-1M', wealth: '150,000,000 gp', influence: 'Global political superpower.', profs: ['Markets', 'Trade', 'Banking', 'Law', 'Army', 'Navy', 'Alliances'] },
+            { tier: 12, preset: 'Hegemony', pb: '+6', pop: '1M+', wealth: '300,000,000 gp', influence: 'Continental-spanning power.', profs: ['Fortification', 'Army', 'Navy', 'Law', 'Markets', 'Trade', 'Banking', 'Technology'] },
+        ],
+        proficiencies: [
+            { group: 'Military', stat: 'str', skills: ['Army', 'Navy', 'Fortification', 'Law'] },
+            { group: 'Commerce', stat: 'dex', skills: ['Markets', 'Trade', 'Banking', 'Crime'] },
+            { group: 'Industry', stat: 'con', skills: ['Forestry', 'Mining', 'Manufacturing', 'Agriculture'] },
+            { group: 'Education', stat: 'int', skills: ['Technology', 'Arcana', 'Physics', 'Medicine'] },
+            { group: 'Diplomacy', stat: 'wis', skills: ['Philosophy', 'Alliances', 'Religion', 'Social Justice'] },
+            { group: 'Culture', stat: 'cha', skills: ['History', 'Art', 'Architecture', 'Food'] },
+        ],
+        randomizer: {
+            prefixes: ['Aer', 'Thal', 'Cor', 'Ely', 'Mar', 'Valen', 'Syl', 'Drak', 'Fen', 'Lir', 'Tor', 'Vor', 'Kel', 'Mer', 'Nor', 'Pal', 'Qir', 'Rin', 'Ser', 'Ul', 'Wyn', 'Xal', 'Yar', 'Zeph', 'Gal', 'Hael', 'Iss', 'Jar', 'Lis', 'Myr', 'Nys', 'Ori', 'Pyr', 'Quo', 'Rha', 'Sun', 'Tal', 'Uri', 'Vel', 'Xan', 'Yel', 'Zar', 'Bran', 'Cai', 'Den', 'Eon'],
+            cores: ['dor', 'thys', 'riel', 'mark', 'wen', 'var', 'neth', 'mir', 'hyn', 'sal', 'lun', 'tor', 'kai', 'rec', 'fal', 'ion', 'iar', 'ara', 'enn', 'ora', 'eth', 'ael', 'ian', 'orin', 'alan', 'eris', 'yra', 'en', 'on', 'ir', 'us', 'al', 'is', 'ar', 'um', 'ex', 'ux', 'yx', 'ae', 'oe', 'ue', 'ui', 'yion', 'ean', 'ion'],
+            suffixes: ['ion', 'as', 'or', 'is', 'an', 'yr', 'en', 'et', 'ix', 'os', 'um', 'ar', 'el', 'ud', 'us', 'es', 'al', 'on', 'ir', 'ys', 'ai', 'ea', 'oa'],
+            races: ['Aarakocra', 'Aasimar', 'Bugbear', 'Centaur', 'Changeling', 'Dragonborn', 'Dwarf', 'Elf', 'Firbolg', 'Genasi', 'Gith', 'Gnome', 'Goblin', 'Grung', 'Half-Elf', 'Half-Orc', 'Hobgoblin', 'Human', 'Kalastar', 'Kenku', 'Kobold', 'Lizardfolk', 'Locathah', 'Loxodon', 'Minotaur', 'Orc', 'Shifter', 'Simic-Hybrid', 'Tabaxi', 'Tiefling', 'Tortle', 'Triton', 'Vedalken', 'Warforged', 'Yuan-Ti Pureblood'],
+            governments: ['Monarchy', 'Theocracy', 'Oligarchy', 'Democracy', 'Military Junta', 'Tribal Council', 'Plutocracy', 'Anarchy', 'Magocracy', 'Technocracy', 'Republic', 'Confederacy', 'Syndicate', 'Feudalism'],
+            alignments: ['Lawful Good', 'Neutral Good', 'Chaotic Good', 'Lawful Neutral', 'True Neutral', 'Chaotic Neutral', 'Lawful Evil', 'Neutral Evil', 'Chaotic Evil'],
+        }
+    };
+
+    const DOMElements = {};
+
+    function initialize() {
+        // 1. Generate Proficiencies Card HTML (No Change)
+        const statMap = { str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' };
+        let proficienciesHTML = '';
+        DATA.proficiencies.forEach(group => {
+            const statName = statMap[group.stat];
+            proficienciesHTML += `
+                <div class="proficiency-stat-group">
+                    <div class="stat-header-wrapper">
+                        <div class="stat-header">
+                            <div class="stat-info">
+                                <h3>${statName}</h3>
+                                <span>(${group.group})</span>
+                            </div>
+                            <div class="stat-input-group">
+                                <input type="number" id="${group.stat}-stat" min="3" max="18" value="10">
+                                <span class="stat-modifier" id="${group.stat}-mod"></span>
+                            </div>
+                        </div>
+                        <button id="randomize-${group.stat}-stat-btn" class="small-randomizer-btn" data-stat="${group.stat}" title="Randomize Stat Value (3-18)">🎲</button>
+                    </div>
+                    <div class="skills-list">`;
+            group.skills.forEach(skill => {
+                const skillId = skill.toLowerCase().replace(/ /g, '-');
+                proficienciesHTML += `
+                    <div class="proficiency-item">
+                        <div class="proficiency-details">
+                            <input type="checkbox" id="prof-${skillId}" data-proficiency="${skill}" data-stat="${group.stat}">
+                            <label for="prof-${skillId}">${skill}</label>
+                        </div>
+                        <span class="proficiency-bonus-value" id="prof-${skillId}-bonus"></span>
+                    </div>`;
+            });
+            proficienciesHTML += `</div></div>`;
+        });
+        document.getElementById('proficiencies-list').innerHTML = proficienciesHTML;
+
+        // 2. Populate DOM element references
+        const ids = [
+            'dominion-name', 'predominant-race', 'government', 'alignment', 'str-stat', 'dex-stat', 
+            'con-stat', 'int-stat', 'wis-stat', 'cha-stat', 'dominion-size', 'prof-bonus', 
+            'population', 'wealth', 'influence', 'districts', 'key-buildings', 'notable-features',
+            'aesthetics', 'ideals', 'bonds', 'flaws', 'main-factions', 'key-npcs', 
+            'proficiencies-list', 'new-btn', 'save-btn', 'load-btn', 'export-btn', 
+            'roll-stats-btn', 'randomize-fields-btn', 'load-modal',
+            'saved-dominion-list', 'str-mod', 'dex-mod', 'con-mod', 'int-mod', 'wis-mod', 'cha-mod',
+            // Individual randomizer buttons
+            'randomize-name-btn', 'randomize-race-btn', 'randomize-government-btn', 'randomize-alignment-btn',
+            'randomize-str-stat-btn', 'randomize-dex-stat-btn', 'randomize-con-stat-btn',
+            'randomize-int-stat-btn', 'randomize-wis-stat-btn', 'randomize-cha-stat-btn',
+            'randomize-size-btn',
+            // Relations Card IDs
+            'allies', 'enemies',
+            // New Select IDs
+            'race-select', 'government-select', 'alignment-select'
+        ];
+        ids.forEach(id => {
+            DOMElements[id.replace(/-(\w)/g, (m, g) => g.toUpperCase())] = document.getElementById(id);
+        });
+        DOMElements.closeModalBtn = document.querySelector('.close-button');
+        DOMElements.listButtons = document.querySelectorAll('.small-randomizer-btn.list-btn');
+
+        // Helper function to populate Selects
+        function populateSelect(selectElement, dataArray) {
+            selectElement.innerHTML = '';
+            // Add a default instruction option
+             const defaultOption = document.createElement('option');
+             defaultOption.textContent = '--- Select from List ---';
+             defaultOption.value = '';
+             selectElement.appendChild(defaultOption);
+            dataArray.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item;
+                option.textContent = item;
+                selectElement.appendChild(option);
+            });
+        }
+        
+        // 3. Populate Select dropdowns (Dominion Size and the new separate List Selects)
+        
+        // Dominion Size (Standard Select): ADDED data- attributes for visual control
+        const defaultSizeOption = document.createElement('option');
+        defaultSizeOption.textContent = 'Select a size preset...';
+        defaultSizeOption.value = '';
+        defaultSizeOption.disabled = true;
+        defaultSizeOption.selected = true;
+        DOMElements.dominionSize.appendChild(defaultSizeOption);
+        DATA.sizePresets.forEach(preset => {
+            const option = document.createElement('option');
+            const longText = `${preset.preset} (Pop: ${preset.pop})`; // Store long text
+            // Text Content (what is shown in the list): Full Name (Pop)
+            option.textContent = longText;
+            // Value (what is submitted): Only the Preset Name
+            option.value = preset.preset; 
+            option.setAttribute('data-long-text', longText); // Store long text
+            option.setAttribute('data-short-text', preset.preset); // Store short text
+            DOMElements.dominionSize.appendChild(option);
+        });
+
+        // Populate new Select elements for independent dropdowns
+        populateSelect(DOMElements.raceSelect, DATA.randomizer.races);
+        populateSelect(DOMElements.governmentSelect, DATA.randomizer.governments);
+        populateSelect(DOMElements.alignmentSelect, DATA.randomizer.alignments);
+        
+        // Find all inputs including the new text inputs
+        DOMElements.allInputs = document.querySelectorAll('input[type="text"], input[type="number"], textarea, input[type="checkbox"], select');
+        
+        addEventListeners();
+        updateAllCalculatedValues();
+    }
+
+    // NEW HELPER FUNCTION to handle the required visual fix
+    function updateDominionSizeDisplay(selectedValue) {
+        for (const option of DOMElements.dominionSize.options) {
+            if (option.value === '') continue; // Skip the default option
+            if (option.value === selectedValue) {
+                // When selected, show ONLY the name
+                option.textContent = option.getAttribute('data-short-text');
+            } else {
+                // When unselected (in the list), show the FULL name
+                option.textContent = option.getAttribute('data-long-text');
+            }
+        }
+    }
+
+
+    function addEventListeners() {
+        DOMElements.rollStatsBtn.addEventListener('click', rollStats);
+        DOMElements.randomizeFieldsBtn.addEventListener('click', randomizeAllFields);
+        DOMElements.newBtn.addEventListener('click', clearSheet);
+        DOMElements.saveBtn.addEventListener('click', saveDominion);
+        DOMElements.loadBtn.addEventListener('click', showLoadModal);
+        DOMElements.exportBtn.addEventListener('click', () => window.print());
+        DOMElements.closeModalBtn.addEventListener('click', () => DOMElements.loadModal.style.display = 'none');
+        window.addEventListener('click', (event) => {
+            if (event.target == DOMElements.loadModal) DOMElements.loadModal.style.display = 'none';
+        });
+
+        // --- New Independent Dropdown Logic ---
+        DOMElements.listButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevents clicks outside the list from closing it immediately
+                const targetId = e.target.dataset.listId; // e.g., 'race-select'
+                const targetContainer = document.getElementById(targetId.replace('-select', '-list-container'));
+
+                // Hide all other lists first
+                document.querySelectorAll('.custom-select-list').forEach(list => {
+                    if (list !== targetContainer) {
+                        list.style.display = 'none';
+                    }
+                });
+                // Toggle the target list
+                targetContainer.style.display = targetContainer.style.display === 'block' ? 'none' : 'block';
+            });
+        });
+
+        // Listener for when an item is selected from the custom select
+        document.querySelectorAll('.custom-select-list select').forEach(select => {
+            select.addEventListener('change', (e) => {
+                const selectedValue = e.target.value;
+                if (selectedValue) {
+                    // Determine which text input to update based on the select's ID
+                    let inputId;
+                    if (e.target.id === 'race-select') inputId = 'predominant-race';
+                    else if (e.target.id === 'government-select') inputId = 'government';
+                    else if (e.target.id === 'alignment-select') inputId = 'alignment';
+                    
+                    if (inputId) {
+                        document.getElementById(inputId).value = selectedValue;
+                    }
+                }
+                // Hide the list after selection
+                e.target.parentElement.style.display = 'none';
+            });
+        });
+
+        // Close the list if the user clicks anywhere else on the page
+        window.addEventListener('click', () => {
+             document.querySelectorAll('.custom-select-list').forEach(list => {
+                list.style.display = 'none';
+            });
+        });
+
+        // Individual Randomizer Listeners for center column
+        DOMElements.randomizeNameBtn.addEventListener('click', randomizeName);
+        DOMElements.randomizeRaceBtn.addEventListener('click', randomizeRace);
+        DOMElements.randomizeGovernmentBtn.addEventListener('click', randomizeGovernment);
+        DOMElements.randomizeAlignmentBtn.addEventListener('click', randomizeAlignment);
+        DOMElements.randomizeSizeBtn.addEventListener('click', randomizeSize);
+
+        // Capability Group Randomizer Listeners for stats
+        document.querySelectorAll('[id^="randomize-"][id$="-stat-btn"]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const stat = e.target.dataset.stat;
+                randomizeStat(stat);
+            });
+        });
+
+        DOMElements.dominionSize.addEventListener('change', (e) => {
+            const selectedValue = e.target.value; // The short name (preset.preset)
+
+            // ADDED: Call the visual fix function
+            updateDominionSizeDisplay(selectedValue);
+            
+            // The existing preset logic
+            if(selectedValue) applySizePreset(selectedValue);
+        });
+
+        // The logic for Prof. Bonus now lives at the top, but listeners remain the same
+        const statInputs = [DOMElements.strStat, DOMElements.dexStat, DOMElements.conStat, DOMElements.intStat, DOMElements.wisStat, DOMElements.chaStat, DOMElements.profBonus];
+        statInputs.forEach(input => input.addEventListener('input', updateAllCalculatedValues));
+        DOMElements.proficienciesList.querySelectorAll('input[type="checkbox"]').forEach(box => {
+            box.addEventListener('change', updateAllCalculatedValues);
+        });
+    }
+
+    const getRandomItem = (arr) => arr[Math.floor(Math.random() * arr.length)];
+    // Rolls 3d6 (range 3-18)
+    const roll3d6 = () => Math.floor(Math.random() * 6) + Math.floor(Math.random() * 6) + Math.floor(Math.random() * 6) + 3; 
+    
+    const calculateModifier = (statValue) => Math.floor((statValue - 10) / 2);
+    
+    function updateAllCalculatedValues() {
+        const stats = {
+            str: parseInt(DOMElements.strStat.value) || 10,
+            dex: parseInt(DOMElements.dexStat.value) || 10,
+            con: parseInt(DOMElements.conStat.value) || 10,
+            int: parseInt(DOMElements.intStat.value) || 10,
+            wis: parseInt(DOMElements.wisStat.value) || 10,
+            cha: parseInt(DOMElements.chaStat.value) || 10,
+        };
+        const modifiers = {};
+        
+        for (const stat in stats) {
+            const mod = calculateModifier(stats[stat]);
+            modifiers[stat] = mod;
+            const modEl = DOMElements[`${stat}Mod`];
+            // The Proficiency Bonus element itself no longer has a span, only the stat groups do
+            if (modEl) { 
+                modEl.textContent = `(${mod >= 0 ? '+' : ''}${mod})`;
+            }
+        }
+        
+        const pb = parseInt(DOMElements.profBonus.value.replace('+', '')) || 0;
+
+        DOMElements.proficienciesList.querySelectorAll('input[type="checkbox"]').forEach(box => {
+            const associatedStat = box.dataset.stat;
+            const baseModifier = modifiers[associatedStat];
+            const totalBonus = box.checked ? baseModifier + pb : baseModifier;
+            
+            const bonusEl = document.getElementById(`${box.id}-bonus`);
+            bonusEl.textContent = `${totalBonus >= 0 ? '+' : ''}${totalBonus}`;
+        });
+    }
+
+    function rollStats() {
+        DOMElements.strStat.value = roll3d6();
+        DOMElements.dexStat.value = roll3d6();
+        DOMElements.conStat.value = roll3d6();
+        DOMElements.intStat.value = roll3d6();
+        DOMElements.wisStat.value = roll3d6();
+        DOMElements.chaStat.value = roll3d6();
+        updateAllCalculatedValues();
+    }
+
+    /* --- Individual Randomizer Functions --- */
+    function randomizeName() {
+        const { prefixes, cores, suffixes } = DATA.randomizer;
+        DOMElements.dominionName.value = getRandomItem(prefixes) + getRandomItem(cores) + getRandomItem(suffixes);
+    }
+    
+    function randomizeRace() {
+        DOMElements.predominantRace.value = getRandomItem(DATA.randomizer.races);
+    }
+
+    function randomizeGovernment() {
+        DOMElements.government.value = getRandomItem(DATA.randomizer.governments);
+    }
+
+    function randomizeAlignment() {
+        DOMElements.alignment.value = getRandomItem(DATA.randomizer.alignments);
+    }
+    
+    function randomizeSize() {
+        const randomPreset = getRandomItem(DATA.sizePresets);
+        const selectedValue = randomPreset.preset; // Get the short name
+
+        applySizePreset(selectedValue);
+        
+        // Ensure the dropdown reflects the selected preset value (just the name)
+        DOMElements.dominionSize.value = selectedValue;
+
+        // Apply visual fix
+        updateDominionSizeDisplay(selectedValue);
+    }
+
+    // Function to randomize only the Core Stat Value (3-18)
+    function randomizeStat(stat) {
+        const statInput = DOMElements[`${stat}Stat`];
+        if (statInput) {
+            statInput.value = roll3d6();
+            updateAllCalculatedValues();
+        }
+    }
+    
+    // Randomize All Fields: excludes Dominion Size
+    function randomizeAllFields() {
+        randomizeName();
+        randomizeRace();
+        randomizeGovernment();
+        randomizeAlignment();
+    }
+    /* --- End Individual Randomizer Functions --- */
+    
+    function applySizePreset(presetName) {
+        // Find the preset by the name which is now the .value of the select
+        const preset = DATA.sizePresets.find(p => p.preset === presetName);
+        if (!preset) return;
+
+        DOMElements.profBonus.value = preset.pb;
+        DOMElements.population.value = preset.pop;
+        DOMElements.wealth.value = preset.wealth;
+        DOMElements.influence.value = preset.influence;
+
+        DOMElements.proficienciesList.querySelectorAll('input[type="checkbox"]').forEach(box => {
+            box.checked = preset.profs.includes(box.dataset.proficiency);
+        });
+        updateAllCalculatedValues();
+    }
+
+    function clearSheet() {
+        if (confirm("Are you sure you want to clear all fields? Any unsaved data will be lost.")) {
+            DOMElements.allInputs.forEach(input => {
+                if (input.type === 'checkbox') input.checked = false;
+                else if (input.tagName === 'SELECT') input.selectedIndex = 0;
+                else input.value = '';
+            });
+            ['strStat', 'dexStat', 'conStat', 'intStat', 'wisStat', 'chaStat'].forEach(s => DOMElements[s].value = 10);
+            DOMElements.profBonus.value = "+0";
+            updateAllCalculatedValues();
+        }
+    }
+
+    const DB_KEY = 'dominionGeneratorDB';
+
+    function getDatabase() { return JSON.parse(localStorage.getItem(DB_KEY)) || {}; }
+    function saveDatabase(db) { localStorage.setItem(DB_KEY, JSON.stringify(db)); }
+
+    function saveDominion() {
+        const key = DOMElements.dominionName.value.trim();
+        if (!key) { alert("Please enter a Dominion Name before saving."); return; }
+
+        const db = getDatabase();
+        if (db[key] && !confirm(`A dominion named "${key}" already exists. Overwrite?`)) return;
+
+        const dominionObject = {};
+        DOMElements.allInputs.forEach(input => {
+            const id = input.id;
+            if(!id) return;
+            // Correctly saves the state of all input types
+            dominionObject[id] = (input.type === 'checkbox') ? input.checked : input.value;
+        });
+
+        db[key] = dominionObject;
+        saveDatabase(db);
+        alert(`Dominion "${key}" saved!`);
+    }
+
+    function loadDominion(key) {
+        const dominionObject = getDatabase()[key];
+        if (!dominionObject) return;
+
+        DOMElements.allInputs.forEach(input => {
+            const id = input.id;
+            if(!id) return;
+            if (dominionObject[id] !== undefined) {
+                if (input.type === 'checkbox') input.checked = dominionObject[id];
+                else input.value = dominionObject[id];
+            }
+        });
+        DOMElements.loadModal.style.display = 'none';
+        updateAllCalculatedValues();
+
+        // Call the visual fix function after loading to ensure the selected display is correct
+        updateDominionSizeDisplay(dominionObject['dominion-size']);
+    }
+
+    function deleteDominion(key) {
+        if (!confirm(`Are you sure you want to permanently delete "${key}"?`)) return;
+        const db = getDatabase();
+        delete db[key];
+        saveDatabase(db);
+        populateLoadList();
+    }
+
+    function showLoadModal() {
+        populateLoadList();
+        DOMElements.loadModal.style.display = 'block';
+    }
+
+    function populateLoadList() {
+        const keys = Object.keys(getDatabase());
+        DOMElements.savedDominionList.innerHTML = '';
+
+        if (keys.length === 0) {
+            DOMElements.savedDominionList.innerHTML = '<li>No dominions saved yet.</li>';
+            return;
+        }
+
+        keys.sort().forEach(key => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <span class="dominion-name-modal">${key}</span>
+                <div>
+                    <button class="load-item-btn" data-key="${key}">Load</button>
+                    <button class="delete-item-btn" data-key="${key}" style="background-color: #8a5c5c;">Delete</button>
+                </div>
+            `;
+            DOMElements.savedDominionList.appendChild(li);
+        });
+        
+        DOMElements.savedDominionList.querySelectorAll('.load-item-btn').forEach(btn => btn.addEventListener('click', (e) => loadDominion(e.target.dataset.key)));
+        DOMElements.savedDominionList.querySelectorAll('.delete-item-btn').forEach(btn => btn.addEventListener('click', (e) => deleteDominion(e.target.dataset.key)));
+    }
+
+    initialize();
+});
+</script>
+
+</body>
+</html>

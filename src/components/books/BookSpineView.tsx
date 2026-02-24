@@ -3,6 +3,7 @@ import type { Book } from '@/types/book';
 import BookCard from './BookCard';
 import EditableBook from './EditableBook';
 import { useBookStore } from '@/stores/bookStoreSimple';
+import { useThemeStore } from '@/stores/themeStore';
 
 interface BookSpineViewProps {
   books: Book[];
@@ -23,23 +24,53 @@ const BookSpineView: React.FC<BookSpineViewProps> = ({
   className = '',
   enableEditing = false
 }) => {
-  const { updateBook } = useBookStore();
+  const { updateBook, leatherPresets } = useBookStore();
+  const { theme } = useThemeStore();
 
   const handleBookUpdate = (updatedBook: Book) => {
     updateBook(updatedBook.id, updatedBook);
     onBookSelect(updatedBook);
   };
 
-  // Split books into two rows
-  const midPoint = Math.ceil(books.length / 2);
-  const topRowBooks = books.slice(0, midPoint);
-  const bottomRowBooks = books.slice(midPoint);
+  // Arrange books in reading order: top row first, then bottom row
+  const booksPerRow = 8;
+  const topRowBooks = books.slice(0, Math.min(booksPerRow, books.length));
+  const bottomRowBooks = books.length > booksPerRow ? books.slice(booksPerRow) : [];
 
   const generateSpineColor = (book: Book) => {
-    // Match the color logic from BookCover and BookSpine components
-    if (book.coverImage) {
-      // For books with cover images, use the book's color or fallback
-      return book.color || '#3b82f6';
+    // Priority: coverPageSettings baseStyle color, then book.color, then gradient, then leather
+    if (book.coverPageSettings) {
+      const settings = book.coverPageSettings;
+      if (settings.baseStyle === 'leather' && book.leatherColor) {
+        // Find the leather preset - leather colors stay consistent regardless of theme
+        const preset = leatherPresets.find(p => p.color === book.leatherColor);
+        if (preset) {
+          return preset.color; // Use base color, not theme variant
+        }
+        return book.leatherColor;
+      }
+      if (settings.baseStyle === 'gradient' && book.gradient) {
+        // Extract first color from gradient
+        const match = book.gradient.match(/#[0-9a-fA-F]{6}/);
+        return match ? match[0] : book.color;
+      }
+      if (settings.title && settings.title.style.color) {
+        return settings.title.style.color;
+      }
+    }
+    
+    // Handle leather mode - leather colors stay consistent regardless of theme
+    if (book.isLeatherMode && book.leatherColor) {
+      const preset = leatherPresets.find(p => p.color === book.leatherColor);
+      if (preset) {
+        return preset.color; // Use base color, not theme variant
+      }
+      return book.leatherColor;
+    }
+    
+    // Fallback to book color properties
+    if (book.color) {
+      return book.color;
     }
     
     if (book.gradient) {
@@ -48,13 +79,8 @@ const BookSpineView: React.FC<BookSpineViewProps> = ({
       return match ? match[0] : '#3b82f6';
     }
     
-    if (book.isLeatherMode) {
-      // Use leather color if available
-      return book.leatherColor || '#8B4513';
-    }
-    
-    // Fallback to book color or default
-    return book.color || '#3b82f6';
+    // Final fallback
+    return '#3b82f6';
   };
 
   const SpineBook: React.FC<{ book: Book; index: number }> = ({ book, index }) => {

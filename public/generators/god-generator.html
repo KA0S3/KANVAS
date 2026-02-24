@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forge of Gods v0.9. - Pantheon & Deity Manager</title>
+
+    <style>
+        /* --- Font Import --- */
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Cormorant+Garamond:wght@300;400;600&display=swap');
+
+        /* --- Global Stone & Ethereal Theme --- */
+        :root {
+            --bg-color: #121212;
+            --card-bg: #222222;
+            --text-color: #dcdcdc;
+            --border-color: #383838;
+            --accent-color-deity: #e0f7fa;
+            --accent-glow-deity: 0 0 2px rgba(224, 247, 250, 0.7), 0 0 6px rgba(178, 235, 242, 0.5);
+            --accent-color-pantheon: #ffcc80;
+            --secondary-color-pantheon: #e53935;
+            --accent-glow-pantheon: 0 0 5px #ffcc80, 0 0 15px #e53935;
+            --accent-color-festival: #a5d6a7;
+            --secondary-color-festival: #4caf50;
+            --accent-glow-festival: 0 0 5px #a5d6a7, 0 0 15px #4caf50;
+            /* NEW Relationship Theme Colors (Red Glow) */
+            --accent-color-relationship: #ff8a80;
+            --secondary-color-relationship: #e53935;
+            --accent-glow-relationship: 0 0 5px #ff8a80, 0 0 15px #e53935;
+            
+            --font-header: 'Cinzel', serif;
+            --font-body: 'Cormorant Garamond', serif;
+            --stone-texture: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAcAAAAHCAYAAACzXTVzAAAAGElEQVQImWNgYGBgYFjDkIeTf+AABoAAp9yQ0FwAAAAASUVORK5CYII=') repeat;
+        }
+
+        body {
+            font-family: var(--font-body);
+            background-color: var(--bg-color);
+            background-image: var(--stone-texture);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        /* --- Header & Tab Navigation --- */
+        .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid var(--border-color); }
+        .header h1 { font-family: var(--font-header); font-size: 2em; margin: 0; padding-bottom: 10px; color: var(--text-color); text-shadow: 0 0 8px rgba(255, 255, 255, 0.1); }
+        .tabs { display: flex; justify-content: center; border-bottom: 1px solid var(--border-color); margin-bottom: 20px; }
+        .tab-button { padding: 10px 20px; margin: 0 5px; cursor: pointer; background: var(--card-bg); border: 1px solid var(--border-color); color: var(--text-color); font-family: var(--font-header); font-weight: 700; transition: all 0.3s ease; }
+        .tab-button.active.deity { background: rgba(178, 235, 242, 0.1); border-bottom: 2px solid var(--accent-color-deity); color: var(--accent-color-deity); box-shadow: 0 0 10px rgba(178, 235, 242, 0.4); }
+        .tab-button.active.pantheon { background: rgba(255, 204, 128, 0.1); border-bottom: 2px solid var(--accent-color-pantheon); color: var(--accent-color-pantheon); box-shadow: 0 0 10px rgba(229, 57, 53, 0.4); }
+        .tab-button.active.festival { background: rgba(165, 214, 167, 0.1); border-bottom: 2px solid var(--accent-color-festival); color: var(--accent-color-festival); box-shadow: 0 0 10px rgba(76, 175, 80, 0.4); }
+        /* NEW Relationship Tab Style */
+        .tab-button.active.relationship { background: rgba(255, 138, 128, 0.1); border-bottom: 2px solid var(--accent-color-relationship); color: var(--accent-color-relationship); box-shadow: 0 0 10px rgba(229, 57, 53, 0.4); }
+        
+        .tab-content { display: none; padding: 20px; background: var(--card-bg); border: 1px solid var(--border-color); box-shadow: 0 0 20px rgba(0, 0, 0, 0.5); border-radius: 5px; }
+        .tab-content.active { display: grid; gap: 20px; }
+        #deity-anvil.active, #pantheon-forge.active, #festival-sanctum.active { grid-template-columns: 1fr 1fr; }
+        #relationship-manual.active { grid-template-columns: 1fr; } /* NEW: Ensure single column for new tab */
+        
+
+        /* --- Card and Form Styling --- */
+        .card { background: var(--card-bg); padding: 20px; border: 1px solid var(--border-color); border-radius: 5px; box-shadow: 0 0 15px rgba(0, 0, 0, 0.3); display: flex; flex-direction: column; }
+        #deity-anvil .card { box-shadow: 0 0 12px rgba(224, 247, 250, 0.1); }
+        .card h2 { font-family: var(--font-header); text-align: center; margin-top: 0; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: center; align-items: center; gap: 15px; }
+        .card h2 .random-all-btn { font-size: 0.8em; cursor: pointer; transition: transform 0.3s ease, text-shadow 0.3s ease; }
+        .card h2 .random-all-btn:hover { transform: rotate(360deg) scale(1.2); }
+        .card h3 { font-family: var(--font-header); text-align: center; margin-top: 0; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: center; align-items: center; gap: 15px; }
+        .form-group { margin-bottom: 15px; display: flex; flex-direction: column; position: relative; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.9em; letter-spacing: 0.5px; }
+        input[type="text"], textarea, select { width: 100%; padding: 8px; box-sizing: border-box; background: #1e1e1e; border: 1px solid var(--border-color); color: var(--text-color); font-family: var(--font-body); font-size: 1em; border-radius: 3px; }
+        
+        /* --- Hybrid Input Component (HIC) & Dropdown List --- */
+        .hic-group { display: flex; gap: 5px; }
+        .hic-group input[type="text"], .hic-group select { flex-grow: 1; }
+        .hic-group .btn-hic { flex-shrink: 0; padding: 8px 10px; font-size: 1em; line-height: 1; }
+        .custom-select-list { display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 50; border: 1px solid var(--accent-color-deity); border-radius: 4px; box-shadow: 0 4px 8px rgba(0,0,0,0.6); margin-top: 2px; }
+        .custom-select-list select { width: 100%; border: none; background-color: #1e1e1e; color: var(--text-color); }
+        
+        /* --- SAC (Symbol, Animal, Colour) Tab Styling --- */
+        .sac-tabs { display: flex; justify-content: flex-start; border-bottom: 1px solid var(--border-color); margin-bottom: 15px; }
+        .sac-tab-button { padding: 8px 12px; cursor: pointer; background: transparent; border: none; color: #aaa; font-family: var(--font-body); font-weight: 600; transition: all 0.3s ease; border-bottom: 2px solid transparent; }
+        .sac-tab-button.active { color: var(--accent-color-deity); border-bottom: 2px solid var(--accent-color-deity); }
+        .sac-tab-content { display: none; }
+        .sac-tab-content.active { display: block; }
+
+        /* --- Button Styling --- */
+        .btn { padding: 10px 15px; border: none; cursor: pointer; font-family: var(--font-header); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border-radius: 3px; transition: all 0.3s ease; }
+        .btn-deity { background: rgba(178, 235, 242, 0.1); color: var(--accent-color-deity); border: 1px solid var(--accent-color-deity); box-shadow: var(--accent-glow-deity); text-shadow: var(--accent-glow-deity); }
+        .btn-deity:hover { background: rgba(178, 235, 242, 0.2); box-shadow: var(--accent-glow-deity), 0 0 25px #b2ebf2; }
+        .btn-pantheon { background: rgba(255, 204, 128, 0.1); color: var(--accent-color-pantheon); border: 1px solid var(--secondary-color-pantheon); box-shadow: var(--accent-glow-pantheon); text-shadow: 0 0 5px var(--secondary-color-pantheon); }
+        .btn-pantheon:hover { background: rgba(255, 204, 128, 0.2); box-shadow: var(--accent-glow-pantheon), 0 0 25px #ffeb3b; }
+        .btn-festival { background: rgba(165, 214, 167, 0.1); color: var(--accent-color-festival); border: 1px solid var(--secondary-color-festival); box-shadow: var(--accent-glow-festival); text-shadow: var(--accent-glow-festival); }
+        .btn-festival:hover { background: rgba(165, 214, 167, 0.2); box-shadow: var(--accent-glow-festival), 0 0 25px #81c784; }
+        /* NEW Relationship Button Style */
+        .btn-relationship { background: rgba(255, 138, 128, 0.1); color: var(--accent-color-relationship); border: 1px solid var(--secondary-color-relationship); box-shadow: var(--accent-glow-relationship); text-shadow: 0 0 5px var(--secondary-color-relationship); }
+        .btn-relationship:hover { background: rgba(255, 138, 128, 0.2); box-shadow: var(--accent-glow-relationship), 0 0 25px #ff8a80; }
+
+        .button-group { display: flex; gap: 10px; margin-top: auto; padding-top: 15px; }
+        .full-width { width: 100%; }
+        /* Add hover spin for .random-all-btn on buttons too */
+        .btn.random-all-btn { font-size: 1em; /* override h2 font-size */ display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .btn.random-all-btn:hover { transform: scale(1.05); }
+        .btn.random-all-btn span { display: inline-block; transition: transform 0.3s ease; }
+        .btn.random-all-btn:hover span { transform: rotate(360deg) scale(1.2); }
+        
+        /* --- Table Styling --- */
+        .data-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.9em; table-layout: fixed; }
+        .data-table th { background: #333333; color: var(--text-color); padding: 10px; text-align: left; border: 1px solid var(--border-color); font-family: var(--font-header); }
+        .data-table td { padding: 8px; border: 1px solid var(--border-color); background: #2a2a2a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .deity-list-table tbody tr:hover { background: #383838; cursor: pointer; }
+        /* NEW: Clickable span in tables */
+        .clickable-deity {
+            cursor: pointer;
+            color: var(--accent-color-deity);
+            text-decoration: underline;
+            text-shadow: var(--accent-glow-deity);
+            transition: all 0.2s ease;
+        }
+        .clickable-deity:hover {
+            color: #fff;
+            text-shadow: var(--accent-glow-deity), 0 0 10px var(--accent-color-deity);
+        }
+
+        /* --- Relationship List Refactor --- */
+        .relationships-container { display: flex; flex-direction: column; height: 100%; }
+        .relationships-list-wrapper { flex-grow: 1; overflow-y: auto; }
+        /* NEW: Wrapper for inline relationship table */
+        .inline-relationships-wrapper {
+            overflow-y: auto;
+            max-height: 200px; /* Adjust as needed */
+            margin-top: 15px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        /* --- Domain Grid Display --- */
+        .domain-grid-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; padding: 10px; border: 1px solid var(--border-color); border-radius: 3px; background: #1e1e1e; }
+        .domain-accordion-item { border: 1px solid var(--border-color); border-radius: 3px; }
+        .domain-accordion-header { padding: 8px; cursor: pointer; background: #2a2a2a; display: flex; align-items: center; gap: 8px; }
+        .domain-accordion-header:hover { background: #383838; }
+        .domain-accordion-header input[type="checkbox"] { margin: 0; }
+        .domain-accordion-content { display: none; padding: 10px; background: #121212; border-top: 1px solid var(--border-color); max-height: 150px; overflow-y: auto; }
+        .domain-accordion-content.active { display: block; }
+        .domain-accordion-content label { display: block; margin-bottom: 2px; font-size: 0.9em; font-weight: normal; }
+        
+        /* --- Festival Sanctum Styling --- */
+        .festival-display { border-left: 3px solid var(--secondary-color-festival); padding-left: 15px; margin-bottom: 15px; }
+        .festival-display h3 { font-family: var(--font-header); color: var(--accent-color-festival); margin: 0 0 5px 0; }
+        .festival-display p { margin: 0; font-size: 1.1em; }
+        .saved-festival-item { background: #2a2a2a; border: 1px solid var(--border-color); padding: 10px; border-radius: 4px; margin-bottom: 10px; }
+        .saved-festival-item h4 { margin: 0 0 8px 0; color: var(--accent-color-festival); font-family: var(--font-header); }
+        .saved-festival-item p { font-size: 0.9em; margin: 0 0 5px 0; }
+        .saved-festival-item .button-group { padding-top: 10px; margin-top: 10px; border-top: 1px solid var(--border-color); justify-content: flex-end; }
+        .saved-festival-item .button-group .btn { padding: 4px 8px; font-size: 0.8em; }
+
+
+        /* --- Print / PDF Export Styles --- */
+        .print-only { display: none; }
+        @media print {
+            body { background: #fff !important; color: #000 !important; font-size: 10pt; }
+            .no-print, .header, .tabs, .tab-content:not(.print-active) { display: none !important; }
+            .tab-content.print-active { display: block !important; background: none; border: none; box-shadow: none; padding: 0; }
+            .card { break-inside: avoid; border: 1px solid #ccc !important; box-shadow: none !important; background: #fff !important; margin-bottom: 15px; }
+            .print-only { display: block; font-family: var(--font-body); }
+            h1, h2, h3 { color: #000 !important; text-shadow: none; }
+            .print-deity-sheet, .print-pantheon-sheet { padding: 1.5cm; }
+            .print-header { text-align: center; border-bottom: 2px solid #000; margin-bottom: 15px; }
+            .print-header h1 { font-size: 24pt; margin: 0; }
+            .print-header h2 { font-size: 14pt; font-family: var(--font-body); font-style: italic; margin-top: 5px; }
+            .print-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+            .print-section { margin-bottom: 15px; }
+            .print-section h3 { font-size: 12pt; border-bottom: 1px solid #888; padding-bottom: 3px; margin-bottom: 8px; text-align: left; }
+            .print-section p, .print-section ul { margin: 0; font-size: 10pt; }
+            .print-section ul { list-style-position: inside; padding-left: 5px; }
+            .print-section strong { font-weight: bold; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header no-print">
+        <h1>THE FORGE OF GODS</h1>
+        <div class="tabs">
+            <button class="tab-button active deity" data-tab="deity-anvil">DEITY ANVIL</button>
+            <button class="tab-button pantheon" data-tab="pantheon-forge">PANTHEON FORGE</button>
+            <button class="tab-button festival" data-tab="festival-sanctum">FESTIVAL SANCTUM</button>
+            <button class="tab-button relationship" data-tab="relationship-manual">RELATIONSHIP MANUAL</button>
+        </div>
+    </div>
+
+    <div id="deity-anvil" class="tab-content active">
+        <div class="card">
+            <h2 style="color:var(--accent-color-deity); border-bottom: 1px solid var(--accent-color-deity); text-shadow: var(--accent-glow-deity);">
+                <span>Deity Details</span>
+                <span class="random-all-btn" id="randomize-all-btn" title="Generate a new random deity's details">🎲</span>
+            </h2>
+            <form id="deity-form" style="display: flex; flex-direction: column; flex-grow: 1;">
+                <div class="form-group">
+                    <label for="deity-name">Deity Name</label>
+                    <div class="hic-group">
+                        <input type="text" id="deity-name" placeholder="E.g., Aerthos">
+                        <button type="button" class="btn btn-deity btn-hic" id="generate-name-btn" title="Generate Name">🎲</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="divine-class">Divine Class</label>
+                    <div class="hic-group">
+                        <select id="divine-class"></select>
+                        <button type="button" class="btn btn-deity btn-hic" data-list-id="divine-class-list" title="Show List">▼</button>
+                    </div>
+                    <div class="custom-select-list" id="divine-class-list-container">
+                        <select id="divine-class-list" size="5"></select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="deity-epithet">Epithet / Title</label>
+                    <div class="hic-group">
+                        <input type="text" id="deity-epithet" placeholder="E.g., the Shattered">
+                        <button type="button" class="btn btn-deity btn-hic" id="generate-epithet-btn" title="Generate Epithet">🎲</button>
+                        <button type="button" class="btn btn-deity btn-hic" data-list-id="epithet-list" title="Show List">▼</button>
+                    </div>
+                    <div class="custom-select-list" id="epithet-list-container">
+                        <select id="epithet-list" size="5"></select>
+                    </div>
+                </div>
+                 <div class="form-group">
+                    <label for="alignment">Alignment</label>
+                    <div class="hic-group">
+                        <input type="text" id="alignment" placeholder="E.g., Lawful Good">
+                        <button type="button" class="btn btn-deity btn-hic" id="generate-alignment-btn" title="Generate Alignment">🎲</button>
+                        <button type="button" class="btn btn-deity btn-hic" data-list-id="alignment-list" title="Show List">▼</button>
+                    </div>
+                    <div class="custom-select-list" id="alignment-list-container">
+                        <select id="alignment-list" size="5"></select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Symbol, Animal, Weapon & Colour</label>
+                    <div class="sac-tabs">
+                        <button type="button" class="sac-tab-button active" data-sac-tab="symbol">Symbol</button>
+                        <button type="button" class="sac-tab-button" data-sac-tab="animal">Animal</button>
+                        <button type="button" class="sac-tab-button" data-sac-tab="weapon">Weapon</button>
+                        <button type="button" class="sac-tab-button" data-sac-tab="colour">Colour</button>
+                    </div>
+                    
+                    <div id="sac-tab-symbol" class="sac-tab-content active">
+                        <div class="hic-group">
+                            <input type="text" id="symbol" placeholder="Select or generate a symbol">
+                            <button type="button" class="btn btn-deity btn-hic" id="generate-symbol-btn" title="Generate Symbol">🎲</button>
+                            <button type="button" class="btn btn-deity btn-hic" data-list-id="symbol-list" title="Show List">▼</button>
+                        </div>
+                         <div class="custom-select-list" id="symbol-list-container">
+                            <select id="symbol-list" size="5"></select>
+                        </div>
+                    </div>
+                     <div id="sac-tab-animal" class="sac-tab-content">
+                        <div class="hic-group">
+                            <input type="text" id="animal" placeholder="Select or generate an animal">
+                            <button type="button" class="btn btn-deity btn-hic" id="generate-animal-btn" title="Generate Animal">🎲</button>
+                            <button type="button" class="btn btn-deity btn-hic" data-list-id="animal-list" title="Show List">▼</button>
+                        </div>
+                         <div class="custom-select-list" id="animal-list-container">
+                            <select id="animal-list" size="5"></select>
+                        </div>
+                    </div>
+                    <div id="sac-tab-weapon" class="sac-tab-content">
+                        <div class="hic-group">
+                            <input type="text" id="weapon" placeholder="Select or generate a weapon">
+                            <button type="button" class="btn btn-deity btn-hic" id="generate-weapon-btn" title="Generate Weapon">🎲</button>
+                            <button type="button" class="btn btn-deity btn-hic" data-list-id="weapon-list" title="Show List">▼</button>
+                        </div>
+                         <div class="custom-select-list" id="weapon-list-container">
+                            <select id="weapon-list" size="5"></select>
+                        </div>
+                    </div>
+                    <div id="sac-tab-colour" class="sac-tab-content">
+                        <div class="hic-group">
+                            <input type="text" id="colour" placeholder="Select or generate a colour">
+                            <button type="button" class="btn btn-deity btn-hic" id="generate-colour-btn" title="Generate Colour">🎲</button>
+                            <button type="button" class="btn btn-deity btn-hic" data-list-id="colour-list" title="Show List">▼</button>
+                        </div>
+                         <div class="custom-select-list" id="colour-list-container">
+                            <select id="colour-list" size="5"></select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="tenets">Holy Tenet</label>
+                    <div class="hic-group">
+                        <textarea id="tenets" rows="3" placeholder="E.g., Thou shalt honor life at all costs."></textarea>
+                        <button type="button" class="btn btn-deity btn-hic" id="generate-tenets-btn" title="Generate Tenet">🎲</button>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button type="button" class="btn btn-deity" id="save-deity-btn">Save / Update</button>
+                    <button type="button" class="btn btn-deity" id="new-deity-btn">Clear</button>
+                    <button type="button" class="btn btn-deity" id="delete-deity-btn">Delete</button>
+                    <button type="button" class="btn btn-deity" id="export-deity-btn">Export to PDF</button>
+                </div>
+                <p style="font-size: 0.9em; margin-top: 10px; color: #aaa;">* New deities are saved to the library and can be found under the "Unassigned" filter in the Pantheon Forge.</p>
+                <div class="form-group" style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+                    <label for="add-to-pantheon-select">Add to Pantheon</label>
+                    <div class="hic-group">
+                        <select id="add-to-pantheon-select"> <option value="">-- Select a Pantheon --</option> </select>
+                        <button type="button" class="btn btn-deity" id="add-to-pantheon-btn">Add</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+        
+        <div class="card" style="display: flex; flex-direction: column;">
+            <div style="flex-shrink: 0;">
+                <h2 style="color:var(--accent-color-deity); border-bottom: 1px solid var(--accent-color-deity); text-shadow: var(--accent-glow-deity);">Domains</h2>
+                <div class="hic-group" style="margin-bottom: 15px;">
+                    <p style="flex-grow: 1; margin: 0; font-size: 0.9em;">Select one Major and one of its Minor domains.</p>
+                    <button type="button" class="btn btn-deity btn-hic" id="generate-domains-btn" title="Generate Domains">🎲</button>
+                </div>
+                <div id="domain-grid" class="domain-grid-container"></div>
+            </div>
+            
+            <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 15px; display: flex; flex-direction: column; flex-grow: 1;">
+                <h2 style="color:var(--accent-color-deity); border-bottom: 1px solid var(--accent-color-deity); text-shadow: var(--accent-glow-deity);">Relationships</h2>
+                <p style="font-size: 0.9em; margin-top:0;">View and edit all deity relationships in the dedicated Relationship Manual.</p>
+                <button type="button" class="btn btn-deity full-width" id="go-to-relationships-btn">Open Relationship Manual</button>
+                
+                <div class="inline-relationships-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Subject</th>
+                                <th>Predicate</th>
+                                <th>Object</th>
+                            </tr>
+                        </thead>
+                        <tbody id="current-deity-relationships-list">
+                            </tbody>
+                    </table>
+                </div>
+                </div>
+            </div>
+
+        <div class="card" style="grid-column: 1 / -1;">
+            <h2 style="color:var(--accent-color-deity); border-bottom: 1px solid var(--accent-color-deity); text-shadow: var(--accent-glow-deity);">Deity Library</h2>
+            <div class="form-group">
+                <label for="deity-anvil-library-filter-select">Filter by Pantheon</label>
+                <select id="deity-anvil-library-filter-select"></select>
+            </div>
+            <p style="font-size: 0.9em;">Click a deity to load them into the Deity Details form for editing.</p>
+            <div style="overflow-y: auto; flex-grow: 1; max-height: 300px;"> <table class="data-table deity-list-table">
+                    <thead> <tr> <th style="width: 40%;">Name</th> <th style="width: 25%;">Class</th> <th style="width: 35%;">Domains</th> </tr> </thead>
+                    <tbody id="deity-anvil-library-list"></tbody>
+                </table>
+            </div>
+        </div>
+        </div>
+
+    <div id="pantheon-forge" class="tab-content">
+        <div class="card">
+            <h2 style="color:var(--accent-color-pantheon); border-bottom: 1px solid var(--secondary-color-pantheon); text-shadow: var(--accent-glow-pantheon);">Pantheon Lore</h2>
+            <button type="button" class="btn btn-pantheon full-width random-all-btn" id="forge-new-pantheon-btn-global" style="margin-bottom: 15px;" title="Create a new pantheon with a random name, myth, and 5-8 new deities">
+                Forge New Pantheon <span>🎲</span>
+            </button>
+            <div class="form-group">
+                <label for="pantheon-select">Select Pantheon</label>
+                <div class="hic-group">
+                    <select id="pantheon-select"></select>
+                    <button type="button" class="btn btn-pantheon" id="new-pantheon-btn" title="New Pantheon">+</button>
+                    <button type="button" class="btn btn-pantheon" id="delete-pantheon-btn" title="Delete Selected Pantheon">-</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="pantheon-name">Pantheon Name</label>
+                <div class="hic-group">
+                    <input type="text" id="pantheon-name" placeholder="E.g., The Valian Host">
+                    <button type="button" class="btn btn-pantheon btn-hic" id="generate-pantheon-name-btn" title="Generate Name">🎲</button>
+                </div>
+            </div>
+            <div class="form-group" style="flex-grow: 1;">
+                <label for="creation-myth">Creation Myth</label>
+                <div class="hic-group" style="flex-grow: 1;">
+                    <textarea id="creation-myth" rows="15" placeholder="The ancient tales..." style="flex-grow: 1;"></textarea>
+                    <button type="button" class="btn btn-pantheon btn-hic" id="generate-myth-btn" title="Generate Myth">🎲</button>
+                </div>
+            </div>
+            <div class="button-group">
+                <button type="button" class="btn btn-pantheon" id="export-pantheon-btn">Export to PDF</button>
+                <button type="button" class="btn btn-pantheon" id="export-data-btn">Export JSON</button>
+                <input type="file" id="import-file" style="display: none;">
+                <button type="button" class="btn btn-pantheon" onclick="document.getElementById('import-file').click();">Import JSON</button>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2 style="color:var(--accent-color-pantheon); border-bottom: 1px solid var(--secondary-color-pantheon); text-shadow: var(--accent-glow-pantheon);">Deity Library</h2>
+            <div class="form-group">
+                <label for="library-filter-select">Filter by Pantheon</label>
+                <select id="library-filter-select"></select>
+            </div>
+            <button type="button" class="btn btn-pantheon full-width" id="generate-deities-for-pantheon-btn" style="margin-bottom: 15px;" title="Generate 5-8 new deities for the currently selected pantheon">Generate Deities for Selected Pantheon</button>
+            <p style="font-size: 0.9em;">Click a deity to load them into the Deity Anvil for editing.</p>
+            <div style="overflow-y: auto; flex-grow: 1;">
+                <table class="data-table deity-list-table">
+                    <thead> <tr> <th style="width: 40%;">Name</th> <th style="width: 25%;">Class</th> <th style="width: 35%;">Domains</th> </tr> </thead>
+                    <tbody id="deity-library-list"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="festival-sanctum" class="tab-content">
+        <div class="card">
+            <h2 style="color:var(--accent-color-festival); border-bottom: 1px solid var(--secondary-color-festival); text-shadow: var(--accent-glow-festival);">Festival Generator</h2>
+            <div class="form-group">
+                <label for="festival-deity-select">Select Deity</label>
+                <select id="festival-deity-select">
+                    <option value="">-- Select a Deity --</option>
+                </select>
+            </div>
+            <button type="button" id="generate-festival-btn" class="btn btn-festival full-width" style="margin-bottom: 20px;">Generate New Festival Details</button>
+            <div id="festival-output">
+                <div class="festival-display"> <h3>Festival Name</h3> <p id="festival-name-output">--</p> </div>
+                <div class="festival-display"> <h3>Timing / Date</h3> <p id="festival-timing-output">--</p> </div>
+                <div class="festival-display"> <h3>Core Ritual</h3> <p id="festival-ritual-output">--</p> </div>
+                <div class="festival-display"> <h3>Required Offering</h3> <p id="festival-offering-output">--</p> </div>
+                <div class="festival-display"> <h3>Linked Domain</h3> <p id="festival-domain-output">--</p> </div>
+            </div>
+            <div class="button-group">
+                <button type="button" class="btn btn-festival" id="save-festival-btn">Save Festival to Deity</button>
+                 <button type="button" class="btn btn-festival" id="clear-festival-btn">Clear Form</button>
+            </div>
+        </div>
+        <div class="card">
+             <h2 style="color:var(--accent-color-festival); border-bottom: 1px solid var(--secondary-color-festival); text-shadow: var(--accent-glow-festival);">Saved Festivals</h2>
+             <div id="saved-festivals-list" style="overflow-y: auto; flex-grow: 1;">
+                 <p>Select a deity to view their saved festivals.</p>
+             </div>
+        </div>
+    </div>
+
+    <div id="relationship-manual" class="tab-content">
+        <div class="card">
+            <div class="relationships-container" style="flex-grow: 1;">
+                 <h2 style="color:var(--accent-color-relationship); border-bottom: 1px solid var(--accent-color-relationship); text-shadow: var(--accent-glow-relationship);">Relationship Forge</h2>
+                 <div class="form-group">
+                    <label for="relationship-filter-select">Filter by Pantheon</label>
+                    <select id="relationship-filter-select">
+                        <option value="all">Show All Relationships</option>
+                        </select>
+                </div>
+                <div class="relationships-list-wrapper">
+                    <table class="data-table">
+                        <thead> <tr> <th>Subject</th> <th>Predicate</th> <th>Object</th> <th style="width: 10%"></th> </tr> </thead>
+                        <tbody id="relationships-list"></tbody>
+                    </table>
+                </div>
+
+                <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+                    <h3 style="color:var(--accent-color-relationship); border-bottom: 1px solid var(--accent-color-relationship); text-shadow: var(--accent-glow-relationship); font-family: var(--font-header); text-align: center; margin-top: 0; margin-bottom: 20px; padding-bottom: 10px;">Manual Relationship Editor</h3>
+                    <p style="font-size: 0.9em; margin-top:0;">Create specific relationships between any two deities.</p>
+                    <div class="form-group"> <label for="deity-a">Subject Deity</label> <select id="deity-a"></select> </div>
+                    <div class="form-group"> <label for="relationship-type">Relationship (Predicate)</label> <select id="relationship-type"></select> </div>
+                    <div class="form-group"> <label for="deity-b">Object Deity</label> <select id="deity-b"></select> </div>
+                    <button type="button" class="btn btn-relationship full-width" id="add-relationship-btn">Add Relationship</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="print-only">
+        <div id="print-deity-sheet-container" class="print-deity-sheet"></div>
+        <div id="print-pantheon-sheet-container" class="print-pantheon-sheet"></div>
+    </div>
+
+
+    <script>
+        // --- DATA TABLES (V4 - Expanded per Mandate) ---
+        const DIVINE_CLASSES = [
+            { name: "Celestial/Titan", dvr: "Greater Deity / Overdeity" },
+            { name: "God", dvr: "Intermediate Deity", default: true },
+            { name: "Lesser Deity", dvr: "Lesser Deity / Exarch" },
+            { name: "Quasi-Deity", dvr: "Demigod / Hero Deity" },
+            { name: "Primordial/Vestige", dvr: "Ancient Force / Forgotten God" }
+        ];
+        const DOMAINS = { "Life": ["Fertility", "Rebirth", "Healing", "Protection", "Hope", "Innocence", "Sanctuary", "Vigor", "Charity", "Empathy"], "Death": ["Underworld", "Grave", "Sacrifice", "Entropy", "Grief", "Untimely Death", "Oblivion", "Rest", "Silence", "Ancestors"], "Light": ["Sun", "Dawn", "Truth", "Purity", "Illumination", "Revelation", "Glory", "Stars", "Fire", "Justice"], "Knowledge": ["Secrets", "Wisdom", "Lore", "Invention", "Magic", "Divination", "Memory", "History", "Artifice", "Reason", "Prophecy", "Puzzles"], "War": ["Glory", "Victory", "Valor", "Attrition", "Conflict", "Rage", "Progress", "Courage", "Strategy", "Tyranny", "Massacre", "Arms"], "Order": ["Law", "Justice", "Tyranny", "Civilization", "Duty", "Structure", "Discipline", "Pacts", "Bureaucracy", "Stability", "Oaths"], "Chaos": ["Change", "Rebellion", "Trickery", "Misfortune", "Chance/Luck", "Madness", "Folly", "Accident", "Gambling", "Plague"], "Nature": ["Beasts", "Wilderness", "Seasons", "Plants", "Earth", "Sea", "Air", "Woodlands", "Fungus", "Deserts", "Bees/Swarm"], "Magic": ["Arcana", "Illusion", "Secrets", "Sorcery", "Psionics", "Prophecy", "Runes", "Summoning", "Metals", "Alchemy"], "Commerce": ["Trade", "Wealth", "Avarice", "Greed", "Exchange", "Ownership", "Banking", "Thieves", "Craft", "Smuggling"], "Tempest": ["Storms", "Rain", "Wind", "Sea", "Waves", "Weather", "Natural Disaster", "Blizzards", "Quakes", "Tides", "Fog"], "Abstract": ["Arrogance", "Obsession", "Reflection", "Vanity", "Gluttony", "Sloth", "Jealousy", "Fear", "Laughter", "Dreams", "Silence"], "Art/Craft": ["Beauty", "Music", "Poetry", "Architecture", "Sculpture", "Theatre", "Forgery", "Dance", "Fashion", "Taste"], "Time/Fate": ["Destiny", "Prophecy", "Memory", "History", "Cycles", "Mortality", "Stasis", "Eternity", "Nostalgia", "Divination"] };
+        // NEW SYMBOL DATA START
+        const SYMBOL_PARTS = { A: ["A Sleeping", "Three Crescent", "A Shattered", "A Weeping", "A Burning", "A Silver", "A Golden", "An Iron", "A Flowing", "Two Unblinking", "A Simple", "An Ivory", "A Moss-Grown", "A Looming", "A Runic"], B: ["Crown", "River", "Serpent", "Mountain", "Eye", "Tree", "Sword", "Hand", "Skull", "Heart", "Anvil", "Chalice", "Coin", "Dove", "Book"], C: ["Held in a Bronze Gauntlet", "On a Field of Black Stone", "Wreathed in Green Vines", "Beneath Three Distant Stars", "Wrapped in Golden Wire", "Clasped by Two Iron Hands", "Adorned with the Feathers of a Dove", "Dripping with Water and Salt", "Balanced on a Single Coin", "Pierced by a Shepherd's Crook", "Set on a Pedestal of Bone", "Illuminated by a Single Lamp", "Stuck in the Bark of an Oak", "Carved into a Slab of Marble", "Resting on a Bed of Thorns"] };
+        const SYMBOLS = ["A Sleeping Crown Held in a Bronze Gauntlet", "Three Crescent River On a Field of Black Stone", "A Shattered Serpent Wreathed in Green Vines", "A Weeping Mountain Beneath Three Distant Stars", "A Burning Eye Wrapped in Golden Wire", "A Silver Tree Clasped by Two Iron Hands", "A Golden Sword Adorned with the Feathers of a Dove", "An Iron Hand Dripping with Water and Salt", "A Flowing Skull Balanced on a Single Coin", "Two Unblinking Heart Pierced by a Shepherd's Crook", "A Simple Anvil Set on a Pedestal of Bone", "An Ivory Chalice Illuminated by a Single Lamp", "A Moss-Grown Coin Stuck in the Bark of an Oak", "A Looming Dove Carved into a Slab of Marble", "A Runic Book Resting on a Bed of Thorns"];
+        // NEW SYMBOL DATA END
+        const ANIMALS = ["Dragon", "Phoenix", "Eagle", "Serpent/Snake", "Owl", "Wolf", "Lion/Griffin", "Scarab Beetle", "Stag/Deer", "Raven/Crow", "Spider", "Dolphin", "Goat/Ram"];
+        // NEW WEAPON DATA START
+        const WEAPON_PARTS = { A: ["A Bronze Spear", "A Heavy Net", "A Hunter's Bow", "A Simple Mace", "A Traveler's Cloak", "An Ash Wood Staff", "A Silver Scythe", "A Clay Pot", "A Golden Lyre", "A Bronze Shield", "A Pair of Sandals", "A Spiked Crown", "A Simple Hammer", "A Runic Tome", "A Gold Chalice"], B: ["Crowned with", "Cast with", "Strung with", "Made heavy by", "Woven from", "Topped with", "Tempered in", "Filled with", "Adorned with", "Forged from", "Bound with", "Resting upon", "Embedded with", "Bound in", "Carved with"], C: ["A Wreath of Fresh Olive Leaves", "The Hair of a Drowned Maiden", "The Sinews of a White Deer", "Iron Ore from the First Mine", "The Hide of a Black Bull", "A Cluster of Dry Pinecones", "The Oil of a Sacred Lamp", "The Ashes of a Fallen Hero", "Feathers from a Sacred Swan", "The Scale of a Serpent", "The Rope from a Shipwreck", "Grave Dirt and River Stone", "Grains of Coastal Sand", "The Skin of a White Goat", "Vines from a Wild Grapevine"] };
+        const WEAPONS = [ "A Bronze Spear Crowned with A Wreath of Fresh Olive Leaves", "A Heavy Net Cast with The Hair of a Drowned Maiden", "A Hunter's Bow Strung with The Sinews of a White Deer", "A Simple Mace Made heavy by Iron Ore from the First Mine", "A Traveler's Cloak Woven from The Hide of a Black Bull", "An Ash Wood Staff Topped with A Cluster of Dry Pinecones", "A Silver Scythe Tempered in The Oil of a Sacred Lamp", "A Clay Pot Filled with The Ashes of a Fallen Hero", "A Golden Lyre Adorned with Feathers from a Sacred Swan", "A Bronze Shield Forged from The Scale of a Serpent", "A Pair of Sandals Bound with The Rope from a Shipwreck", "A Spiked Crown Resting upon Grave Dirt and River Stone", "A Simple Hammer Embedded with Grains of Coastal Sand", "A Runic Tome Bound in The Skin of a White Goat", "A Gold Chalice Carved with Vines from a Wild Grapevine" ];
+        // NEW WEAPON DATA END
+        const COLOURS = ["White", "Red", "Blue", "Black", "Green", "Gold/Yellow", "Purple", "Silver", "Brown", "Grey"];
+        const RELATIONSHIP_TYPES = [ "Blood Feud", "Unrequited Love", "Master/Servant", "Debt of Honor", "Prophetic Rivalry", "Silent Ally", "Former Mortal/Patron", "Cosmic Twin", "Philosophical Disagreement", "Shared Secret", "Allied With / Supports", "Rival of / Directly Opposes", "Neutral Interaction / Tolerates", "Patron/Child / Created By", "Subordinate to / Bound By", "Seeking Help From" ];
+        const FESTIVAL_COMPONENTS = { prefix: ["The Grand", "The Silent", "The Feast of", "The Annual", "The Bitter", "The Celestial", "The Sunken", "The Mourning", "The Hidden", "The Iron"], subject: ["First Harvest", "Deepest Night", "Unseen Tide", "Iron Star", "Final Whisper", "Rending Veil", "Blessed Rain", "Great Vigil", "Woven Oath", "Broken Mirror"], timing: ["the Summer Solstice", "the Winter Solstice", "the Spring Equinox", "the Autumn Equinox", "the Blood Moon", "the Harvest Moon", "the New Moon", "the Day of the Great Comet", "the 7th Sun of the 7th Month", "the Month of Rust", "the end of the 100th Year", "the next Planetary Alignment"], ritual: ["a Public Confession", "a Procession of Lights", "a Three-Day Fast", "a Symbolic Sacrifice (effigy burning)", "a series of Competitive Games", "a Grand Feast", "a day of Public Penance", "a Mass Trance", "a Sacred Drama performance", "a Vow of Silence"], offering: ["A Coin of Pure Gold", "A Single Drop of Blood", "The First Bloom of Spring", "A Silent Prayer", "A Finely Forged Item", "A Written Truth", "A Bowl of Salt and Water", "A Verbally Broken Promise"] };
+        const NAME_PARTS = { P: ["Aer", "Thal", "Cor", "Ely", "Mar", "Valen", "Syl", "Drak", "Fen", "Lir", "Tor", "Vor", "Kel", "Mer", "Nor", "Pal", "Qir", "Rin", "Ser", "Wyn", "Xal", "Yar", "Zeph", "Gal", "Hael", "Iss", "Jar", "Myr", "Nys", "Ori", "Pyr", "Quo", "Rha", "Sun", "Tal", "Uri", "Vel", "Xan", "Yel", "Zar", "Bran", "Cai", "Den", "Eon"], C: ["dor", "thys", "riel", "mark", "wen", "var", "neth", "mir", "hyn", "sal", "lun", "tor", "kai", "rec", "fal", "ion", "iar", "ara", "enn", "ora", "eth", "ael", "ian", "orin", "alan", "eris", "yga", "en", "ir", "us", "al", "is", "ar", "ex", "ux", "yx", "ae", "oe", "ue", "ui", "yion", "ean", "ion", "vath", "celt", "jor", "tyn", "ghal", "kryll", "wun", "zyth", "al", "ul", "el", "il"], S: ["ion", "as", "or", "is", "an", "yr", "en", "et", "ix", "os", "um", "ar", "el", "ud", "us", "es", "al", "on", "ir", "ys", "ai", "ea", "oa", "ius", "ax", "yl", "ius", "odes", "athos", "ulos", "aean", "nys", "eth", "ol", "ir"], E: ["the Shattered", "of the Seven Winds", "Dragoneye", "Soulbinder", "Moonfall", "Stormwarden", "Flameheart", "Ironfist", "Nightstrider", "Starseer", "Windrider", "Dawnbringer", "Shadowstalker", "Mistweaver", "Stormcaller", "Lightbearer", "Earthshaker", "Frostwarden", "Sunblade", "Duskfallen", "Dreamspeaker", "Thundershade", "Emberguard", "Wavecrash", "Bloodthorn", "Leafwhisper", "Crystalbane", "Goldsinger", "Silverhand", "The Great Weaver", "Master of Fate", "The Unseen", "The Silent Sentinel", "Bringer of Plagues", "The All-Knowing", "Lord of Whispers", "Speaker of Truths", "Defender of the Veil", "The Tyrant's Hand", "Patron of Thieves", "The Unwavering", "The Broken Chain"] };
+        const TENET_PARTS = { posDirective: ["Thou Shalt", "You must"], posVerb: ["Honor", "Trust", "Protect", "Preserve", "Seek", "Share"], posContext: ["Life", "The Word", "Justice", "The Family", "The Cycle", "Wisdom", "The Unseen"], posModifier: ["at all costs", "above all others", "even in times of darkness", "with great diligence", "for the sake of all"], negDirective: ["Thou Shalt Not", "Never"], negVerb: ["Betray", "Lie", "Waste", "Muddle", "Deny", "Forgive", "Suffer"], negContext: ["Innocence", "The Truth", "The Artifact", "The Gift", "The Rival God", "Failure", "Ignorance"], negModifier: ["for personal gain", "without retribution", "under threat", "in the sight of mortals", "twice"], statementStart: ["Knowledge is", "Love is", "Change is", "Failure teaches", "War is"], statementEnd: ["Power", "Temporary", "Inevitable", "Progress", "the only purity", "a constant companion"] };
+        const PANTHEON_THEMES = { prefix: ["The Astral", "The Chained", "The Sundered", "The Primal", "The Silent", "The Glorious", "The Iron", "The Deep", "The Celestial"], core: ["Covenant", "Cycle", "Echo", "Weave", "Court", "Council", "Legion", "Whisper", "Chorus", "Void", "Root", "Olympians", "Titans", "Primordials"], suffix: ["Pantheon", "Concordance", "Compact", "Doctrine", "Collective", "Anathema", "Liturgy", "Enigma", "Hierarchy", "Lineage", "Tribunal", "Host"], descriptor: ["of the Bleeding Stars", "of the Endless War", "of the Unbroken Coil", "of the Stone Heart", "of the First Breath", "of the Great Sleep", "of the Rending Veil", "of the Unwavering Watch", "of the Eternal Judgment", "of the Bitter Harvest"] };
+        const CREATION_MYTH_PARTS = { step1: ["From the Primordial Void,", "From the Formless Chaos,", "From the Great Abyss,", "From an Eternal Slumber,", "From a Pure Idea,", "From within the Cosmic Egg,"], step2: ["a being of pure thought woke itself from nothingness.", "the first beings were born from violent conflict.", "a great sacrifice was made, giving form to the first creator.", "a dreamer emerged, shaping reality from its visions.", "divine twins of light and shadow began their dance.", "the World Parent gave birth to the sky and the earth."], step3: ["They began by separating the primal elements of light and dark.", "A Great Sundering tore reality asunder, creating the gods from its fragments.", "The first of the gods was born, and they retrieved the prime matter from the depths.", "The birth of the gods was an echo that gave order to the chaos."], step4: ["The world was formed from the body of a fallen primordial.", "They cast the stars and moons into the void like seeds of light.", "The fabric of the material plane was woven from pure magic.", "A great and terrible power was imprisoned to stabilize creation."], step5: ["Thus, the First Law was written in the stars.", "With creation came the first sin, introducing a flaw into the cosmos.", "The divine rivalries were established, setting the stage for eternal conflict.", "Mortals were granted the spark of consciousness.", "But this creation was not the first, nor will it be the last, for all exists in a great cycle of destruction and rebirth."] };
+        const ALIGNMENTS = ["Lawful Good", "Neutral Good", "Chaotic Good", "Lawful Neutral", "True Neutral", "Chaotic Neutral", "Lawful Evil", "Neutral Evil", "Chaotic Evil"];
+
+        // --- STATE MANAGEMENT (v4) ---
+        let deities = JSON.parse(localStorage.getItem('deities_v4')) || [];
+        let relationships = JSON.parse(localStorage.getItem('relationships_v4')) || [];
+        let pantheons = JSON.parse(localStorage.getItem('pantheons_v4')) || [];
+        let currentDeityId = null;
+        let currentPantheonId = null;
+        let currentFestivalId = null; // Used for editing festivals
+
+        // --- UTILITY & GENERATION ---
+        function getRandomElement(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+        function getDeityById(id) { return deities.find(d => d.id == id); }
+        function getPantheonById(id) { return pantheons.find(p => p.id == id); }
+        function generateDeityName() { let name = ""; if (Math.random() < 0.9) name += getRandomElement(NAME_PARTS.P); name += getRandomElement(NAME_PARTS.C); if (Math.random() < 0.7) name += getRandomElement(NAME_PARTS.S); return name.charAt(0).toUpperCase() + name.slice(1); }
+        function generateEpithet() { return getRandomElement(NAME_PARTS.E); }
+        function generateAlignment() { return getRandomElement(ALIGNMENTS); }
+        function generateSymbol() { return `${getRandomElement(SYMBOL_PARTS.A)} ${getRandomElement(SYMBOL_PARTS.B)} ${getRandomElement(SYMBOL_PARTS.C)}`; }
+        function generateAnimal() { return getRandomElement(ANIMALS); }
+        function generateWeapon() { let weapon = `${getRandomElement(WEAPON_PARTS.A)} ${getRandomElement(WEAPON_PARTS.B)} ${getRandomElement(WEAPON_PARTS.C)}`; if (Math.random() < 0.4) { weapon += ` and ${getRandomElement(WEAPON_PARTS.C)}`; } return weapon; }
+        function generateColour() { return getRandomElement(COLOURS); }
+        function generateTenet() { const choice = Math.random(); if (choice < 0.45) { return `${getRandomElement(TENET_PARTS.posDirective)} ${getRandomElement(TENET_PARTS.posVerb).toLowerCase()} ${getRandomElement(TENET_PARTS.posContext).toLowerCase()} ${getRandomElement(TENET_PARTS.posModifier).toLowerCase()}.`; } else if (choice < 0.9) { return `${getRandomElement(TENET_PARTS.negDirective)} ${getRandomElement(TENET_PARTS.negVerb).toLowerCase()} ${getRandomElement(TENET_PARTS.negContext).toLowerCase()} ${getRandomElement(TENET_PARTS.negModifier).toLowerCase()}.`; } else { return `${getRandomElement(TENET_PARTS.statementStart)} ${getRandomElement(TENET_PARTS.statementEnd).toLowerCase()}.`; } }
+        function generatePantheonName() { let name = `${getRandomElement(PANTHEON_THEMES.prefix)} ${getRandomElement(PANTHEON_THEMES.core)}`; if (Math.random() > 0.5) name += ` ${getRandomElement(PANTHEON_THEMES.suffix)}`; else name += `, ${getRandomElement(PANTHEON_THEMES.descriptor)}`; return name; }
+        function generateCreationMyth() { return Object.values(CREATION_MYTH_PARTS).map(part => getRandomElement(part)).join(' '); }
+        function generateDomains() {
+            document.querySelectorAll('#domain-grid input[type="checkbox"]').forEach(cb => cb.checked = false);
+            const randomMajor = getRandomElement(Object.keys(DOMAINS));
+            const randomMinor = getRandomElement(DOMAINS[randomMajor]);
+            document.querySelector(`.domain-accordion-header input[value="${randomMajor}"]`).checked = true;
+            document.querySelector(`.domain-accordion-content input[value="${randomMinor}"]`).checked = true;
+        }
+        function generateRandomDeity() {
+            clearDeityForm(false);
+            document.getElementById('deity-name').value = generateDeityName();
+            document.getElementById('divine-class').value = DIVINE_CLASSES.find(dc => dc.default).name;
+            document.getElementById('deity-epithet').value = generateEpithet();
+            document.getElementById('alignment').value = generateAlignment();
+            document.getElementById('symbol').value = generateSymbol();
+            document.getElementById('animal').value = generateAnimal();
+            document.getElementById('weapon').value = generateWeapon();
+            document.getElementById('colour').value = generateColour();
+            document.getElementById('tenets').value = generateTenet();
+            generateDomains();
+        }
+
+        // --- DATA & FORM MANAGEMENT ---
+        function saveDeity() {
+            const name = document.getElementById('deity-name').value.trim();
+            if (!name) { alert('Deity Name is required.'); return; }
+            const rankObj = DIVINE_CLASSES.find(dc => dc.name === document.getElementById('divine-class').value);
+            const deity = {
+                id: currentDeityId || Date.now(),
+                name: name,
+                epithet: document.getElementById('deity-epithet').value.trim(),
+                rank: rankObj ? rankObj.name : DIVINE_CLASSES[1].name,
+                alignment: document.getElementById('alignment').value.trim(),
+                domains: { 
+                    majors: Array.from(document.querySelectorAll('.domain-accordion-header input:checked')).map(cb => cb.value),
+                    minors: Array.from(document.querySelectorAll('.domain-accordion-content input:checked')).map(cb => cb.value)
+                },
+                symbol: document.getElementById('symbol').value.trim(),
+                animal: document.getElementById('animal').value.trim(),
+                weapon: document.getElementById('weapon').value.trim(),
+                colour: document.getElementById('colour').value.trim(),
+                tenets: document.getElementById('tenets').value.trim(),
+                festivals: getDeityById(currentDeityId)?.festivals || [] // Preserve existing festivals
+            };
+            const existingIndex = deities.findIndex(d => d.id == deity.id);
+            if (existingIndex > -1) deities[existingIndex] = deity;
+            else deities.push(deity);
+            currentDeityId = deity.id;
+            localStorage.setItem('deities_v4', JSON.stringify(deities));
+            renderDeityLibrary();
+            renderDeityAnvilLibrary(); 
+            updateAllDropdowns();
+            renderRelationships();
+            // renderCurrentDeityRelationships(); // This is now called by renderRelationships()
+            alert(`Deity '${deity.name} ${deity.epithet}' saved/updated!`);
+        }
+
+        function loadDeity(id) {
+            const deity = getDeityById(id);
+            if (!deity) return;
+            clearDeityForm(false);
+            currentDeityId = deity.id;
+            document.getElementById('deity-name').value = deity.name;
+            document.getElementById('divine-class').value = deity.rank;
+            document.getElementById('deity-epithet').value = deity.epithet || '';
+            document.getElementById('alignment').value = deity.alignment;
+            document.getElementById('symbol').value = deity.symbol || '';
+            document.getElementById('animal').value = deity.animal || '';
+            document.getElementById('weapon').value = deity.weapon || '';
+            document.getElementById('colour').value = deity.colour || '';
+            document.getElementById('tenets').value = deity.tenets;
+            if (deity.domains) {
+                deity.domains.majors.forEach(major => { const cb = document.querySelector(`.domain-accordion-header input[value="${major}"]`); if (cb) cb.checked = true; });
+                deity.domains.minors.forEach(minor => { const cb = document.querySelector(`.domain-accordion-content input[value="${minor}"]`); if (cb) cb.checked = true; });
+            }
+            document.getElementById('relationship-filter-select').value = 'current';
+            renderRelationships(); // This will also call renderCurrentDeityRelationships()
+            switchTab('deity-anvil');
+        }
+
+        function clearDeityForm(confirmFirst = true) {
+            if (confirmFirst && !confirm("Clear the form? Unsaved changes will be lost.")) return;
+            currentDeityId = null;
+            document.getElementById('deity-form').reset();
+            document.querySelectorAll('#domain-grid input').forEach(cb => cb.checked = false);
+            const defaultClass = DIVINE_CLASSES.find(r => r.default);
+            if (defaultClass) document.getElementById('divine-class').value = defaultClass.name;
+            if (document.getElementById('relationship-filter-select').value === 'current') { 
+                document.getElementById('relationship-filter-select').value = 'all'; 
+                renderRelationships(); 
+            }
+            renderCurrentDeityRelationships(); // NEW: Clear the inline table
+        }
+
+        function deleteDeity() {
+            if (!currentDeityId) { alert('No deity is selected to delete.'); return; }
+            const deity = getDeityById(currentDeityId);
+            if (confirm(`Delete '${deity.name} ${deity.epithet}'? This removes them from all pantheons and relationships.`)) {
+                deities = deities.filter(d => d.id != currentDeityId);
+                relationships = relationships.filter(r => r.deityAId != currentDeityId && r.deityBId != currentDeityId);
+                pantheons.forEach(p => { p.memberIds = p.memberIds.filter(id => id != currentDeityId); });
+                localStorage.setItem('deities_v4', JSON.stringify(deities));
+                localStorage.setItem('relationships_v4', JSON.stringify(relationships));
+                localStorage.setItem('pantheons_v4', JSON.stringify(pantheons));
+                clearDeityForm(false);
+                renderDeityLibrary();
+                renderDeityAnvilLibrary(); 
+                updateAllDropdowns();
+                renderRelationships();
+            }
+        }
+
+        // --- PANTHEON MANAGEMENT ---
+        function createNewPantheon() {
+            const newPantheon = { id: Date.now(), name: 'New Pantheon', myth: '', memberIds: [] };
+            pantheons.push(newPantheon);
+            localStorage.setItem('pantheons_v4', JSON.stringify(pantheons));
+            currentPantheonId = newPantheon.id;
+            renderPantheonSelectors();
+            handlePantheonSelection();
+        }
+        async function forgeNewPantheon() {
+            if (!confirm("This will create a new pantheon with 5-8 new deities and relationships. Continue?")) return;
+            const newPantheon = { id: Date.now(), name: generatePantheonName(), myth: generateCreationMyth(), memberIds: [] };
+            const count = Math.floor(Math.random() * 4) + 5;
+            for (let i = 0; i < count; i++) {
+                generateDomains();
+                const newDeity = { id: Date.now() + i, name: generateDeityName(), epithet: generateEpithet(), rank: getRandomElement(DIVINE_CLASSES).name, alignment: generateAlignment(), domains: { majors: Array.from(document.querySelectorAll('.domain-accordion-header input:checked')).map(cb => cb.value), minors: Array.from(document.querySelectorAll('.domain-accordion-content input:checked')).map(cb => cb.value) }, symbol: generateSymbol(), animal: generateAnimal(), weapon: generateWeapon(), colour: generateColour(), tenets: generateTenet(), festivals: [] };
+                deities.push(newDeity);
+                newPantheon.memberIds.push(newDeity.id);
+            }
+            pantheons.push(newPantheon);
+            generateRelationshipsForPantheon(newPantheon, false);
+            localStorage.setItem('deities_v4', JSON.stringify(deities));
+            localStorage.setItem('pantheons_v4', JSON.stringify(pantheons));
+            localStorage.setItem('relationships_v4', JSON.stringify(relationships));
+            currentPantheonId = newPantheon.id;
+            renderPantheonSelectors();
+            handlePantheonSelection();
+            updateAllDropdowns();
+            renderRelationships();
+            switchTab('pantheon-forge');
+            alert(`Forged new pantheon: '${newPantheon.name}' with ${count} deities.`);
+        }
+        function generateDeitiesForPantheon() {
+            if (!currentPantheonId) {
+                alert("Please select a pantheon first.");
+                return;
+            }
+            const pantheon = getPantheonById(currentPantheonId);
+            if (!pantheon) {
+                alert("Error: Could not find selected pantheon.");
+                return;
+            }
+            if (!confirm(`This will generate 5-8 new deities and add them to '${pantheon.name}'. Continue?`)) return;
+
+            const count = Math.floor(Math.random() * 4) + 5;
+            let newDeityIds = [];
+            for (let i = 0; i < count; i++) {
+                generateDomains(); // Use the global domain generator
+                const newDeity = { id: Date.now() + i, name: generateDeityName(), epithet: generateEpithet(), rank: getRandomElement(DIVINE_CLASSES).name, alignment: generateAlignment(), domains: { majors: Array.from(document.querySelectorAll('.domain-accordion-header input:checked')).map(cb => cb.value), minors: Array.from(document.querySelectorAll('.domain-accordion-content input:checked')).map(cb => cb.value) }, symbol: generateSymbol(), animal: generateAnimal(), weapon: generateWeapon(), colour: generateColour(), tenets: generateTenet(), festivals: [] };
+                deities.push(newDeity);
+                pantheon.memberIds.push(newDeity.id);
+                newDeityIds.push(newDeity.id);
+            }
+            
+            const oldMemberIds = pantheon.memberIds.filter(id => !newDeityIds.includes(id));
+            const newPairs = newDeityIds.flatMap(newId => oldMemberIds.map(oldId => [newId, oldId]));
+            newPairs.forEach(([deityAId, deityBId]) => {
+                    if (Math.random() < 0.35) {
+                    const predicate = getRandomElement(RELATIONSHIP_TYPES);
+                    if (!relationships.some(r => (r.deityAId == deityAId && r.deityBId == deityBId) || (r.deityAId == deityBId && r.deityBId == deityAId))) {
+                        relationships.push({ deityAId, predicate, deityBId });
+                    }
+                }
+            });
+
+            localStorage.setItem('deities_v4', JSON.stringify(deities));
+            localStorage.setItem('pantheons_v4', JSON.stringify(pantheons));
+            localStorage.setItem('relationships_v4', JSON.stringify(relationships));
+            
+            updateAllDropdowns();
+            renderRelationships();
+            document.getElementById('library-filter-select').value = currentPantheonId;
+            renderDeityLibrary();
+            renderDeityAnvilLibrary(); 
+            alert(`Generated ${count} new deities and added them to '${pantheon.name}'.`);
+        }
+        function deleteCurrentPantheon() { if (!currentPantheonId) { alert("Please select a pantheon to delete."); return; } const pantheon = getPantheonById(currentPantheonId); if (confirm(`Delete pantheon '${pantheon.name}'?`)) { pantheons = pantheons.filter(p => p.id != currentPantheonId); localStorage.setItem('pantheons_v4', JSON.stringify(pantheons)); currentPantheonId = null; renderPantheonSelectors(); handlePantheonSelection(); } }
+        function addDeityToPantheon() { const pantheonId = document.getElementById('add-to-pantheon-select').value; if (!currentDeityId || !pantheonId) { alert("Please select a deity and a pantheon."); return; } const pantheon = getPantheonById(pantheonId); if (pantheon.memberIds.includes(currentDeityId)) { alert("This deity is already in that pantheon."); return; } pantheon.memberIds.push(currentDeityId); generateRelationshipsForPantheon(pantheon, true); localStorage.setItem('pantheons_v4', JSON.stringify(pantheons)); alert(`Added deity to '${pantheon.name}'.`); document.getElementById('library-filter-select').value = pantheonId; renderDeityLibrary(); renderDeityAnvilLibrary(); }
+        function handlePantheonSelection() { 
+            currentPantheonId = document.getElementById('pantheon-select').value; 
+            if (currentPantheonId) { 
+                const pantheon = getPantheonById(currentPantheonId); 
+                document.getElementById('pantheon-name').value = pantheon.name; 
+                document.getElementById('creation-myth').value = pantheon.myth; 
+                document.getElementById('library-filter-select').value = currentPantheonId; 
+                document.getElementById('deity-anvil-library-filter-select').value = currentPantheonId; 
+            } else { 
+                document.getElementById('pantheon-name').value = ''; 
+                document.getElementById('creation-myth').value = ''; 
+            } 
+            renderDeityLibrary(); 
+            renderDeityAnvilLibrary(); 
+        }
+        
+        // --- RELATIONSHIP MANAGEMENT ---
+
+        // NEW: Function to render ONLY the current deity's relationships in the anvil
+        function renderCurrentDeityRelationships() {
+            const list = document.getElementById('current-deity-relationships-list');
+            list.innerHTML = '';
+            
+            if (!currentDeityId) {
+                list.innerHTML = '<tr><td colspan="3" style="text-align: center;">No deity loaded.</td></tr>';
+                return;
+            }
+
+            const filteredRelationships = relationships.filter(r => r.deityAId == currentDeityId || r.deityBId == currentDeityId);
+
+            if (filteredRelationships.length === 0) {
+                list.innerHTML = '<tr><td colspan="3" style="text-align: center;">No relationships found for this deity.</td></tr>';
+                return;
+            }
+
+            filteredRelationships.forEach(r => {
+                const deityA = getDeityById(r.deityAId);
+                const deityB = getDeityById(r.deityBId);
+                if (!deityA || !deityB) return;
+
+                const row = list.insertRow();
+                row.insertCell().innerHTML = `<span class="clickable-deity" onclick="loadDeity(${deityA.id})">${deityA.name} ${deityA.epithet || ''}</span>`;
+                row.insertCell().textContent = r.predicate;
+                row.insertCell().innerHTML = `<span class="clickable-deity" onclick="loadDeity(${deityB.id})">${deityB.name} ${deityB.epithet || ''}</span>`;
+            });
+        }
+
+        function renderRelationships() {
+            const list = document.getElementById('relationships-list');
+            list.innerHTML = '';
+            const filter = document.getElementById('relationship-filter-select').value;
+            let filteredRelationships = relationships;
+
+            if (filter === 'current') {
+                if (!currentDeityId) {
+                    list.innerHTML = '<tr><td colspan="4" style="text-align: center;">No deity selected. Load a deity in the Anvil to see their relationships.</td></tr>';
+                    renderCurrentDeityRelationships(); // NEW
+                    return;
+                }
+                filteredRelationships = relationships.filter(r => r.deityAId == currentDeityId || r.deityBId == currentDeityId);
+            } else if (filter !== 'all') {
+                const pantheon = getPantheonById(filter);
+                if (pantheon) {
+                    const memberIds = new Set(pantheon.memberIds);
+                    filteredRelationships = relationships.filter(r => memberIds.has(r.deityAId) && memberIds.has(r.deityBId));
+                }
+            }
+
+            if (filteredRelationships.length === 0) { 
+                list.innerHTML = '<tr><td colspan="4" style="text-align: center;">No relationships match filter.</td></tr>'; 
+                renderCurrentDeityRelationships(); // NEW
+                return; 
+            }
+            
+            filteredRelationships.forEach((r, index) => {
+                const deityA = getDeityById(r.deityAId), deityB = getDeityById(r.deityBId);
+                if (!deityA || !deityB) return;
+                const row = list.insertRow();
+                row.insertCell().innerHTML = `<span class="clickable-deity" onclick="loadDeity(${deityA.id})">${deityA.name} ${deityA.epithet || ''}</span>`;
+                row.insertCell().textContent = r.predicate;
+                row.insertCell().innerHTML = `<span class="clickable-deity" onclick="loadDeity(${deityB.id})">${deityB.name} ${deityB.epithet || ''}</span>`;
+                const originalIndex = relationships.findIndex(rel => rel === r);
+                row.insertCell().innerHTML = `<button onclick="deleteRelationship(${originalIndex})" class="btn btn-relationship" style="padding: 3px 8px; font-size: 0.7em;">X</button>`;
+            });
+
+            renderCurrentDeityRelationships(); // NEW: Sync the anvil display
+        }
+        function deleteRelationship(index) { 
+            relationships.splice(index, 1); 
+            localStorage.setItem('relationships_v4', JSON.stringify(relationships)); 
+            renderRelationships(); 
+        }
+        function addRelationship() { 
+            const deityAId = document.getElementById('deity-a').value, predicate = document.getElementById('relationship-type').value, deityBId = document.getElementById('deity-b').value; 
+            if (!deityAId || !predicate || !deityBId) { alert('Please complete all fields.'); return; } 
+            if (deityAId === deityBId) { alert('A deity cannot have a relationship with itself.'); return; } 
+            if (relationships.some(r => r.deityAId == deityAId && r.predicate === predicate && r.deityBId == deityBId)) { alert('This exact relationship already exists.'); return; } 
+            relationships.push({ deityAId, predicate, deityBId }); 
+            localStorage.setItem('relationships_v4', JSON.stringify(relationships)); 
+            renderRelationships(); 
+            document.getElementById('deity-a').value = ''; 
+            document.getElementById('relationship-type').value = ''; 
+            document.getElementById('deity-b').value = ''; 
+        }
+        function generateRelationshipsForPantheon(pantheon, singleNewMember) {
+            const members = pantheon.memberIds; if (members.length < 2) return; let newRelationships = 0;
+            const pairs = singleNewMember ? members.slice(0, -1).map(id => [id, members[members.length - 1]]) : members.flatMap((v, i) => members.slice(i + 1).map(w => [v, w]));
+            pairs.forEach(([deityAId, deityBId]) => {
+                if (Math.random() < 0.35) {
+                    const predicate = getRandomElement(RELATIONSHIP_TYPES);
+                    if (!relationships.some(r => (r.deityAId == deityAId && r.deityBId == deityBId) || (r.deityAId == deityBId && r.deityBId == deityAId))) {
+                        relationships.push({ deityAId, predicate, deityBId }); newRelationships++;
+                    }
+                }
+            });
+            if (newRelationships > 0) { 
+                localStorage.setItem('relationships_v4', JSON.stringify(relationships)); 
+                renderRelationships(); 
+                alert(`Generated ${newRelationships} new relationships within '${pantheon.name}'.`); 
+            }
+        }
+
+        // --- FESTIVAL MANAGEMENT ---
+        function generateFestival() {
+            const deityId = document.getElementById('festival-deity-select').value;
+            if (!deityId) { alert("Please select a deity."); return; }
+            const deity = getDeityById(deityId);
+            const festivalData = {
+                name: `${getRandomElement(FESTIVAL_COMPONENTS.prefix)} ${getRandomElement(FESTIVAL_COMPONENTS.subject)}`,
+                timing: `Held on ${getRandomElement(FESTIVAL_COMPONENTS.timing)}.`,
+                ritual: `The core observation is ${getRandomElement(FESTIVAL_COMPONENTS.ritual)}.`,
+                offering: `${getRandomElement(FESTIVAL_COMPONENTS.offering)} is required.`,
+                domain: deity.domains?.majors[0] || "General reverence"
+            };
+            displayFestival(festivalData);
+        }
+        function saveFestival() {
+            const deityId = document.getElementById('festival-deity-select').value;
+            if (!deityId) { alert("Please select a deity to save the festival to."); return; }
+            const deity = getDeityById(deityId);
+            
+            const festivalData = {
+                id: currentFestivalId || Date.now(),
+                name: document.getElementById('festival-name-output').textContent,
+                timing: document.getElementById('festival-timing-output').textContent,
+                ritual: document.getElementById('festival-ritual-output').textContent,
+                offering: document.getElementById('festival-offering-output').textContent,
+                domain: document.getElementById('festival-domain-output').textContent
+            };
+
+            if (festivalData.name === '--') { alert("Please generate festival details first."); return; }
+
+            if (currentFestivalId) { // Update existing
+                const index = deity.festivals.findIndex(f => f.id === currentFestivalId);
+                deity.festivals[index] = festivalData;
+            } else { // Add new
+                deity.festivals.push(festivalData);
+            }
+            
+            localStorage.setItem('deities_v4', JSON.stringify(deities));
+            alert(`Festival saved for ${deity.name}.`);
+            handleFestivalDeitySelection(); // Re-render list
+        }
+        function displayFestival(festival) {
+            document.getElementById('festival-name-output').textContent = festival.name || '--';
+            document.getElementById('festival-timing-output').textContent = festival.timing || '--';
+            document.getElementById('festival-ritual-output').textContent = festival.ritual || '--';
+            document.getElementById('festival-offering-output').textContent = festival.offering || '--';
+            document.getElementById('festival-domain-output').textContent = festival.domain || '--';
+        }
+        function clearFestivalForm() {
+            currentFestivalId = null;
+            displayFestival({});
+        }
+        function handleFestivalDeitySelection() {
+            const deityId = document.getElementById('festival-deity-select').value;
+            clearFestivalForm();
+            renderSavedFestivals(deityId);
+        }
+        function renderSavedFestivals(deityId) {
+            const listContainer = document.getElementById('saved-festivals-list');
+            if (!deityId) {
+                listContainer.innerHTML = '<p>Select a deity to view their saved festivals.</p>';
+                return;
+            }
+            const deity = getDeityById(deityId);
+            if (!deity.festivals || deity.festivals.length === 0) {
+                listContainer.innerHTML = '<p>No festivals saved for this deity.</p>';
+                return;
+            }
+            listContainer.innerHTML = '';
+            deity.festivals.forEach(festival => {
+                const item = document.createElement('div');
+                item.className = 'saved-festival-item';
+                item.innerHTML = `
+                    <h4>${festival.name}</h4>
+                    <p><strong>Timing:</strong> ${festival.timing}</p>
+                    <p><strong>Ritual:</strong> ${festival.ritual}</p>
+                    <div class="button-group">
+                        <button type="button" class="btn btn-festival" onclick="editFestival(${deity.id}, ${festival.id})">Edit</button>
+                        <button type="button" class="btn btn-festival" onclick="deleteFestival(${deity.id}, ${festival.id})">Delete</button>
+                    </div>
+                `;
+                listContainer.appendChild(item);
+            });
+        }
+        function editFestival(deityId, festivalId) {
+            const deity = getDeityById(deityId);
+            const festival = deity.festivals.find(f => f.id === festivalId);
+            if(festival) {
+                currentFestivalId = festivalId;
+                displayFestival(festival);
+            }
+        }
+        function deleteFestival(deityId, festivalId) {
+            if (confirm("Are you sure you want to delete this festival?")) {
+                const deity = getDeityById(deityId);
+                deity.festivals = deity.festivals.filter(f => f.id !== festivalId);
+                localStorage.setItem('deities_v4', JSON.stringify(deities));
+                renderSavedFestivals(deityId);
+            }
+        }
+
+
+        // --- UI RENDERING & INITIALIZATION ---
+        function renderDeityLibrary() {
+            const list = document.getElementById('deity-library-list');
+            list.innerHTML = '';
+            const filter = document.getElementById('library-filter-select').value;
+            let members = [];
+            if (filter === 'all') members = deities;
+            else if (filter === 'unassigned') { const assignedIds = new Set(pantheons.flatMap(p => p.memberIds)); members = deities.filter(d => !assignedIds.has(d.id)); }
+            else { const pantheon = getPantheonById(filter); members = pantheon ? pantheon.memberIds.map(id => getDeityById(id)).filter(d => d) : []; }
+            if (members.length === 0) { list.innerHTML = '<tr><td colspan="3" style="text-align: center;">No deities match filter.</td></tr>'; return; }
+            members.forEach(d => {
+                const row = list.insertRow();
+                row.onclick = () => loadDeity(d.id);
+                const domains = [...(d.domains?.majors || []), ...(d.domains?.minors || [])];
+                const domainString = domains.slice(0, 3).map(dom => d.domains.majors.includes(dom) ? `<b>${dom}</b>` : dom).join(', ');
+                row.insertCell().innerHTML = `${d.name} ${d.epithet || ''}`.trim();
+                row.insertCell().innerHTML = d.rank;
+                row.insertCell().innerHTML = domainString;
+            });
+        }
+
+        // NEW: Function for Deity Anvil's library
+        function renderDeityAnvilLibrary() {
+            const list = document.getElementById('deity-anvil-library-list');
+            list.innerHTML = '';
+            const filter = document.getElementById('deity-anvil-library-filter-select').value;
+            let members = [];
+            if (filter === 'all') members = deities;
+            else if (filter === 'unassigned') { const assignedIds = new Set(pantheons.flatMap(p => p.memberIds)); members = deities.filter(d => !assignedIds.has(d.id)); }
+            else { const pantheon = getPantheonById(filter); members = pantheon ? pantheon.memberIds.map(id => getDeityById(id)).filter(d => d) : []; }
+            if (members.length === 0) { list.innerHTML = '<tr><td colspan="3" style="text-align: center;">No deities match filter.</td></tr>'; return; }
+            members.forEach(d => {
+                const row = list.insertRow();
+                row.onclick = () => loadDeity(d.id);
+                const domains = [...(d.domains?.majors || []), ...(d.domains?.minors || [])];
+                const domainString = domains.slice(0, 3).map(dom => d.domains.majors.includes(dom) ? `<b>${dom}</b>` : dom).join(', ');
+                row.insertCell().innerHTML = `${d.name} ${d.epithet || ''}`.trim();
+                row.insertCell().innerHTML = d.rank;
+                row.insertCell().innerHTML = domainString;
+            });
+        }
+
+        // NEW: Rewritten renderPantheonSelectors
+        function renderPantheonSelectors() {
+            const pantheonSelects = [document.getElementById('pantheon-select'), document.getElementById('add-to-pantheon-select')];
+            const librarySelects = [document.getElementById('library-filter-select'), document.getElementById('deity-anvil-library-filter-select')];
+            const relationshipSelect = document.getElementById('relationship-filter-select');
+
+            // Store current values
+            const currentLibFilter = document.getElementById('library-filter-select').value;
+            const currentAnvilLibFilter = document.getElementById('deity-anvil-library-filter-select').value;
+            const currentRelFilter = document.getElementById('relationship-filter-select').value;
+
+            pantheonSelects.forEach(s => s.innerHTML = '<option value="">-- Select Pantheon --</option>');
+            librarySelects.forEach(s => s.innerHTML = '<option value="all">All Deities</option><option value="unassigned">Unassigned</option>');
+            relationshipSelect.innerHTML = '<option value="all">All Pantheons</option><option value="current">Current Deity</option>';
+
+            pantheons.forEach(p => {
+                const option = `<option value="${p.id}">${p.name}</option>`;
+                pantheonSelects.forEach(s => s.innerHTML += option);
+                librarySelects.forEach(s => s.innerHTML += option);
+                relationshipSelect.innerHTML += option;
+            });
+
+            document.getElementById('pantheon-select').value = currentPantheonId || '';
+            // Restore filter values if they exist
+            document.getElementById('library-filter-select').value = currentLibFilter || 'all';
+            document.getElementById('deity-anvil-library-filter-select').value = currentAnvilLibFilter || 'all';
+            document.getElementById('relationship-filter-select').value = currentRelFilter || 'all';
+        }
+
+        function updateAllDropdowns() {
+            const selects = [document.getElementById('deity-a'), document.getElementById('deity-b'), document.getElementById('festival-deity-select')];
+            selects.forEach(s => s.innerHTML = '<option value="">-- Select Deity --</option>');
+            deities.forEach(d => { const option = `<option value="${d.id}">${d.name} ${d.epithet || ''}`.trim() + `</option>`; selects.forEach(s => s.innerHTML += option); });
+            if (document.getElementById('relationship-type').options.length <= 1) { document.getElementById('relationship-type').innerHTML = '<option value="">-- Select Predicate --</option>' + RELATIONSHIP_TYPES.map(r => `<option value="${r}">${r}</option>`).join(''); }
+        }
+        function populateHybridSelects() {
+            const lists = { 
+                "divine-class-list": DIVINE_CLASSES.map(dc => dc.name), 
+                "epithet-list": NAME_PARTS.E, 
+                "alignment-list": ALIGNMENTS, 
+                "symbol-list": SYMBOLS, 
+                "animal-list": ANIMALS, 
+                "weapon-list": WEAPONS,
+                "colour-list": COLOURS 
+            };
+            for(const id in lists) { document.getElementById(id).innerHTML = lists[id].map(item => `<option value="${item}">${item}</option>`).join(''); }
+        }
+        function loadDomainGrid() {
+            const container = document.getElementById('domain-grid'); container.innerHTML = '';
+            Object.keys(DOMAINS).forEach(major => {
+                const item = document.createElement('div'); item.className = 'domain-accordion-item';
+                const header = document.createElement('div'); header.className = 'domain-accordion-header'; header.innerHTML = `<input type="checkbox" value="${major}"> <label>${major}</label>`;
+                const content = document.createElement('div'); content.className = 'domain-accordion-content'; content.innerHTML = DOMAINS[major].map(minor => `<label><input type="checkbox" value="${minor}"> ${minor}</label>`).join('');
+                item.append(header, content); container.appendChild(item);
+                header.addEventListener('click', (e) => { if (e.target.type === 'checkbox') return; content.classList.toggle('active'); });
+            });
+        }
+        
+        // --- DATA I/O & PRINTING ---
+        function exportData() { const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ pantheons, deities, relationships }, null, 2)); const dl = document.createElement('a'); dl.setAttribute("href", dataStr); dl.setAttribute("download", `Forge_of_Gods_v4_Backup.json`); dl.click(); dl.remove(); }
+        function importData(event) {
+            const file = event.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (data.pantheons && data.deities && data.relationships && confirm("WARNING: This will OVERWRITE ALL current data. Continue?")) {
+                        pantheons = data.pantheons; deities = data.deities; relationships = data.relationships;
+                        localStorage.setItem('pantheons_v4', JSON.stringify(pantheons)); localStorage.setItem('deities_v4', JSON.stringify(deities)); localStorage.setItem('relationships_v4', JSON.stringify(relationships));
+                        currentPantheonId = null; currentDeityId = null; initApp(); alert('Data successfully imported!');
+                    } else { alert('Error: Imported file is missing required fields.'); }
+                } catch (error) { alert('Error parsing file.'); }
+            };
+            reader.readAsText(file); event.target.value = '';
+        }
+        function exportDeityToPDF() {
+            if(!currentDeityId) { alert("Please load a deity to export."); return; }
+            const deity = getDeityById(currentDeityId);
+            const rank = DIVINE_CLASSES.find(r => r.name === deity.rank);
+            const html = `
+                <div class="print-header"><h1>${deity.name}</h1><h2>${deity.epithet}</h2></div>
+                <div class="print-grid">
+                    <div class="print-section"><h3>Core Details</h3><p><b>Class:</b> ${deity.rank} <i>(${rank.dvr})</i></p><p><b>Alignment:</b> ${deity.alignment}</p></div>
+                    <div class="print-section"><h3>Symbols & Associations</h3><p><b>Symbol:</b> ${deity.symbol}</p><p><b>Animal:</b> ${deity.animal}</p><p><b>Weapon:</b> ${deity.weapon || 'N/A'}</p><p><b>Colour:</b> ${deity.colour}</p></div>
+                </div>
+                <div class="print-section"><h3>Domains</h3><p><b>Major:</b> ${deity.domains.majors.join(', ')}</p><p><b>Minor:</b> ${deity.domains.minors.join(', ')}</p></div>
+                <div class="print-section"><h3>Holy Tenet</h3><p>${deity.tenets}</p></div>
+            `;
+            document.getElementById('print-deity-sheet-container').innerHTML = html;
+            document.getElementById('pantheon-forge').classList.remove('print-active');
+            document.getElementById('deity-anvil').classList.add('print-active');
+            window.print();
+        }
+        function exportPantheonToPDF() {
+            if(!currentPantheonId) { alert("Please select a pantheon to export."); return; }
+            const pantheon = getPantheonById(currentPantheonId);
+            const members = pantheon.memberIds.map(id => getDeityById(id)).filter(d => d);
+            let membersHtml = '<ul>';
+            members.forEach(d => { membersHtml += `<li><b>${d.name} ${d.epithet}</b> - <i>${d.rank} of ${d.domains.majors.join('/')}</i></li>`; });
+            membersHtml += '</ul>';
+            const html = `
+                <div class="print-header"><h1>${pantheon.name}</h1></div>
+                <div class="print-section"><h3>Creation Myth</h3><p>${pantheon.myth.replace(/\n/g, '<br>')}</p></div>
+                <div class="print-section"><h3>Members</h3>${membersHtml}</div>
+            `;
+            document.getElementById('print-pantheon-sheet-container').innerHTML = html;
+            document.getElementById('deity-anvil').classList.remove('print-active');
+            document.getElementById('pantheon-forge').classList.add('print-active');
+            window.print();
+        }
+
+        // --- APP INITIALIZATION & EVENT BINDING ---
+        function switchTab(tabId) { 
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active')); 
+            document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active', 'deity', 'pantheon', 'festival', 'relationship')); 
+            document.getElementById(tabId).classList.add('active'); 
+            const newButton = document.querySelector(`.tab-button[data-tab="${tabId}"]`); 
+            newButton.classList.add('active', tabId.split('-')[0]); 
+            if(tabId !== 'deity-anvil') document.querySelector('.tab-button[data-tab="deity-anvil"]').classList.add('deity'); 
+            if(tabId !== 'pantheon-forge') document.querySelector('.tab-button[data-tab="pantheon-forge"]').classList.add('pantheon'); 
+            if(tabId !== 'festival-sanctum') document.querySelector('.tab-button[data-tab="festival-sanctum"]').classList.add('festival'); 
+            // NEW: Add relationship class logic
+            if(tabId !== 'relationship-manual') document.querySelector('.tab-button[data-tab="relationship-manual"]').classList.add('relationship'); 
+        }
+        function initApp() {
+            // Data migration for festivals
+            deities.forEach(d => { if(d.festival && !Array.isArray(d.festivals)) { d.festivals = [d.festival]; delete d.festival; } else if (!d.festivals) { d.festivals = []; } });
+            localStorage.setItem('deities_v4', JSON.stringify(deities));
+
+            document.getElementById('divine-class').innerHTML = DIVINE_CLASSES.map(dc => `<option value="${dc.name}">${dc.name} (${dc.dvr})</option>`).join('');
+            const defaultClass = DIVINE_CLASSES.find(r => r.default);
+            if (defaultClass) document.getElementById('divine-class').value = defaultClass.name;
+            populateHybridSelects();
+            loadDomainGrid();
+            renderPantheonSelectors();
+            handlePantheonSelection(); // This now renders both libraries
+            updateAllDropdowns();
+            renderRelationships(); // This now renders both relationship tables
+            clearDeityForm(false);
+        }
+        function bindEvents() {
+            document.querySelectorAll('.tab-button').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
+            // Hybrid Input Button Listeners
+            document.querySelectorAll('.btn-hic[data-list-id]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const container = document.getElementById(e.currentTarget.dataset.listId + '-container'); // Use currentTarget
+                    document.querySelectorAll('.custom-select-list').forEach(list => { if (list !== container) list.style.display = 'none'; });
+                    container.style.display = container.style.display === 'block' ? 'none' : 'block';
+                });
+            });
+            document.querySelectorAll('.custom-select-list select').forEach(select => {
+                select.addEventListener('change', (e) => {
+                    const inputId = e.target.id.replace('-list', '');
+                    document.getElementById(inputId).value = e.target.value;
+                    e.target.parentElement.style.display = 'none';
+                });
+            });
+            window.addEventListener('click', () => document.querySelectorAll('.custom-select-list').forEach(list => list.style.display = 'none'));
+            
+            // SAC Tab buttons
+             document.querySelectorAll('.sac-tab-button').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const tabId = e.target.dataset.sacTab;
+                    document.querySelectorAll('.sac-tab-button').forEach(btn => btn.classList.remove('active'));
+                    e.target.classList.add('active');
+                    document.querySelectorAll('.sac-tab-content').forEach(content => {
+                        content.classList.remove('active');
+                        if (content.id === `sac-tab-${tabId}`) {
+                            content.classList.add('active');
+                        }
+                    });
+                });
+            });
+            
+            // Deity Anvil
+            document.getElementById('randomize-all-btn').addEventListener('click', generateRandomDeity);
+            document.getElementById('generate-name-btn').addEventListener('click', () => document.getElementById('deity-name').value = generateDeityName());
+            document.getElementById('generate-epithet-btn').addEventListener('click', () => document.getElementById('deity-epithet').value = generateEpithet());
+            document.getElementById('generate-alignment-btn').addEventListener('click', () => document.getElementById('alignment').value = generateAlignment());
+            document.getElementById('generate-symbol-btn').addEventListener('click', () => document.getElementById('symbol').value = generateSymbol());
+            document.getElementById('generate-animal-btn').addEventListener('click', () => document.getElementById('animal').value = generateAnimal());
+            document.getElementById('generate-weapon-btn').addEventListener('click', () => document.getElementById('weapon').value = generateWeapon());
+            document.getElementById('generate-colour-btn').addEventListener('click', () => document.getElementById('colour').value = generateColour());
+            document.getElementById('generate-tenets-btn').addEventListener('click', () => document.getElementById('tenets').value = generateTenet());
+            document.getElementById('generate-domains-btn').addEventListener('click', generateDomains);
+            document.getElementById('save-deity-btn').addEventListener('click', saveDeity);
+            document.getElementById('new-deity-btn').addEventListener('click', () => clearDeityForm(true));
+            document.getElementById('delete-deity-btn').addEventListener('click', deleteDeity);
+            document.getElementById('add-to-pantheon-btn').addEventListener('click', addDeityToPantheon);
+            document.getElementById('export-deity-btn').addEventListener('click', exportDeityToPDF);
+            document.getElementById('go-to-relationships-btn').addEventListener('click', () => switchTab('relationship-manual'));
+            document.getElementById('deity-anvil-library-filter-select').addEventListener('change', renderDeityAnvilLibrary);
+            
+            // Relationship Manual (Event listeners for moved content)
+            document.getElementById('relationship-filter-select').addEventListener('change', renderRelationships);
+            document.getElementById('add-relationship-btn').addEventListener('click', addRelationship);
+
+            // Pantheon Forge
+            document.getElementById('pantheon-select').addEventListener('change', handlePantheonSelection);
+            document.getElementById('library-filter-select').addEventListener('change', renderDeityLibrary);
+            document.getElementById('new-pantheon-btn').addEventListener('click', createNewPantheon);
+            document.getElementById('forge-new-pantheon-btn-global').addEventListener('click', forgeNewPantheon);
+            document.getElementById('generate-deities-for-pantheon-btn').addEventListener('click', generateDeitiesForPantheon);
+            document.getElementById('delete-pantheon-btn').addEventListener('click', deleteCurrentPantheon);
+            document.getElementById('pantheon-name').addEventListener('change', (e) => { if(currentPantheonId) { getPantheonById(currentPantheonId).name = e.target.value.trim(); localStorage.setItem('pantheons_v4', JSON.stringify(pantheons)); renderPantheonSelectors(); } });
+            document.getElementById('creation-myth').addEventListener('change', (e) => { if(currentPantheonId) { getPantheonById(currentPantheonId).myth = e.target.value.trim(); localStorage.setItem('pantheons_v4', JSON.stringify(pantheons)); } });
+            document.getElementById('generate-pantheon-name-btn').addEventListener('click', () => { document.getElementById('pantheon-name').value = generatePantheonName(); if(currentPantheonId) { getPantheonById(currentPantheonId).name = document.getElementById('pantheon-name').value; localStorage.setItem('pantheons_v4', JSON.stringify(pantheons)); renderPantheonSelectors(); } });
+            document.getElementById('generate-myth-btn').addEventListener('click', () => { document.getElementById('creation-myth').value = generateCreationMyth(); if(currentPantheonId) { getPantheonById(currentPantheonId).myth = document.getElementById('creation-myth').value; localStorage.setItem('pantheons_v4', JSON.stringify(pantheons)); } });
+            document.getElementById('export-pantheon-btn').addEventListener('click', exportPantheonToPDF);
+            document.getElementById('export-data-btn').addEventListener('click', exportData);
+            document.getElementById('import-file').addEventListener('change', importData);
+
+            // Festival Sanctum
+            document.getElementById('generate-festival-btn').addEventListener('click', generateFestival);
+            document.getElementById('save-festival-btn').addEventListener('click', saveFestival);
+            document.getElementById('clear-festival-btn').addEventListener('click', clearFestivalForm);
+            document.getElementById('festival-deity-select').addEventListener('change', handleFestivalDeitySelection);
+        }
+        document.addEventListener('DOMContentLoaded', () => { initApp(); bindEvents(); switchTab('deity-anvil'); });
+    </script></body>
+</html>

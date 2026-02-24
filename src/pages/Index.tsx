@@ -89,6 +89,17 @@ const Index = () => {
     }
   };
 
+  const handleWorldCreated = (newBookId: string) => {
+    // Find the newly created book
+    const allBooks = getAllBooks();
+    const newBook = allBooks.find(book => book.id === newBookId);
+    
+    if (newBook) {
+      // Select the new book and focus on it in single view mode
+      handleBookSelect(newBook);
+    }
+  };
+
   const backgroundStyle = {
     backgroundImage: `url(${theme === 'dark' ? cosmicBackground : lightBackground})`,
     backgroundSize: '300%',
@@ -147,7 +158,7 @@ const Index = () => {
 
             {/* Create Book Button */}
             <div className="absolute bottom-6 left-6 z-10">
-              <WorldCreationDialog>
+              <WorldCreationDialog onWorldCreated={handleWorldCreated}>
                 <Button className="bg-blue-600 hover:bg-blue-700">
                   ✨ Create New World
                 </Button>

@@ -18,19 +18,19 @@ const WorldCreationDialog = ({ children, onWorldCreated }: WorldCreationDialogPr
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [selectedColor, setSelectedColor] = useState('#8B4513');
+  const [selectedColor, setSelectedColor] = useState('#00D9FF');
   const [isLeatherMode, setIsLeatherMode] = useState(true);
   const [selectedLeatherColor, setSelectedLeatherColor] = useState<LeatherColorPreset | null>(null);
   const [customCoverImage, setCustomCoverImage] = useState<string | null>(null);
   const { createBook, leatherPresets } = useBookStore();
 
   const colorOptions = [
-    { value: '#1a1a1a', label: 'Rich Black', gradient: 'linear-gradient(135deg, #1a1a1a, #2d2d2d)' },
-    { value: '#1e3a8a', label: 'Navy Blue', gradient: 'linear-gradient(135deg, #1e3a8a, #2563eb)' },
-    { value: '#8B4513', label: 'Classic Brown', gradient: 'linear-gradient(135deg, #8B4513, #A0522D)' },
-    { value: '#2d5016', label: 'Forest Green', gradient: 'linear-gradient(135deg, #2d5016, #3a6b1e)' },
-    { value: '#722f37', label: 'Royal Purple', gradient: 'linear-gradient(135deg, #722f37, #88333c)' },
-    { value: '#36454f', label: 'Arctic White', gradient: 'linear-gradient(135deg, #36454f, #4a5568)' },
+    { value: '#00D9FF', label: 'Electric Azure', gradient: 'linear-gradient(135deg, rgba(0,217,255,0.6), rgba(0,149,255,0.4)), radial-gradient(circle at 30% 30%, rgba(255,255,255,0.7), transparent 50%)' },
+    { value: '#FF006E', label: 'Neon Magenta', gradient: 'linear-gradient(135deg, rgba(255,0,110,0.6), rgba(255,0,150,0.4)), radial-gradient(circle at 70% 70%, rgba(255,255,255,0.8), transparent 50%)' },
+    { value: '#FFBE0B', label: 'Solar Flare', gradient: 'linear-gradient(135deg, rgba(255,190,11,0.6), rgba(255,223,0,0.4)), radial-gradient(circle at 40% 60%, rgba(255,255,255,0.7), transparent 50%)' },
+    { value: '#8338EC', label: 'Cosmic Purple', gradient: 'linear-gradient(135deg, rgba(131,56,236,0.6), rgba(175,82,222,0.4)), radial-gradient(circle at 60% 40%, rgba(255,255,255,0.8), transparent 50%)' },
+    { value: '#06FFB4', label: 'Quantum Teal', gradient: 'linear-gradient(135deg, rgba(6,255,180,0.6), rgba(0,255,195,0.4)), radial-gradient(circle at 30% 70%, rgba(255,255,255,0.7), transparent 50%)' },
+    { value: '#FB5607', label: 'Plasma Orange', gradient: 'linear-gradient(135deg, rgba(251,86,7,0.6), rgba(255,119,48,0.4)), radial-gradient(circle at 50% 50%, rgba(255,255,255,0.8), transparent 50%)' },
   ];
 
   const handleCreateWorld = () => {
@@ -39,9 +39,9 @@ const WorldCreationDialog = ({ children, onWorldCreated }: WorldCreationDialogPr
     const defaultLeatherColor = leatherPresets[0];
     const leatherColorToUse = selectedLeatherColor || defaultLeatherColor;
     
-    // Find the gradient for the selected color
+    // Find the gradient for the selected color, or create fallback gradient if color not found
     const colorOption = colorOptions.find(option => option.value === selectedColor);
-    const gradient = colorOption ? colorOption.gradient : undefined;
+    const gradient = colorOption ? colorOption.gradient : `linear-gradient(135deg, ${selectedColor}dd, ${selectedColor}99), radial-gradient(circle at 50% 50%, rgba(255,255,255,0.6), transparent 50%)`;
 
     const newBookId = createBook({
       title: title.trim(),

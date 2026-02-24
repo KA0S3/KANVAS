@@ -9,7 +9,6 @@ import { GlobalTagManager } from '@/components/tags/GlobalTagManager';
 import { cn } from '@/lib/utils';
 import { AssetEditModal } from '@/components/asset/AssetEditModal';
 import { SettingsPanel } from '@/components/settings/SettingsPanel';
-import { GeneratorModal } from '@/components/generators/GeneratorModal';
 import type { Asset } from '@/components/AssetItem';
 
 interface AssetExplorerProps {
@@ -24,11 +23,6 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
   const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
-  const [generatorModal, setGeneratorModal] = useState<{
-    isOpen: boolean;
-    path: string;
-    title: string;
-  }>({ isOpen: false, path: '', title: '' });
   
   const rootAssets = assets ? Object.values(assets).filter(asset => !asset.parentId) : [];
   
@@ -123,54 +117,50 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
         
         {/* Four main buttons */}
         <div className="flex gap-1">
-          <Button
-            variant="outline"
-            className="h-10 flex-1 flex flex-col items-center justify-center gap-0.5 bg-sidebar-accent/20 border-sidebar-border hover:bg-sidebar-accent/40 px-1 fantasy-tab"
-            onClick={() => setGeneratorModal({
-              isOpen: true,
-              path: '/generators/character-generator.html',
-              title: 'Character Generator'
-            })}
+          <button
+            type="button"
+            className="whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border hover:text-accent-foreground py-2 h-10 flex-1 flex flex-col items-center justify-center gap-0.5 bg-sidebar-accent/20 border-sidebar-border hover:bg-sidebar-accent/40 px-1 fantasy-tab"
+            onClick={() => {
+              console.log('Characters button clicked');
+              window.open('/generators/character-generator.html', '_blank');
+            }}
           >
             <Users className="w-4 h-4" />
             <span className="text-xs">Characters</span>
-          </Button>
-          <Button
-            variant="outline"
-            className="h-10 flex-1 flex flex-col items-center justify-center gap-0.5 bg-sidebar-accent/20 border-sidebar-border hover:bg-sidebar-accent/40 px-1 fantasy-tab"
-            onClick={() => setGeneratorModal({
-              isOpen: true,
-              path: '/generators/city-generator.html',
-              title: 'City Generator'
-            })}
+          </button>
+          <button
+            type="button"
+            className="whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border hover:text-accent-foreground py-2 h-10 flex-1 flex flex-col items-center justify-center gap-0.5 bg-sidebar-accent/20 border-sidebar-border hover:bg-sidebar-accent/40 px-1 fantasy-tab"
+            onClick={() => {
+              console.log('Cities button clicked');
+              window.open('/generators/city-generator.html', '_blank');
+            }}
           >
             <Building className="w-4 h-4" />
             <span className="text-xs">Cities</span>
-          </Button>
-          <Button
-            variant="outline"
-            className="h-10 flex-1 flex flex-col items-center justify-center gap-0.5 bg-sidebar-accent/20 border-sidebar-border hover:bg-sidebar-accent/40 px-1 fantasy-tab"
-            onClick={() => setGeneratorModal({
-              isOpen: true,
-              path: '/generators/god-generator.html',
-              title: 'God Generator'
-            })}
+          </button>
+          <button
+            type="button"
+            className="whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border hover:text-accent-foreground py-2 h-10 flex-1 flex flex-col items-center justify-center gap-0.5 bg-sidebar-accent/20 border-sidebar-border hover:bg-sidebar-accent/40 px-1 fantasy-tab"
+            onClick={() => {
+              console.log('Gods button clicked');
+              window.open('/generators/god-generator.html', '_blank');
+            }}
           >
             <Sparkles className="w-4 h-4" />
             <span className="text-xs">Gods</span>
-          </Button>
-          <Button
-            variant="outline"
-            className="h-10 flex-1 flex flex-col items-center justify-center gap-0.5 bg-sidebar-accent/20 border-sidebar-border hover:bg-sidebar-accent/40 px-1 fantasy-tab"
-            onClick={() => setGeneratorModal({
-              isOpen: true,
-              path: '/generators/battle-generator.html',
-              title: 'Battle Generator'
-            })}
+          </button>
+          <button
+            type="button"
+            className="whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border hover:text-accent-foreground py-2 h-10 flex-1 flex flex-col items-center justify-center gap-0.5 bg-sidebar-accent/20 border-sidebar-border hover:bg-sidebar-accent/40 px-1 fantasy-tab"
+            onClick={() => {
+              console.log('Battles button clicked');
+              window.open('/generators/battle-manager.html', '_blank');
+            }}
           >
             <Swords className="w-4 h-4" />
             <span className="text-xs">Battles</span>
-          </Button>
+          </button>
         </div>
       </div>
       
@@ -252,37 +242,6 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
       <SettingsPanel
         isOpen={settingsPanelOpen}
         onClose={() => setSettingsPanelOpen(false)}
-      />
-      
-      {/* Generator Modal */}
-      <GeneratorModal
-        isOpen={generatorModal.isOpen}
-        onClose={() => setGeneratorModal({ ...generatorModal, isOpen: false })}
-        generatorPath={generatorModal.path}
-        title={generatorModal.title}
-        onImport={(assetData) => {
-          // Create the asset using the store's createAsset function
-          const newAsset = createAsset({
-            name: assetData.name,
-            type: 'other',
-            x: 100,
-            y: 100,
-            width: 200,
-            height: 150,
-            description: assetData.description,
-            customFields: [],
-            customFieldValues: [],
-            tags: assetData.tags || [],
-          }, currentActiveId);
-          
-          // Update the asset with the additional data from the generator
-          updateAsset(newAsset, {
-            description: assetData.description,
-            tags: assetData.tags || []
-          });
-          
-          setGeneratorModal({ ...generatorModal, isOpen: false });
-        }}
       />
 
     </div>

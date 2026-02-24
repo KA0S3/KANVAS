@@ -28,6 +28,7 @@ export interface Book {
         customFont?: string;
         color: string;
         size: 'small' | 'medium' | 'large' | 'extra-large';
+        sizePx?: number;
         outlineColor?: string;
         outlineThickness?: number;
         shadowEnabled?: boolean;
@@ -41,6 +42,7 @@ export interface Book {
         customFont?: string;
         color: string;
         size: 'small' | 'medium' | 'large' | 'extra-large';
+        sizePx?: number;
         outlineColor?: string;
         outlineThickness?: number;
         shadowEnabled?: boolean;

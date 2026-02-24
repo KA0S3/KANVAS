@@ -1,0 +1,1471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KAOS' Battle Manager – DM</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    /* === Base Theme & Blood-Soaked Aesthetic (from Dm3) === */
+    :root {
+      --color-gold: #c5a45a;
+      --color-gold-dark: #b9994f;
+      --color-gold-darker: #9c8442;
+      --color-gold-shadow: rgba(197, 164, 90, 0.4);
+      --color-bg: #0b0b0b;
+      --color-bg-panel: rgba(20, 20, 20, 0.92);
+      --color-bg-item: rgba(30, 30, 30, 0.9);
+      --color-text: #c5a45a;
+      --color-blood-red: #8a0303;
+      --color-blood-shadow: rgba(138, 3, 3, 0.7);
+      --color-blood-hover: #f55;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Cinzel', serif;
+      background-color: var(--color-bg);
+      color: var(--color-text);
+      /* Subtle noise/texture overlay */
+      background-image: radial-gradient(rgba(197,164,90,0.05) 1px, transparent 1px),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' viewBox='0 0 4 4'%3E%3Cpath fill='%23333' fill-opacity='0.1' d='M1 3h1v1H1V3zm2-2h1v1H3V1z'%3E%3C/path%3E%3C/svg%3E");
+      background-size: 30px 30px, 2px 2px;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 2.2rem;
+      letter-spacing: 3px;
+      color: var(--color-gold);
+      text-shadow: 0 0 12px var(--color-gold-shadow), 0 0 25px var(--color-gold-shadow), 0 0 8px var(--color-blood-shadow);
+      margin-top: 15px;
+      font-weight: 700;
+    }
+
+    /* === Layout (MODIFIED for side-by-side & full-width quick-ref) === */
+    #main {
+      display: flex;
+      flex-direction: column; /* Start with column layout to place quick-ref at the bottom */
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+      padding: 20px;
+      /* Removed max-width to allow content to fill the screen better */
+      margin: 0 auto;
+      width: 100%; /* Use full available width */
+      box-sizing: border-box;
+    }
+    
+    #top-row {
+        display: flex;
+        gap: 20px;
+        width: 100%; /* Full width for the row containing Controls and Tracker */
+        /* max-width: 1400px; EDITED: Removed max-width */
+        align-items: flex-start;
+        flex-wrap: wrap; /* Allows wrapping on smaller screens */
+    }
+    
+    #left-column { /* Now just the Controls panel */
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        flex: 1;
+        min-width: 300px;
+        /* max-width: 450px; EDITED: Removed max-width */
+    }
+    
+    #tracker-panel {
+      flex: 2;
+      /* max-width: 600px; EDITED: Removed max-width */
+      min-width: 300px;
+      position: relative;
+    }
+
+    #quick-ref-panel {
+        width: 100%; /* Force this panel to take up the full width */
+        /* max-width: 1400px; EDITED: Removed max-width */
+    }
+
+    .panel {
+      background: var(--color-bg-panel);
+      border: 2px solid var(--color-gold-dark);
+      border-radius: 8px;
+      box-shadow: 0 0 15px var(--color-gold-shadow), 0 0 20px var(--color-blood-shadow) inset;
+      padding: 20px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    
+    .panel h2 {
+      color: var(--color-gold);
+      font-size: 1.4rem;
+      margin-top: 0;
+      border-bottom: 1px solid var(--color-gold-darker);
+      padding-bottom: 8px;
+      text-shadow: 0 0 5px var(--color-gold-shadow);
+      letter-spacing: 1px;
+    }
+
+    /* === Controls === (No change) */
+    #addForm {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    
+    #mainControls {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 15px;
+    }
+    
+    #actionButtons {
+        display: flex;
+        gap: 10px;
+    }
+    #actionButtons button {
+        flex: 1;
+    }
+
+    input, button, textarea {
+      font-family: 'Cinzel', serif;
+      background: #111;
+      border: 1px solid var(--color-gold-dark);
+      color: var(--color-text);
+      padding: 10px;
+      border-radius: 4px;
+      font-size: 0.9rem;
+      box-sizing: border-box;
+    }
+    
+    input {
+        width: 100%;
+    }
+    
+    input::placeholder { color: var(--color-gold-darker); }
+    input:focus {
+      outline: 1px solid var(--color-gold);
+      box-shadow: 0 0 8px var(--color-gold-shadow);
+    }
+
+    button {
+      background: var(--color-gold-darker);
+      color: var(--color-gold);
+      cursor: pointer;
+      font-weight: bold;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      transition: all 0.3s;
+      border: 1px solid var(--color-gold-darker);
+      text-shadow: 0 0 5px var(--color-gold-shadow);
+    }
+    
+    button:hover {
+      background-color: var(--color-gold);
+      color: var(--color-bg);
+      border-color: var(--color-gold);
+      box-shadow: 0 0 10px var(--color-gold-shadow), 0 0 15px var(--color-gold-shadow);
+      text-shadow: none;
+    }
+    
+    /* Custom button styles */
+    .add-combatant-button { 
+        background-color: var(--color-gold-darker); 
+    }
+    .add-combatant-button:hover { 
+        background-color: var(--color-gold); 
+        color: var(--color-bg); 
+    }
+
+    .add-monster-button { 
+        background-color: var(--color-blood-red); 
+        color: var(--color-gold); 
+        border-color: var(--color-blood-shadow); 
+    }
+    .add-monster-button:hover { 
+        background-color: var(--color-blood-hover); 
+        color: var(--color-bg);
+    }
+    
+    .next-turn-button { 
+        background-color: var(--color-blood-red); 
+        color: var(--color-gold); 
+        border-color: var(--color-blood-shadow); 
+    }
+    .next-turn-button:hover { 
+        background-color: var(--color-blood-hover);
+        color: var(--color-bg);
+    }
+    
+    .show-player-view-button { 
+        background-color: var(--color-gold-darker); 
+    }
+    .show-player-view-button:hover { 
+        background-color: var(--color-gold); 
+        color: var(--color-bg); 
+    }
+
+    /* === Initiative List === (No change) */
+    #initiativeList {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .combatant {
+      padding: 10px;
+      margin: 5px 0;
+      background: var(--color-bg-item);
+      border: 1px solid var(--color-gold-darker);
+      border-radius: 4px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      cursor: grab;
+      position: relative;
+      transition: all 0.3s;
+    }
+
+    .combatant.active {
+      background: var(--color-gold);
+      color: #000;
+      font-weight: bold;
+      border-color: var(--color-blood-hover);
+      box-shadow: 0 0 15px var(--color-gold-shadow), 0 0 25px var(--color-blood-shadow);
+    }
+    
+    .combatant-main-info {
+        display: flex;
+        align-items: center;
+        flex-grow: 1;
+        width: 100%;
+    }
+    
+    .combatant-name {
+        flex-grow: 1;
+        outline: none;
+        border: none;
+        background: transparent;
+        color: inherit;
+        font-family: 'Cinzel', serif;
+        font-size: 1.1em;
+        font-weight: bold;
+        padding: 5px;
+        margin-right: 10px;
+        border-radius: 3px;
+        min-width: 100px;
+    }
+    
+    .combatant.active .combatant-name {
+        color: #000;
+        text-shadow: 0 0 3px #000;
+    }
+    .combatant-name:focus {
+      background: #000;
+      color: var(--color-gold);
+      outline: 1px dashed var(--color-gold);
+      box-shadow: 0 0 8px var(--color-gold-shadow);
+    }
+    
+    /* EDITED: Added this new rule to fix black-on-black text when editing active combatant */
+    .combatant.active .combatant-name:focus {
+      background: #000;
+      color: var(--color-gold);
+      text-shadow: none;
+    }
+    
+    .combatant-conditions {
+        flex-basis: 100%;
+        margin-top: 8px;
+        padding-left: 10px;
+    }
+    
+    .add-condition-btn {
+        background: rgba(0,0,0,0.2);
+        border: 1px solid var(--color-gold-darker);
+        color: var(--color-gold-darker);
+        font-size: 0.8em;
+        padding: 5px 8px;
+        margin-left: 10px;
+        cursor: pointer;
+        flex: 0 0 auto;
+        font-weight: normal;
+        text-transform: none;
+    }
+    .combatant.active .add-condition-btn {
+        background: rgba(0,0,0,0.2);
+        color: #333;
+        border-color: #555;
+    }
+    .combatant.active .add-condition-btn:hover {
+        background: rgba(0,0,0,0.3);
+        color: #000;
+    }
+    .add-condition-btn:hover {
+        background: rgba(197, 164, 90, 0.1);
+        color: var(--color-gold);
+        border-color: var(--color-gold);
+    }
+
+    .delete-btn {
+      background: none;
+      border: none;
+      color: var(--color-blood-red);
+      cursor: pointer;
+      font-size: 1.2em;
+      padding: 5px;
+      width: auto;
+      text-shadow: 0 0 5px var(--color-blood-shadow);
+      flex: 0 0 auto;
+    }
+    .delete-btn:hover {
+      color: var(--color-blood-hover);
+      text-shadow: 0 0 5px var(--color-blood-hover);
+      background: none;
+      box-shadow: none;
+    }
+    .combatant.active .delete-btn {
+      color: var(--color-blood-red);
+    }
+    .combatant.active .delete-btn:hover {
+      color: var(--color-blood-hover);
+    }
+    
+    .combatant-conditions button {
+        background: var(--color-blood-red);
+        border: 1px solid var(--color-blood-shadow);
+        color: var(--color-gold);
+        padding: 3px 8px;
+        margin-right: 5px;
+        margin-bottom: 5px;
+        font-size: 0.9em;
+        line-height: 1;
+        cursor: pointer;
+        border-radius: 4px;
+        box-shadow: 0 0 5px var(--color-blood-shadow);
+    }
+    .combatant.active .combatant-conditions button {
+        background: var(--color-blood-red);
+        color: #fff;
+    }
+    .combatant-conditions button:hover {
+        background: var(--color-blood-hover);
+        color: var(--color-bg);
+    }
+    
+    /* === Condition Menu Popup === (No change) */
+    .condition-menu {
+        position: absolute;
+        top: 100%;
+        right: 0;
+        width: 250px;
+        max-height: 200px;
+        overflow-y: auto;
+        background: #000;
+        border: 2px solid var(--color-blood-red);
+        box-shadow: 0 0 15px var(--color-blood-shadow);
+        z-index: 50;
+        padding: 5px;
+        display: none;
+    }
+    
+    .condition-menu.show {
+        display: block;
+    }
+    
+    .condition-menu button {
+        background: transparent;
+        border: none;
+        color: var(--color-gold);
+        text-align: left;
+        padding: 5px 10px;
+        width: 100%;
+        margin: 0;
+        font-size: 0.9em;
+        transition: background 0.1s;
+        text-transform: none;
+        letter-spacing: 0;
+        font-weight: normal;
+    }
+    
+    .condition-menu button:hover {
+        background: var(--color-blood-red);
+        color: #fff;
+        box-shadow: none;
+    }
+    
+    /* === QUICK REF ACCORDION STYLES (MODIFIED for Split Header) === */
+    .quickref-category {
+        margin-bottom: 10px;
+        border: 1px solid var(--color-gold-darker);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    /* START CSS MODIFICATION */
+    .quickref-category-header {
+        background-color: rgba(0,0,0,0.3);
+        color: var(--color-gold);
+        padding: 12px 15px;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        /* Aligns icon and the title group vertically */
+        align-items: center; 
+        font-weight: bold;
+        font-size: 1.2rem;
+        transition: background-color 0.2s;
+        border-bottom: 1px solid var(--color-gold-darker);
+        min-height: 40px; 
+    }
+    .quickref-category-header:hover {
+        background-color: rgba(197, 164, 90, 0.1);
+    }
+    
+    .quickref-main-title {
+        font-size: 1.2rem;
+        flex-grow: 1; /* Allow title to take up space */
+    }
+
+    /* **PRIMARY EDIT: Style for the new category description text in the content area** */
+    .quickref-category-description {
+        text-align: left;
+        font-size: 0.9rem; 
+        font-weight: normal;
+        color: #fff; /* Use white/light color for better contrast */
+        margin: 0 0 15px 0; /* Margin at bottom to separate from grid */
+        padding: 5px 10px; /* Match content padding */
+        opacity: 0.8; /* Subtle transparency */
+        font-style: italic; 
+        white-space: normal; /* Allow the note to wrap */
+        line-height: 1.3;
+    }
+    
+    /* **PRIMARY EDIT: New group for right-aligned items in header** */
+    .quickref-right-group {
+        display: flex;
+        align-items: center;
+        gap: 15px; /* Space between note and icon */
+        flex-shrink: 0; /* Prevent this group from shrinking */
+    }
+    
+    /* **PRIMARY EDIT: New style for the header note (top-right)** */
+    .quickref-header-note {
+        font-size: 0.9rem;
+        font-weight: normal;
+        color: var(--color-gold);
+        text-align: right;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        white-space: nowrap; /* Prevent wrapping */
+    }
+    /* END CSS MODIFICATION */
+
+    .quickref-toggle-icon {
+        font-size: 1.2em;
+        transition: transform 0.3s;
+        transform-origin: center;
+        /* margin-left is removed, gap is handled by parent */
+    }
+    .quickref-category-header[aria-expanded="true"] .quickref-toggle-icon {
+        transform: rotate(90deg);
+    }
+
+    .quickref-category-content {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.4s ease-out;
+        background-color: rgba(0,0,0,0.2);
+        padding: 0 10px;
+    }
+    .quickref-category-content.active {
+        max-height: 2000px; /* Large value */
+        padding: 10px;
+    }
+
+    /* New Grid Container for Items */
+    .quickref-item-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); /* Responsive grid */
+        gap: 10px;
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    /* Quick Ref Item (Now a grid cell) */
+    .quickref-item {
+        margin-bottom: 0; /* Remove bottom margin as grid handles spacing */
+        border: 1px solid var(--color-gold-darker);
+        border-radius: 4px;
+        overflow: hidden;
+        transition: transform 0.1s, box-shadow 0.1s;
+    }
+    
+    .quickref-item:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(197, 164, 90, 0.5);
+    }
+    
+    /* Item Header: The visible part (clickable for lightbox) */
+    .quickref-item-header {
+        background-color: var(--color-bg-item);
+        color: var(--color-text);
+        padding: 10px 12px;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column; /* Stack name and cost */
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        font-weight: bold;
+        transition: background-color 0.2s;
+        height: 100%; /* Important for equal height in grid */
+        box-sizing: border-box;
+    }
+    .quickref-item-header:hover {
+        background-color: var(--color-gold-darker);
+        color: var(--color-bg);
+    }
+    .quickref-item-header span:first-child {
+        /* Name */
+        font-size: 1em;
+        line-height: 1.2;
+    }
+    .quickref-item-header .cost {
+        font-size: 0.75rem;
+        font-weight: normal;
+        color: var(--color-gold-dark);
+        margin-top: 4px;
+    }
+    .quickref-item-header:hover .cost {
+        color: var(--color-bg);
+    }
+
+    /* Hide the old accordion content/toggle icons */
+    .quickref-item-toggle-icon,
+    .quickref-item-content {
+        display: none !important; 
+    }
+    
+    /* === Lightbox Modal Styles === */
+    #quickref-lightbox {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.9);
+        display: none; /* Hidden by default */
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        backdrop-filter: blur(5px);
+    }
+
+    .lightbox-content {
+        background: var(--color-bg-panel);
+        border: 2px solid var(--color-gold);
+        border-radius: 8px;
+        box-shadow: 0 0 30px var(--color-gold-shadow), 0 0 40px var(--color-blood-shadow);
+        padding: 30px;
+        max-width: 600px;
+        width: 90%;
+        color: var(--color-text);
+        position: relative;
+    }
+
+    .lightbox-content h3 {
+        color: var(--color-gold);
+        font-size: 1.8rem;
+        margin-top: 0;
+        border-bottom: 2px solid var(--color-gold-darker);
+        padding-bottom: 10px;
+        text-shadow: 0 0 10px var(--color-gold-shadow);
+        letter-spacing: 1px;
+        font-family: 'Cinzel', serif;
+    }
+    
+    .lightbox-content .cost {
+        display: block;
+        color: var(--color-gold-dark);
+        font-size: 0.9rem;
+        margin-bottom: 15px;
+        font-family: 'Cinzel', serif;
+    }
+
+    .lightbox-content p {
+        margin: 0;
+        font-size: 1em;
+        line-height: 1.6;
+        color: #aaa;
+        font-family: sans-serif; /* Better readability for description text */
+    }
+    
+    /* START CSS MODIFICATION: Style for new HR tags */
+    .lightbox-content hr {
+        border: 0;
+        height: 1px;
+        background: var(--color-gold-darker);
+        margin: 15px 0;
+    }
+    /* END CSS MODIFICATION */
+    
+    .lightbox-content p strong {
+        color: var(--color-gold);
+        font-family: 'Cinzel', serif;
+    }
+
+    .lightbox-close {
+        position: absolute;
+        top: 10px;
+        right: 15px;
+        font-size: 2rem;
+        color: var(--color-blood-red);
+        cursor: pointer;
+        background: none;
+        border: none;
+        line-height: 1;
+        padding: 5px;
+        transition: color 0.2s, transform 0.2s;
+    }
+    .lightbox-close:hover {
+        color: var(--color-blood-hover);
+        transform: scale(1.1);
+    }
+
+
+    /* === Responsive Design (MODIFIED) === */
+    @media (max-width: 1024px) {
+        #top-row {
+            flex-direction: column;
+            align-items: center;
+        }
+        #left-column, #tracker-panel {
+            /* EDITED: Changed from 90% to 100% and removed max-width */
+            width: 100%;
+        }
+    }
+    @media (max-width: 768px) {
+      /* EDITED: Removed .panel { max-width: 95%; } */
+      .quickref-item-grid {
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); /* Smaller min-width for mobile */
+      }
+      
+      /* START CSS MODIFICATION */
+      /* Ensure header note wraps on small screens if needed, or just stays right */
+      .quickref-category-header {
+          position: relative; /* For icon positioning */
+      }
+      .quickref-main-title {
+          width: 100%;
+          padding-right: 40px; /* Make room for icon */
+      }
+      .quickref-right-group {
+          position: absolute;
+          right: 15px;
+          top: 50%;
+          transform: translateY(-50%);
+      }
+      .quickref-header-note {
+          /* Optionally hide the note on very small screens if it gets too crowded */
+          /* display: none; */ 
+      }
+      .quickref-toggle-icon {
+          position: static; /* Reset position */
+          right: auto;
+          top: auto;
+      }
+      /* END CSS MODIFICATION */
+    }
+  </style>
+</head>
+<body>
+  <h1>KAOS' BATTLE MANAGER</h1>
+
+  <div id="main">
+    
+    <div id="top-row">
+        <div id="left-column">
+            <div id="controls-panel" class="panel">
+                <h2>Controls</h2>
+                <form id="addForm">
+                    <input id="nameInput" placeholder="Character / Monster Name" required />
+                </form>
+                <div id="mainControls">
+                    <button id="addCombatantBtn" class="add-combatant-button">ADD COMBATANT</button>
+                    <button id="addRandomMonsterBtn" class="add-monster-button">ADD MONSTER 👹</button>
+                    
+                    <div id="actionButtons">
+                        <button id="nextTurnBtn" class="next-turn-button">NEXT TURN ➡️</button>
+                        <button id="shuffleBtn">🎲 SHUFFLE</button>
+                    </div>
+                    
+                    <button id="togglePipBtn" class="show-player-view-button">SHOW PLAYER VIEW 👁️</button> 
+                    
+                    <p style="text-align: center; font-size: 0.8em; color: var(--color-gold-darker); margin: 5px 0 0;">(Offline Mode – No Sync)</p>
+                </div>
+                
+            </div>
+        </div>
+        
+        <div id="tracker-panel" class="panel">
+          <h2>⚔️ Initiative Tracker</h2>
+          <ul id="initiativeList"></ul>
+        </div>
+    </div>
+    
+    <div id="quick-ref-panel" class="panel">
+        <h2>DM Quick Ref</h2>
+        <div id="quickRefList">
+        </div>
+    </div>
+
+    <div id="quickref-lightbox">
+        <div class="lightbox-content">
+            <button class="lightbox-close" id="lightboxCloseBtn">✖</button>
+            <h3 id="lightbox-title"></h3>
+            <span class="cost" id="lightbox-cost"></span>
+            <div id="lightbox-description"></div>
+        </div>
+    </div>
+  </div>
+  
+  <script>
+    // ==================================
+    // OFFLINE INITIATIVE TRACKER
+    // ==================================
+    let initiative = JSON.parse(localStorage.getItem("initiative_order") || "[]");
+    let monsterCounter = parseInt(localStorage.getItem("monster_count") || "1");
+    let pipWindow = null;
+    
+    // --- Element Cache ---
+    const listEl = document.getElementById("initiativeList");
+    const nameInput = document.getElementById("nameInput");
+    const addForm = document.getElementById("addForm");
+    
+    const addCombatantBtn = document.getElementById("addCombatantBtn");
+    const addRandomMonsterBtn = document.getElementById("addRandomMonsterBtn");
+    const nextTurnBtn = document.getElementById("nextTurnBtn");
+    const shuffleBtn = document.getElementById("shuffleBtn");
+    const togglePipBtn = document.getElementById("togglePipBtn");
+    
+    const quickRefListEl = document.getElementById("quickRefList");
+    
+    // --- Global Data (Updated with Full Descriptions and Costs) ---
+    
+    // START JAVASCRIPT MODIFICATION (QUICK_REF_DATA)
+    // Data has been updated based on the reference text, formatted with <p> and <hr> tags.
+    const QUICK_REF_DATA = [
+      {
+        category: "🏃 Movement",
+        header_note: "LIMITED BY MOVEMENT SPEED",
+        desc: "You can move at any time during your turn (before, after, or during actions).",
+        items: [
+          { name: "Move", cost: "Movement cost: 5ft per 5ft moved", desc: "<p>If you have more than one speed, such as your walking speed and a flying speed, you can switch back and forth between your speeds during your move. Whenever you switch, subtract the distance you've already moved from the new speed.</p><hr><p>You can move through a nonhostile creature's space.</p><hr><p>You can move through a hostile creature's space only if the creature is at least two sizes larger or smaller than you.</p><hr><p>Another creature's space is difficult terrain for you.</p><hr><p>Whether a creature is a friend or an enemy, you can't willingly end your move in its space.</p><hr><p>PHB, pg. 190.</p>" },
+          { name: "Climb", cost: "Movement cost: 10ft per 5ft climbed", desc: "<p>May involve a Strength (Athletics) check if the climb is difficult</p><hr><p>PHB, pg. 182.</p>" },
+          { name: "Swim", cost: "Movement cost: 10ft per 5ft swum", desc: "<p>May involve a Strength (Athletics) check if the swim is difficult</p><hr><p>PHB, pg. 182.</p>" },
+          { name: "Drop prone", cost: "Movement cost: 0ft (free)", desc: "<p>You can drop prone without using any of your speed</p><hr><p>To move while prone, you must crawl or use magic such as teleportation</p><hr><p>Dropping prone adds the Prone condition (melee attacks against you have advantage, ranged attacks against you have disadvantage, your own attacks have disadvantage)</p><hr><p>PHB, pgs. 190-191,292.</p>" },
+          { name: "Crawl", cost: "Movement cost: 10ft per 5ft crawled", desc: "<p>PHB, pg. 182.</p>" },
+          { name: "Stand up", cost: "Movement cost: half of your speed", desc: "<p>You can't stand up if you don't have enough movement left or if your speed is 0</p><hr><p>PHB, pg. 190-191.</p>" },
+          { name: "High jump", cost: "Movement cost: 5ft per 5ft jumped", desc: "<p>You leap into the air a number of feet equal to 3 + your Strength modifier if you move at least 10 feet on foot immediately before the jump.</p><hr><p>When you make a standing high jump, you can jump only half that distance.</p><hr><p>You can extend your arms half your height above yourself during the jump.</p><hr><p>In some circumstances, your DM might allow you to make a Strength (Athletics) check to jump higher than you normally can.</p><hr><p>PHB, pg. 182.</p>" },
+          { name: "Long jump", cost: "Movement cost: 5ft per 5ft jumped", desc: "<p>You cover a number of feet up to your Strength score if you move at least 10 feet on foot immediately before the jump.</p><hr><p>When you make a standing long jump, you can leap only half that distance</p><hr><p>May involve a DC 10 Strength (Athletics) check to clear a low obstacle (no taller than a quarter of the jump's distance). You hit the obstacle on a failed check.</p><hr><p>May involve a DC 10 Dexterity (Acrobatics) check to land on your feet in difficult terrain. You land prone on a failed check.</p><hr><p>PHB, pg. 182.</p>" },
+          { name: "Improvise", cost: "Perform any movement or stunt you can imagine", desc: "<p>When you describe a kind of movement not detailed elsewhere in the rules, the DM tells you whether it is possible and what kind of roll you need to make, if any, to determine success or failure.</p>" },
+          { name: "Difficult terrain", cost: "Moving in difficult terrain costs an additional 5ft per 5ft of movement", desc: "<p>PHB, pg. 182.</p>" },
+          { name: "Grapple move", cost: "Drag or carry the grappled creature with you", desc: "<p>If you move while grappling another creature, your speed is halved, unless the creature is two or more sizes smaller than you.</p><hr><p>See the attack action for how to grapple a creature.</p><hr><p>PHB, pg. 195.</p>" }
+        ]
+      },
+      {
+        category: "⚔️ Action",
+        header_note: "1/TURN",
+        desc: "You can also interact with one object or feature of the environment for free.",
+        items: [
+          { name: "Attack", cost: "Perform a melee or ranged attack with your weapon", desc: "<p>Certain features, such as the Extra Attack feature of the fighter, allow you to make more than one attack with this action. Each of these attacks is a separate roll and may target different creatures. You may move in between these attacks.</p><hr><p>When you attack with a light melee weapon, you can use a bonus action to attack with your other hand (see the Offhand attack bonus action).</p><hr><p>You may replace one of your melee attacks with a Grapple or a Shove.</p><hr><p>Some conditions give advantage on the attack: attacks against blinded, paralyzed, petrified, restrained, stunned, or unconscious targets; melee attacks against prone targets; attacks by invisible or hidden attackers.</p><hr><p>Some conditions give disadvantage on the attack: attacks against invisible or hidden targets; ranged attacks against prone targets; attacks by blinded, frightened, poisoned, or restrained attackers.</p><hr><p>PHB, pgs. 192,194-195.</p>" },
+          { name: "Grapple", cost: "Attempt to grab a creature or wrestle with it", desc: "<p>You can use the Attack action to make a special melee attack, a grapple. If you're able to make multiple attacks with the Attack action, this attack replaces one of them.</p><hr><p>The target of your grapple must be no more than one size larger than you, and it must be within your reach.</p><hr><p>Using at least one free hand, you try to seize the target by making a grapple check, a Strength (Athletics) check contested by the target's Strength (Athletics) or Dexterity (Acrobatics) check (the target chooses the ability to use).</p><hr><p>If you succeed, you subject the target to the grappled condition (its speed is set to 0).</p><hr><p>PHB, pg. 195.</p>" },
+          { name: "Shove", cost: "Shove a creature, either to knock it prone or push it away from you", desc: "<p>Using the Attack action, you can make a special melee attack to shove a creature. If you're able to make multiple attacks with the Attack action, this attack replaces one of them.</p><hr><p>The target of your shove must be no more than one size larger than you, and it must be within your reach.</p><hr><p>You make a Strength (Athletics) check contested by the target's Strength (Athletics) or Dexterity (Acrobatics) check (the target chooses the ability to use).</p><hr><p>If you win the contest, you either knock the target prone or push it 5 feet away from you.</p><hr><p>PHB, pg. 195.</p>" },
+          { name: "Cast a spell", cost: "Cast time of 1 action", desc: "<p>Cast time of 1 action. For details on casting spells, consult your spellcasting rules.</p>" }, /* Preserved original data as it was missing from reference text */
+          { name: "Dash", cost: "Gain extra movement for the current turn", desc: "<p>The increase equals your speed, after applying any modifiers.</p><hr><p>PHB, pg. 192.</p>" },
+          { name: "Disengage", cost: "Your movement doesn't provoke opportunity attacks for the rest of the turn", desc: "<p>PHB, pg. 192.</p>" },
+          { name: "Dodge", cost: "Focus entirely on avoiding attacks", desc: "<p>Until the start of your next turn, any attack roll made against you has disadvantage if you can see the attacker, and you make Dexterity saving throws with advantage.</p><hr><p>You lose this benefit if you are incapacitated or if your speed drops to 0.</p><hr><p>PHB, pg. 192.</p>" },
+          { name: "Escape", cost: "Escape a grapple", desc: "<p>To escape a grapple, you must succeed on a Strength (Athletics) or Dexterity (Acrobatics) check contested by the grappler's Strength (Athletics) check.</p><hr><p>Escaping other conditions that restrain you (such as manacles) may require a Dexterity or Strength check, as specified by the condition.</p><hr><p>PHB, pg. 195.</p>" },
+          { name: "Help", cost: "Grant an ally advantage on an ability check or attack", desc: "<p>The target gains advantage on the next ability check it makes to perform the task you are helping with.</p><hr><p>Alternatively, the target gains advantage on the next attack roll against against a creature within 5 feet of you.</p><hr><p>The advantage lasts until the start of your next turn.</p><hr><p>PHB, pg. 192.</p>" },
+          { name: "Use Object", cost: "Interact with a second object or use special object abilities", desc: "<p>You can interact with one object for free during your turn (such as drawing a weapon or opening a door). If you want to interact with a second object, use this action.</p><hr><p>When an object requires your action for its use, you also take this action.</p><hr><p>PHB, pg. 193.</p>" },
+          { name: "Use shield", cost: "Equip or unequip a shield", desc: "<p>A shield always takes an action to equip or unequip.</p><hr><p>Armor takes several minutes to equip or unequip.</p><hr><p>PHB, pgs. 144-146.</p>" },
+          { name: "Hide", cost: "Attempt to hide", desc: "<p>You can't hide from a creature that can see you. You must have total cover, be in a heavily obscured area, be invisible, or otherwise block the enemy's vision.</p><hr><p>If you make noise (such as shouting a warning or knocking over a vase), you give away your position.</p><hr><p>When you try to hide, make a Dexterity (Stealth) check and note the result. Until you are discovered or you stop hiding, that check's total is contested by the Wisdom (Perception) check of any creature that actively searches for signs of your presence.</p><hr><p>A creature notices you even if it isn't searching unless your Stealth check is higher than its Passive Perception.</p><hr><p>Out of combat, you may also use a Dexterity (Stealth) check for acts like concealing yourself from enemies, slinking past guards, slipping away without being noticed, or sneaking up on someone without being seen or heard.</p><hr><p>PHB, pg. 192.</p>" },
+          { name: "Search", cost: "Devote your attention to finding something", desc: "<p>Depending on the nature of your search, the DM might have you make a Wisdom (Perception) check or an Intelligence (Investigation) check.</p><hr><p>PHB, pg. 193.</p>" },
+          { name: "Ready", cost: "Choose a trigger and a response reaction", desc: "<p>First, you decide what perceivable circumstance will trigger your reaction.</p><hr><p>Then, you choose the action you will take in response to that trigger, or you choose to move up to your speed in response to it.</p><hr><p>When the trigger occurs, you can either take your reaction right after the trigger finishes or ignore the trigger.</p><hr><p>When you ready a spell, you cast it as normal but hold its energy, which you release with your reaction when the trigger occurs. To be readied, a spell must have a casting time of 1 action, and holding onto the spell's magic requires concentration</p><hr><p>PHB, pg. 193.</p>" },
+          { name: "Use class feature", cost: "Use a racial or class feature that uses an action", desc: "<p>See class page for more information.</p>" },
+          { name: "Stabilize a creature", cost: "Stop a dying creature from needing to make death saving throws", desc: "<p>Make a Wisdom (Medicine) check with DC 10</p><hr><p>On a success, the creature is stable and no longer needs to make death saving throws</p><hr><p>A stable creature regains 1 hit point after 1d4 hours</p><hr><p>PHB, pg. 197.</p>" },
+          { name: "Improvise", cost: "Perform any action you can imagine", desc: "<p>When you describe an action not detailed elsewhere in the rules, the DM tells you whether that action is possible and what kind of roll you need to make, if any, to determine success or failure.</p><hr><p>PHB, pg. 193.</p>" }
+        ]
+      },
+      {
+        category: "✨ Bonus Action",
+        header_note: "MAX. 1/TURN",
+        desc: "You can take a bonus action only when a special ability, spell, or feature states that you can do something as a bonus action.",
+        items: [
+          { name: "Offhand Attack", cost: "Attack with your off hand", desc: "<p>Only usable if you take the Attack action and attack with a light melee weapon that you're holding in one hand.</p><hr><p>Perform a single attack with a different light melee weapon that you're holding in the other hand.</p><hr><p>You don't add your ability modifier to the damage of the bonus attack, unless that modifier is negative.</p><hr><p>If either weapon has the thrown property, you can throw the weapon, instead of making a melee attack with it.</p><hr><p>PHB, pgs. 192,194-195.</p>" },
+          { name: "Cast a spell", cost: "Cast a spell with a casting time of 1 bonus action", desc: "<p>You can't cast a spell with you action and a different spell with your bonus action in the same turn, except if the action is used to cast a cantrip.</p><hr><p>For further details, see the Cast a spell action.</p><hr><p>PHB, pg. 192.</p>" },
+          { name: "Use class feature", cost: "Use a racial or class feature that uses a bonus action", desc: "<p>See class page for more information.</p>" }
+        ]
+      },
+      {
+        category: "⚡ Reaction",
+        header_note: "MAX. 1/ROUND",
+        desc: "A reaction is an instant response to a trigger of some kind, which can occur on your turn or on someone else's.",
+        items: [
+          { name: "Opportunity attack", cost: "You can rarely move heedlessly past your foes without putting yourself in danger", desc: "<p>Trigger: enemy creature you can see leaves your reach.</p><hr><p>Make one melee attack against the provoking creature.</p><hr><p>The attack interrupts the provoking creature's movement, occurring right before the creature leaves your reach.</p><hr><p>Creatures don't provoke an opportunity attack when they teleport or when someone or something moves them without using their movement, action, or reaction.</p><hr><p>PHB, pg. 195.</p>" },
+          { name: "Readied action", cost: "Execute the reaction specified by your Ready action", desc: "<p>Trigger: specified by your Ready action.</p><hr><p>PHB, pg. 193.</p>" },
+          { name: "Cast a spell", cost: "Cast a spell with a casting time of 1 reaction", desc: "<p>Trigger: specified by the spell.</p><hr><p>For further details, see the Cast a spell action.</p><hr><p>PHB, pg. 192.</p>" }
+        ]
+      },
+      {
+        category: "🤕 Condition",
+        header_note: "",
+        desc: "Conditions alter your capabilities in a variety of ways, and can arise as a result of a spell, a class feature, a monster's attack, or other effect.",
+        items: [
+          { name: "Blinded", cost: "You can't see", desc: "<p>You automatically fail any ability check which requires sight.</p><hr><p>You have disadvantage on attack rolls.</p><hr><p>Attack rolls against you have advantage.</p><hr><p>PHB, pg. 290.</p>" },
+          { name: "Charmed", cost: "You are charmed by another creature", desc: "<p>You can't attack your charmer or target them with harmful abilities or magical effects.</p><hr><p>Your charmer has advantage on ability checks to interact socially with you.</p><hr><p>PHB, pg. 290.</p>" },
+          { name: "Deafened", cost: "You can't hear", desc: "<p>You automatically fail any ability check which requires hearing.</p><hr><p>PHB, pg. 290.</p>" },
+          { name: "Exhaustion", cost: "Exhaustion is measured in six levels", desc: "<p>Level&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Effect<br>1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Disadvantage on ability checks<br>2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Speed halved<br>3&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Disadvantage on attack rolls and saving throws<br>4&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Hit point maximum halved<br>5&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Speed reduced to 0<br>6&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Death</p><hr><p>You suffer the effect of your current level of exhaustion as well as all lower levels.</p><hr><p>Finishing a long rest reduces your exhaustion level by 1, provided that you have also had some food and drink.</p><hr><p>Also, being raised from the dead reduces a creature’s exhaustion level by 1.</p><hr><p>PHB, pg. 291.</p>" },
+          { name: "Frightened", cost: "You are frightened", desc: "<p>You have disadvantage on ability checks and attack rolls while the source of your fear is within line of sight.</p><hr><p>You can't willingly move closer to the source of your fear.</p><hr><p>PHB, pg. 290.</p>" },
+          { name: "Grappled", cost: "You are grappled", desc: "<p>Your speed becomes 0, and you can't benefit from any bonus to your speed.</p><hr><p>The condition ends if your grappler is incapacitated.</p><hr><p>The condition also ends if you are removed from the reach of your grappler.</p><hr><p>PHB, pg. 290.</p>" },
+          { name: "Incapacitated", cost: "You can't take actions or reactions", desc: "<p>PHB, pg. 290.</p>" },
+          { name: "Invisible", cost: "You can't be seen without the aid of magic or a special sense", desc: "<p>For the purpose of hiding, you are heavily obscured.</p><hr><p>You can still be detected by any noise you make or tracks you leave.</p><hr><p>You have advantage on attack rolls.</p><hr><p>Attack rolls against you have disadvantage.</p><hr><p>PHB, pg. 291.</p>" },
+          { name: "Paralyzed", cost: "You can't do anything", desc: "<p>You are incapacitated and can't move or speak.</p><hr><p>Attack rolls against you have advantage.</p><hr><p>Any attack that hits you is a critical hit if the attacker is within 5 feet of you.</p><hr><p>You automatically fail Strength and Dexterity saving throws.</p>" },
+          { name: "Petrified", cost: "You are transformed, along with any nonmagical objects you are wearing or carrying, into a solid inanimate substance (usually stone)", desc: "<p>Your weight increases by a factor of ten, and you cease aging.</p><hr><p>You are incapacitated, can't move or speak, and are unaware of your surroundings.</p><hr><p>Attack rolls against you have advantage.</p><hr><p>You automatically fail Strength and Dexterity saving throws.</p><hr><p>You have resistance to all damage.</p><hr><p>You are immune to poison and disease, though a poison or disease already in your system is only suspended, not neutralized.</p><hr><p>PHB, pg. 291.</p>" },
+          { name: "Poisoned", cost: "You are poisoned", desc: "<p>You have disadvantage on attack rolls and ability checks.</p><hr><p>PHB, pg. 292.</p>" },
+          { name: "Prone", cost: "You are prone", desc: "<p>Your only movement option is to crawl, unless you stand up.</p><hr><p>You have disadvantage on attack rolls.</p><hr><p>Attack rolls against you have advantage if the attacker is within 5 feet of you, otherwise the attack roll has disadvantage.</p><hr><p>PHB, pg. 292.</p>" },
+          { name: "Restrained", cost: "You are restrained", desc: "<p>Your speed becomes 0, and you can't benefit from any bonus to your speed.</p><hr><p>You have disadvantage on attack rolls.</p><hr><p>Attack rolls against you have advantage.</p><hr><p>You have disadvantage on Dexterity saving throws.</p><hr><p>PHB, pg. 292.</p>" },
+          { name: "Stunned", cost: "You are stunned", desc: "<p>You are incapacitated, can't move, and can speak only falteringly.</p><hr><p>Attack rolls against you have advantage.</p><hr><p>You automatically fail Strength and Dexterity saving throws.</p><hr><p>PHB, pg. 292.</p>" },
+          { name: "Unconscious", cost: "You are unconscious", desc: "<p>You are incapacitated, can't move or speak, and are unaware of your surroundings.</p><hr><p>You drop whatever you're holding and fall prone.</p><hr><p>Attack rolls against you have advantage.</p><hr><p>Any attack that hits you is a critical hit if the attacker is within 5 feet of you.</p><hr><p>You automatically fail Strength and Dexterity saving throws.</p><hr><p>PHB, pg. 292.</p>" },
+          { name: "Dying", cost: "You have been dropped to zero hit points and are dying", desc: "<p>If you are reduced to 0 hit points by damage that fails to kill you, you fall unconscious and are dying.</p><hr><p>If you receive any healing you immediately regain consciousness again and no longer dying.</p><hr><p>When dying, at the start of each of your turns you make a death saving throw. Roll a d20 and do not add any modifiers.</p><hr><p>A 10 or higher is a success, 9 or lower is a failure.</p><hr><p>On your third success, you become stable.</p><hr><p>On your third failure, you die.</p><hr><p>Rolling a 1 counts as two failures.</p><hr><p>Rolling a 20 immediately causes you to regain 1 hit point.</p><hr><p>You can also be stabilized by an ally taking the Stabilize action and succeeding on a DC 10 Wisdom (Medicine) check.</p><hr><p>Once stable, you regain 1 hit point after 1d4 hours.</p><hr><p>PHB, pg. 197.</p>" }
+        ]
+      },
+      {
+        category: "🌳 Environmental Effects",
+        header_note: "",
+        desc: "Effects that obscure vision can prove a significant hindrance to most adventuring tasks. Obstacles can provide cover during combat, making a target more difficult to harm.",
+        items: [
+          { name: "Lightly obscured", cost: "Dim light, patchy fog, moderate foliage", desc: "<p>Creatures have disadvantage on Wisdom (Perception) checks that rely on sight.</p><hr><p>PHB, pg. 183.</p>" },
+          { name: "Heavily obscured", cost: "Darkness, opaque fog, dense foliage", desc: "<p>A creature in a heavily obscured area effectively suffers from the blinded condition.</p><hr><p>PHB, pg. 183.</p>" },
+          { name: "Bright light", cost: "Bright light lets most creatures see normally", desc: "<p>Gloomy days still provide bright light, as do torches, lanterns, fires, and other sources of illumination within a specific radius.</p><hr><p>PHB, pg. 183.</p>" },
+          { name: "Dim light", cost: "Dim light, also called shadows", desc: "<p>Creates a lightly obscured area.</p><hr><p>An area of dim light is usually a boundary between a source of bright light, such as a torch, and surrounding darkness.</p><hr><p>The soft light of twilight and dawn also counts as dim light. A particularly brilliant full moon might bathe the land in dim light.</p><hr><p>PHB, pg. 183.</p>" },
+          { name: "Darkness", cost: "Darkness creates a heavily obscured area", desc: "<p>Creates a heavily obscured area.</p><hr><p>Characters face darkness outdoors at night (even most moonlit nights), within the confines of an unlit dungeon or a subterranean vault, or in an area of magical darkness.</p><hr><p>PHB, pg. 183.</p>" },
+          { name: "Blindsight", cost: "Perceive your surroundings without relying on sight, within a certain radius", desc: "<p>Creatures without eyes, such as oozes, and creatures with echolocation or heightened senses, such as bats and true dragons, have this sense.</p><hr><p>PHB, pg. 183.</p>" },
+          { name: "Darkvision", cost: "A creature with Darkvision can see better in the dark or low light conditions, within a certain radius", desc: "<p>Within a specified range, a creature with darkvision can see in darkness as if the darkness were dim light, so areas of darkness are only lightly obscured as far as that creature is concerned.</p><hr><p>However, the creature can’t discern color in darkness, only shades of gray.</p><hr><p>Many creatures in the worlds of D&D, especially those that dwell underground, have darkvision.</p><hr><p>PHB, pgs. 183-184.</p>" },
+          { name: "Truesight", cost: "A creature with truesight can see everything in its true form, independent of the environment", desc: "<p>A creature with truesight can, out to a specific range, see in normal and magical darkness, see invisible creatures and objects, automatically detect visual illusions and succeed on saving throws against them, and perceives the original form of a shapechanger or a creature that is transformed by magic.</p><hr><p>Furthermore, the creature can see into the Ethereal Plane.</p><hr><p>PHB, pg. 184.</p>" },
+          { name: "Half cover", cost: "A target has half cover if an obstacle blocks at least half of its body", desc: "<p>The obstacle might be a low wall, a large piece of furniture, a narrow tree trunk, or a creature, whether that creature is an enemy or a friend.</p><hr><p>A target with half cover has a +2 bonus to AC and Dexterity saving throws.</p><hr><p>If a target is behind multiple sources of cover, only the most protective degree of cover applies</p><hr><p>PHB, pg. 196.</p>" },
+          { name: "Three-quarters cover", cost: "A target has three-quarters cover if about three-quarters of it is covered by an obstacle", desc: "<p>The obstacle might be a portcullis, an arrow slit, or a thick tree trunk.</p><hr><p>A target with three-quarters cover has a +5 bonus to AC and Dexterity saving throws.</p><hr><p>If a target is behind multiple sources of cover, only the most protective degree of cover applies</p><hr><p>PHB, pg. 196.</p>" },
+          { name: "Full cover", cost: "A target has total cover if it is completely concealed by an obstacle", desc: "<p>A target with total cover can’t be targeted directly by an attack or a spell, although some spells can reach such a target by including it in an area of effect.</p><hr><p>If a target is behind multiple sources of cover, only the most protective degree of cover applies</p><hr><p>PHB, pg. 196.</p>" }
+        ]
+      }
+    ];
+    // END JAVASCRIPT MODIFICATION (QUICK_REF_DATA)
+
+
+    // Create the simple list of conditions for the tracker dropdown
+    const CONDITIONS_FOR_TRACKER = QUICK_REF_DATA.find(c => c.category === "🤕 Condition").items.map(item => ({
+        name: item.name,
+        // Using the *cost* for the short description in the dropdown, as the new 'desc' is full HTML
+        desc: item.cost 
+    }));
+
+
+    // --- Utility Functions ---
+
+    function saveLocal() {
+      localStorage.setItem("initiative_order", JSON.stringify(initiative));
+      localStorage.setItem("monster_count", monsterCounter);
+    }
+    
+    function applyCondition(combatantId, conditionName) {
+        const combatant = initiative.find(c => c.id === combatantId);
+        const condition = CONDITIONS_FOR_TRACKER.find(c => c.name === conditionName);
+        
+        if (combatant && condition && !combatant.conditions.some(c => c.name === conditionName)) {
+            combatant.conditions.push(condition); // Store the condition object
+            renderList();
+        }
+        document.querySelectorAll('.condition-menu').forEach(menu => menu.classList.remove('show'));
+    }
+    
+    function toggleConditionMenu(combatantId, targetElement) {
+        // Close all other menus
+        document.querySelectorAll('.condition-menu').forEach(menu => {
+            if (menu.parentElement.dataset.id !== combatantId) {
+                menu.classList.remove('show');
+            }
+        });
+        
+        // Toggle the target menu
+        const menu = targetElement.querySelector('.condition-menu');
+        if (menu) {
+            menu.classList.toggle('show');
+        }
+    }
+
+
+    // --- Initiative List Rendering ---
+
+    function renderList() {
+      listEl.innerHTML = "";
+      initiative.sort((a, b) => a.turn_index - b.turn_index);
+      
+      initiative.forEach((c) => {
+        const li = document.createElement("li");
+        li.className = "combatant" + (c.is_active ? " active" : "");
+        li.draggable = true;
+        li.dataset.id = c.id;
+        
+        const mainInfo = document.createElement("div");
+        mainInfo.className = "combatant-main-info";
+        
+        const nameSpan = document.createElement("input");
+        nameSpan.type = "text";
+        nameSpan.className = "combatant-name";
+        nameSpan.value = c.name;
+        nameSpan.onblur = (e) => {
+            c.name = e.target.value;
+            saveLocal();
+            updatePipWindow();
+        };
+        // Prevent newline on Enter key
+        nameSpan.onkeydown = (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            e.target.blur();
+          }
+        };
+        mainInfo.appendChild(nameSpan);
+        
+        const addCondBtn = document.createElement("button");
+        addCondBtn.className = "add-condition-btn";
+        addCondBtn.textContent = "✚ Condition";
+        addCondBtn.onclick = (e) => {
+            e.stopPropagation();
+            toggleConditionMenu(c.id, li);
+        };
+        mainInfo.appendChild(addCondBtn);
+        
+        const condMenu = document.createElement("div");
+        condMenu.className = "condition-menu";
+        CONDITIONS_FOR_TRACKER.forEach(cond => {
+            const condBtn = document.createElement("button");
+            condBtn.textContent = cond.name;
+            condBtn.title = cond.desc; // Add tooltip (now using the 'cost' field)
+            condBtn.onclick = (e) => {
+                e.stopPropagation();
+                applyCondition(c.id, cond.name);
+            };
+            condMenu.appendChild(condBtn);
+        });
+        li.appendChild(condMenu);
+        
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "delete-btn";
+        deleteBtn.textContent = "✖";
+        deleteBtn.onclick = () => deleteCombatant(c.id);
+        mainInfo.appendChild(deleteBtn);
+        
+        li.appendChild(mainInfo);
+
+        // Render applied conditions
+        if (c.conditions.length > 0) {
+            const conditionsDiv = document.createElement("div");
+            conditionsDiv.className = "combatant-conditions";
+            conditionsDiv.innerHTML = c.conditions.map(cond => 
+                `<button data-condition="${cond.name}" title="${cond.desc}">${cond.name} ✖</button>`
+            ).join('');
+            
+            conditionsDiv.addEventListener('click', (e) => {
+                if (e.target.tagName === 'BUTTON') {
+                    const conditionName = e.target.dataset.condition;
+                    c.conditions = c.conditions.filter(cond => cond.name !== conditionName);
+                    renderList(); // Re-render to show change
+                }
+            });
+            li.appendChild(conditionsDiv);
+        }
+        
+        // Drag & Drop Listeners
+        li.addEventListener("dragstart", dragStart);
+        li.addEventListener("dragover", dragOver);
+        li.addEventListener("drop", drop);
+        
+        listEl.appendChild(li);
+      });
+      
+      saveLocal();
+      updatePipWindow(); // Update the PiP window whenever the list changes
+    }
+
+    // --- Combatant Management ---
+
+    function addCombatant(name) {
+      const newEntry = {
+        id: crypto.randomUUID(),
+        name,
+        turn_index: initiative.length,
+        is_active: initiative.length === 0,
+        conditions: []
+      };
+      
+      initiative.push(newEntry);
+      renderList();
+    }
+
+    addCombatantBtn.onclick = () => {
+      const name = nameInput.value.trim() || "New Combatant";
+      addCombatant(name);
+      nameInput.value = "";
+    };
+    
+    addForm.onsubmit = (e) => {
+      e.preventDefault();
+      addCombatantBtn.click();
+    };
+
+    addRandomMonsterBtn.onclick = () => {
+        let maxMonsterNumber = 0;
+        initiative.forEach(c => {
+            const match = c.name.match(/^Monster (\d+)$/);
+            if (match) {
+                maxMonsterNumber = Math.max(maxMonsterNumber, parseInt(match[1]));
+            }
+        });
+        monsterCounter = maxMonsterNumber + 1;
+        addCombatant(`Monster ${monsterCounter}`);
+    };
+
+    function deleteCombatant(id) {
+      const wasActive = initiative.find(c => c.id === id)?.is_active;
+      let activeIndex = initiative.findIndex(c => c.is_active);
+      
+      initiative = initiative.filter(c => c.id !== id);
+      initiative.forEach((c, i) => c.turn_index = i); // Re-index
+      
+      // If the deleted was active, or no one is active
+      if ((wasActive || activeIndex === -1) && initiative.length > 0) {
+          // If the deleted was active, move to the "next" person, which is now at the same index
+          // If no one was active, default to first
+          if(activeIndex >= initiative.length) activeIndex = 0;
+          if(activeIndex < 0) activeIndex = 0;
+          
+          initiative[activeIndex].is_active = true;
+      }
+      
+      renderList();
+    }
+    
+    // Next Turn
+    function nextTurn() {
+      if (!initiative.length) return;
+      
+      initiative.sort((a, b) => a.turn_index - b.turn_index);
+      const activeIndex = initiative.findIndex(c => c.is_active);
+      
+      let nextIndex = 0;
+      if (activeIndex !== -1) {
+          initiative[activeIndex].is_active = false;
+          nextIndex = (activeIndex + 1) % initiative.length;
+      }
+      
+      initiative[nextIndex].is_active = true;
+      renderList();
+    }
+    
+    nextTurnBtn.onclick = nextTurn;
+
+
+    // Shuffle
+    shuffleBtn.onclick = () => {
+      for (let i = initiative.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [initiative[i], initiative[j]] = [initiative[j], initiative[i]];
+      }
+      initiative.forEach((c, i) => c.turn_index = i);
+      
+      // Ensure one person is active, default to first
+      if (initiative.length > 0) {
+          if (!initiative.some(c => c.is_active)) {
+              initiative[0].is_active = true;
+          }
+      }
+      
+      renderList();
+    };
+
+    // --- Drag & Drop ---
+    let draggedId = null;
+    function dragStart(e) { 
+        draggedId = e.target.closest(".combatant").dataset.id;
+        e.dataTransfer.effectAllowed = 'move';
+        document.querySelectorAll('.condition-menu').forEach(menu => menu.classList.remove('show'));
+    }
+    function dragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+    function drop(e) {
+      e.preventDefault();
+      const targetEl = e.target.closest(".combatant");
+      if (!targetEl) return;
+      
+      const targetId = targetEl.dataset.id;
+      if (draggedId === targetId) return;
+
+      const draggedIdx = initiative.findIndex(c => c.id == draggedId);
+      const targetIdx = initiative.findIndex(c => c.id == targetId);
+      
+      const [dragged] = initiative.splice(draggedIdx, 1);
+      initiative.splice(targetIdx, 0, dragged);
+      
+      initiative.forEach((c, i) => c.turn_index = i);
+      renderList();
+    }
+
+    // ==================================
+    // Picture-in-Picture (PiP) (from Dm3, modified)
+    // ==================================
+    
+    function getPipHTML() {
+      return `
+        <head>
+          <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+          <style>
+            :root {
+              --color-gold: #c5a45a;
+              --color-gold-dark: #b9994f;
+              --color-gold-darker: #9c8442;
+              --color-gold-shadow: rgba(197, 164, 90, 0.4);
+              --color-bg: #0b0b0b;
+              --color-bg-panel: rgba(20, 20, 20, 0.92);
+              --color-bg-item: rgba(30, 30, 30, 0.9);
+              --color-text: #c5a45a;
+              --color-blood-red: #8a0303;
+              --color-blood-shadow: rgba(138, 3, 3, 0.7);
+            }
+            .pip-body {
+              font-family: 'Cinzel', serif;
+              background-color: var(--color-bg);
+              color: var(--color-text);
+              padding: 15px;
+              margin: 0;
+              border: 2px solid var(--color-gold-dark);
+              height: 100vh;
+              box-sizing: border-box;
+              display: flex;
+              flex-direction: column;
+              box-shadow: 0 0 20px var(--color-blood-shadow) inset;
+              overflow: hidden;
+            }
+            .pip-body h3 {
+              color: var(--color-gold);
+              text-shadow: 0 0 10px var(--color-gold-shadow);
+              border-bottom: 1px solid var(--color-gold-darker);
+              padding-bottom: 5px;
+              margin: 0 0 10px 0;
+              font-size: 1.1rem;
+            }
+            .pip-body #pip-current {
+              background: var(--color-gold);
+              color: #000;
+              padding: 10px;
+              font-size: 1.2rem;
+              font-weight: bold;
+              border-radius: 4px;
+              text-align: center;
+              box-shadow: 0 0 15px var(--color-gold-shadow), 0 0 25px var(--color-blood-shadow);
+              margin-bottom: 5px;
+              word-wrap: break-word;
+            }
+            .pip-body #pip-current-conditions {
+                text-align: center;
+                font-size: 0.9rem;
+                color: var(--color-blood-hover);
+                margin-bottom: 10px;
+                min-height: 1.2em;
+                font-weight: bold;
+            }
+            .pip-body h4 {
+              color: var(--color-gold-darker);
+              margin: 10px 0 5px 0;
+              font-size: 0.9rem;
+            }
+            .pip-body .pip-next {
+              background: var(--color-bg-item);
+              border: 1px solid var(--color-gold-darker);
+              padding: 8px;
+              border-radius: 4px;
+              font-size: 1rem;
+              word-wrap: break-word;
+            }
+            .pip-body button {
+              font-family: 'Cinzel', serif;
+              background: var(--color-blood-red);
+              color: var(--color-gold);
+              cursor: pointer;
+              font-weight: bold;
+              letter-spacing: 1px;
+              text-transform: uppercase;
+              border: 1px solid var(--color-blood-shadow);
+              text-shadow: 0 0 5px var(--color-gold-shadow);
+              padding: 10px;
+              border-radius: 4px;
+              width: 100%;
+              margin-top: auto; /* Pushes button to bottom */
+              font-size: 0.9rem;
+            }
+            .pip-body button:hover {
+              background-color: var(--color-gold);
+              color: var(--color-bg);
+              border-color: var(--color-gold);
+              box-shadow: 0 0 10px var(--color-gold-shadow);
+            }
+          </style>
+        </head>
+        <body class="pip-body">
+          <h3>CURRENT TURN</h3>
+          <div id="pip-current">(None)</div>
+          <div id="pip-current-conditions"></div>
+          
+          <h4>NEXT</h4>
+          <div id="pip-next1" class="pip-next">(None)</div>
+          
+          <h4>AFTER THAT</h4>
+          <div id="pip-next2" class="pip-next">(None)</div>
+          
+          <button id="pip-next-btn">Next Turn ➡️</button>
+        </body>
+      `;
+    }
+
+    // Launch PiP window
+    togglePipBtn.onclick = async () => {
+      if (pipWindow) {
+        pipWindow.focus();
+        return;
+      }
+      
+      try {
+        pipWindow = await documentPictureInPicture.requestWindow({
+          width: 280,
+          height: 380, // Increased height for conditions
+        });
+
+        pipWindow.document.write(getPipHTML());
+        pipWindow.document.close();
+
+        pipWindow.document.getElementById("pip-next-btn").onclick = () => {
+          nextTurn(); // Triggers the main window's function
+        };
+
+        pipWindow.addEventListener("pagehide", () => {
+          pipWindow = null;
+        });
+
+        updatePipWindow(); // Populate with current data
+
+      } catch (error) {
+        console.error("PiP Error:", error);
+        alert("Picture-in-Picture window failed to open. Make sure your browser supports it and you don't have a popup blocker active.");
+        pipWindow = null;
+      }
+    };
+
+    // Update PiP window content
+    function updatePipWindow() {
+      if (!pipWindow || pipWindow.closed) {
+        pipWindow = null;
+        return;
+      }
+      
+      const doc = pipWindow.document;
+      const currentEl = doc.getElementById("pip-current");
+      const conditionsEl = doc.getElementById("pip-current-conditions");
+      const next1El = doc.getElementById("pip-next1");
+      const next2El = doc.getElementById("pip-next2");
+
+      if (!currentEl) return; // Window hasn't finished loading
+
+      const activeIndex = initiative.findIndex(c => c.is_active);
+      if (activeIndex === -1) {
+        currentEl.innerText = "(None)";
+        conditionsEl.innerText = "";
+        next1El.innerText = "(None)";
+        next2El.innerText = "(None)";
+        return;
+      }
+      
+      const current = initiative[activeIndex];
+      const next1 = initiative[(activeIndex + 1) % initiative.length];
+      const next2 = initiative[(activeIndex + 2) % initiative.length];
+
+      currentEl.innerText = current ? current.name : "(None)";
+      
+      // Update conditions
+      if (current && current.conditions.length > 0) {
+        conditionsEl.innerText = current.conditions.map(c => c.name.toUpperCase()).join(', ');
+      } else {
+        conditionsEl.innerText = "";
+      }
+      
+      if (initiative.length > 1) {
+        next1El.innerText = next1.name;
+      } else {
+        next1El.innerText = "(None)";
+      }
+      
+      if (initiative.length > 2) {
+        next2El.innerText = next2.name;
+      } else {
+        next2El.innerText = "(None)";
+      }
+    }
+
+
+    // ==================================
+    // QUICK REF / LIGHTBOX FUNCTIONS (MODIFIED)
+    // ==================================
+    
+    // --- Lightbox Functions ---
+    const lightboxEl = document.getElementById("quickref-lightbox");
+    const lightboxTitleEl = document.getElementById("lightbox-title");
+    const lightboxCostEl = document.getElementById("lightbox-cost");
+    const lightboxDescEl = document.getElementById("lightbox-description");
+    const lightboxCloseBtn = document.getElementById("lightboxCloseBtn");
+    
+    // START JAVASCRIPT MODIFICATION (showLightbox)
+    // Updated to handle pre-formatted HTML in the 'desc' field
+    function showLightbox(item) {
+        lightboxTitleEl.textContent = item.name;
+        lightboxCostEl.textContent = item.cost;
+        // The 'desc' field now contains pre-formatted HTML (<p> and <hr> tags)
+        lightboxDescEl.innerHTML = item.desc; 
+        lightboxEl.style.display = 'flex'; // Show the modal
+    }
+    // END JAVASCRIPT MODIFICATION
+    
+    function hideLightbox() {
+        lightboxEl.style.display = 'none'; // Hide the modal
+    }
+
+    lightboxCloseBtn.onclick = hideLightbox;
+    // Close on clicking outside the content
+    lightboxEl.onclick = (e) => {
+        if (e.target === lightboxEl) {
+            hideLightbox();
+        }
+    };
+    
+    // Global listener for 'Escape' key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && lightboxEl.style.display === 'flex') {
+            hideLightbox();
+        }
+    });
+
+
+    // --- Quick Ref List Rendering (Grid Style) ---
+
+    function renderQuickRefPanel() {
+        quickRefListEl.innerHTML = "";
+        
+        QUICK_REF_DATA.forEach(category => {
+            const catDiv = document.createElement("div");
+            catDiv.className = "quickref-category";
+            
+            const catHeader = document.createElement("div");
+            catHeader.className = "quickref-category-header";
+            catHeader.setAttribute('aria-expanded', 'false');
+            
+            // START JAVASCRIPT MODIFICATION (Adjusted header structure)
+            catHeader.innerHTML = `
+                <span class="quickref-main-title">${category.category}</span>
+                <span class="quickref-right-group">
+                    <span class="quickref-header-note">${category.header_note.toUpperCase()}</span>
+                    <span class="quickref-toggle-icon">▶</span>
+                </span>
+            `;
+            // END JAVASCRIPT MODIFICATION
+            
+            const catContent = document.createElement("div");
+            catContent.className = "quickref-category-content";
+            
+            // START JAVASCRIPT MODIFICATION (Add category description)
+            if (category.desc) {
+                const catDesc = document.createElement("p");
+                catDesc.className = "quickref-category-description";
+                catDesc.textContent = category.desc;
+                catContent.appendChild(catDesc);
+            }
+            // END JAVASCRIPT MODIFICATION
+            
+            // NEW: Add the grid container
+            const itemGrid = document.createElement("div");
+            itemGrid.className = "quickref-item-grid";
+
+            // Populate inner items
+            category.items.forEach(item => {
+                const itemDiv = document.createElement("div");
+                itemDiv.className = "quickref-item";
+                itemDiv.dataset.name = item.name; // For potential data hooks
+                
+                const itemHeader = document.createElement("div");
+                itemHeader.className = "quickref-item-header";
+                
+                // Content for the grid cell
+                itemHeader.innerHTML = `
+                    <span>${item.name}</span>
+                    <span class="cost">${item.cost}</span>
+                `;
+                
+                // Click logic for lightbox
+                itemHeader.onclick = (e) => {
+                    e.stopPropagation(); 
+                    showLightbox(item); // Show the lightbox with this item's data
+                };
+
+                itemDiv.appendChild(itemHeader);
+                itemGrid.appendChild(itemDiv); // Append to the new grid container
+            });
+            
+            catContent.appendChild(itemGrid); // Append the grid to the category content
+
+            // Toggle logic for category (accordion header)
+            catHeader.onclick = () => {
+                const isActive = catHeader.getAttribute('aria-expanded') === 'true';
+                catHeader.setAttribute('aria-expanded', String(!isActive));
+                catContent.classList.toggle('active');
+            };
+
+            catDiv.appendChild(catHeader);
+            catDiv.appendChild(catContent);
+            quickRefListEl.appendChild(catDiv);
+        });
+    }
+
+
+    // --- Initialization ---
+    renderQuickRefPanel(); // Build the new quick ref panel
+    renderList(); // Build the tracker
+    
+    // Ensure someone is active on load
+    if (initiative.length && !initiative.some(c => c.is_active)) {
+        initiative[0].is_active = true;
+        renderList();
+    }
+    
+    // Global listener to close condition menus
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.combatant') && !e.target.closest('.condition-menu')) {
+            document.querySelectorAll('.condition-menu').forEach(menu => menu.classList.remove('show'));
+        }
+    });
+
+  </script>
+</body>
+</html>
