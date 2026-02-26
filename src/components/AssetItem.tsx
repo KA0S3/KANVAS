@@ -55,6 +55,7 @@ interface AssetItemProps {
   onEdit?: (asset: Asset) => void;
   onSelectAndFocus?: (asset: Asset) => void;
   isEditingBackground?: boolean;
+  onCreateAsset?: (options: { name: string; parentId?: string }) => void;
 }
 
 const iconMap = {
@@ -75,7 +76,7 @@ const colorMap = {
   other: "text-muted-foreground",
 };
 
-export function AssetItem({ asset, onDelete, onMouseDown, onDoubleClick, isSelected, onResize, onEdit, onSelectAndFocus, isEditingBackground = false }: AssetItemProps) {
+export function AssetItem({ asset, onDelete, onMouseDown, onDoubleClick, isSelected, onResize, onEdit, onSelectAndFocus, isEditingBackground = false, onCreateAsset }: AssetItemProps) {
   const Icon = iconMap[asset.type];
   const colorClass = colorMap[asset.type];
   const { getAssetTags } = useTagStore();
@@ -608,6 +609,7 @@ export function AssetItem({ asset, onDelete, onMouseDown, onDoubleClick, isSelec
           onEdit={onEdit}
           onSelectAndFocus={onSelectAndFocus}
           isViewportAsset={true}
+          onCreateAsset={onCreateAsset}
         />
       )}
     </div>

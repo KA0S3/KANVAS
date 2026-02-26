@@ -30,6 +30,7 @@ interface AssetContextMenuProps {
   onEdit?: (asset: Asset) => void;
   onSelectAndFocus?: (asset: Asset) => void;
   isViewportAsset?: boolean;
+  onCreateAsset?: (options: { name: string; parentId?: string }) => void;
 }
 
 export const AssetContextMenu: React.FC<AssetContextMenuProps> = ({
@@ -39,13 +40,13 @@ export const AssetContextMenu: React.FC<AssetContextMenuProps> = ({
   onEdit,
   onSelectAndFocus,
   isViewportAsset = false,
+  onCreateAsset,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const {
     updateAsset,
     setActiveAsset,
-    createAsset,
     getAssetChildren,
   } = useAssetStore();
 
@@ -114,12 +115,17 @@ export const AssetContextMenu: React.FC<AssetContextMenuProps> = ({
     console.log('Dialog state set to true, current state:', showDeleteDialog);
   };
 
-  const handleEdit = () => {
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
     onEdit?.(asset);
     onClose();
   };
 
-  const handleDuplicate = () => {
+  const handleDuplicateAsset = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    e.nativeEvent.stopImmediatePropagation();
+    
     const newAssetData = {
       ...asset,
       name: `${asset.name} (Copy)`,
@@ -128,7 +134,9 @@ export const AssetContextMenu: React.FC<AssetContextMenuProps> = ({
     };
     // Remove id, children, parentId, and timestamps from the data
     const { id, children, parentId, createdAt, updatedAt, ...assetDataToCopy } = newAssetData;
-    createAsset(assetDataToCopy, asset.parentId);
+    if (onCreateAsset) {
+      onCreateAsset(assetDataToCopy);
+    }
     onClose();
   };
 
@@ -149,21 +157,16 @@ export const AssetContextMenu: React.FC<AssetContextMenuProps> = ({
   };
 
   
-  const handleCreateChild = () => {
+  const handleCreateChild = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    e.nativeEvent.stopImmediatePropagation();
+    
     const name = prompt('Enter child asset name:');
-    if (name) {
-      createAsset({
-        name,
-        type: 'other',
-        x: 10,
-        y: 10,
-        width: 200,
-        height: 150,
-        customFields: [],
-        customFieldValues: [],
-      }, asset.id);
-      onClose();
+    if (name && onCreateAsset) {
+      onCreateAsset({ name, parentId: asset.id });
     }
+    onClose();
   };
 
   const handleSelect = () => {
@@ -244,7 +247,7 @@ export const AssetContextMenu: React.FC<AssetContextMenuProps> = ({
 
             {/* Duplicate */}
             <button
-              onClick={handleDuplicate}
+              onClick={handleDuplicateAsset}
               className="w-full px-3 py-2 flex items-center gap-2 text-sm text-foreground hover:bg-glass-border/20 transition-colors"
             >
               <Copy className="w-4 h-4" />

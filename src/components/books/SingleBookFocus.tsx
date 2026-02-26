@@ -37,13 +37,18 @@ const SingleBookFocus: React.FC<SingleBookFocusProps> = ({
     return 0;
   });
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
 
   // Update currentIndex when selectedBookId changes
   useEffect(() => {
     if (selectedBookId) {
       const index = books.findIndex(book => book.id === selectedBookId);
       if (index >= 0 && index !== currentIndex) {
-        setCurrentIndex(index);
+        setIsAnimating(true);
+        setTimeout(() => {
+          setCurrentIndex(index);
+          setTimeout(() => setIsAnimating(false), 50);
+        }, 150);
       }
     }
   }, [selectedBookId, books, currentIndex]);
@@ -98,7 +103,7 @@ const SingleBookFocus: React.FC<SingleBookFocusProps> = ({
   }
 
   return (
-    <div className={`flex items-center justify-center h-full p-8 ${className}`}>
+    <div className={`flex items-center justify-center h-full p-8 ${className} ${isAnimating ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300 ease-in-out`}>
       {/* Left Navigation Button */}
       <button
         onClick={handlePrevious}
@@ -120,7 +125,9 @@ const SingleBookFocus: React.FC<SingleBookFocusProps> = ({
         <div className="perspective-1000">
           <div 
             onDoubleClick={() => handleBookCardDoubleClick(currentBook)}
-            className="cursor-pointer group relative transform scale-110"
+            className={`cursor-pointer group relative transform scale-110 transition-all duration-500 ease-out ${
+              isAnimating ? 'scale-95 opacity-0' : 'scale-110 opacity-100'
+            }`}
           >
             <BookCover book={currentBook} size="large" />
             {/* Hover instruction */}

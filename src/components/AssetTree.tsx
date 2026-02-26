@@ -186,14 +186,16 @@ interface AssetTreeProps {
   onAssetSelect?: (assetId: string) => void;
   selectedAssetId?: string | null;
   onEdit?: (asset: Asset) => void;
+  onCreateAsset?: (options: { name: string; parentId?: string }) => void;
 }
 
 export const AssetTree: React.FC<AssetTreeProps> = ({
   onAssetSelect,
   selectedAssetId,
   onEdit,
+  onCreateAsset,
 }) => {
-  const { flattenedTree, createAsset, reparentAsset, deleteAsset } = useAssetTree();
+  const { flattenedTree, reparentAsset, deleteAsset } = useAssetTree();
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
 
   const handleMove = useCallback((assetId: string, newParentId?: string) => {
@@ -210,22 +212,10 @@ export const AssetTree: React.FC<AssetTreeProps> = ({
 
   const handleCreateChild = useCallback((parentId?: string) => {
     const name = prompt('Enter asset name:');
-    if (name) {
-      createAsset(
-        {
-          name,
-          type: 'other',
-          x: 0,
-          y: 0,
-          width: 200,
-          height: 150,
-          customFields: [],
-          customFieldValues: [],
-        },
-        parentId
-      );
+    if (name && onCreateAsset) {
+      onCreateAsset({ name, parentId });
     }
-  }, [createAsset]);
+  }, [onCreateAsset]);
 
   return (
     <div className="glass rounded-lg p-2 max-h-96 overflow-y-auto">

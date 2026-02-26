@@ -36,10 +36,26 @@ interface AssetEditModalProps {
   assetId?: string | null;
   isNewAsset?: boolean;
   viewportSize?: { width: number; height: number };
+  onCreateAsset?: (options: { name: string; type: string; x: number; y: number; width: number; height: number; description?: string; customFields?: any[]; customFieldValues?: any[]; tags?: string[]; }) => void;
+  isCreating?: boolean;
+  initialData?: {
+    name?: string;
+    type?: string;
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+    description?: string;
+    customFields?: any[];
+    customFieldValues?: any[];
+    tags?: string[];
+    parentId?: string;
+    context?: string;
+  };
 }
 
-export function AssetEditModal({ isOpen, onClose, assetId, isNewAsset = false, viewportSize }: AssetEditModalProps) {
-  const { assets, createAsset, updateAsset, deleteAsset } = useAssetStore();
+export function AssetEditModal({ isOpen, onClose, assetId, isNewAsset = false, viewportSize, onCreateAsset, isCreating = false, initialData }: AssetEditModalProps) {
+  const { assets, updateAsset, deleteAsset } = useAssetStore();
   const { tags, addTagToAsset, removeTagFromAsset } = useTagStore();
   
   const asset = assetId ? assets[assetId] : null;
@@ -65,7 +81,13 @@ export function AssetEditModal({ isOpen, onClose, assetId, isNewAsset = false, v
 
   // Initialize form data when asset changes
   useEffect(() => {
+    console.log('📝 AssetEditModal: Initializing form data');
+    console.log('📝 AssetEditModal: asset:', asset);
+    console.log('📝 AssetEditModal: isNewAsset:', isNewAsset);
+    console.log('📝 AssetEditModal: initialData:', initialData);
+    
     if (asset) {
+      console.log('📝 AssetEditModal: Setting form data from existing asset');
       setFormData({
         name: asset.name || '',
         description: asset.description || '',
@@ -81,15 +103,16 @@ export function AssetEditModal({ isOpen, onClose, assetId, isNewAsset = false, v
         portraitBlur: 0,
       });
     } else if (isNewAsset) {
-      // Reset for new asset
+      // Initialize with initialData for new asset
+      console.log('📝 AssetEditModal: Setting form data from initialData for new asset');
       setFormData({
-        name: '',
-        description: '',
+        name: initialData?.name || '',
+        description: initialData?.description || '',
         thumbnail: '',
-        tags: [],
+        tags: initialData?.tags || [],
       });
-      setCustomFields([]);
-      setCustomFieldValues([]);
+      setCustomFields(initialData?.customFields || []);
+      setCustomFieldValues(initialData?.customFieldValues || []);
       setViewportDisplaySettings({
         name: true,
         description: false,
@@ -97,7 +120,7 @@ export function AssetEditModal({ isOpen, onClose, assetId, isNewAsset = false, v
         portraitBlur: 0,
       });
     }
-  }, [asset, isNewAsset]);
+  }, [asset, isNewAsset, initialData]);
 
   // Refresh asset data when background is saved
   useEffect(() => {
@@ -163,6 +186,11 @@ export function AssetEditModal({ isOpen, onClose, assetId, isNewAsset = false, v
 
   const handleSave = () => {
     try {
+      console.log('💾 AssetEditModal: handleSave called');
+      console.log('💾 AssetEditModal: isNewAsset:', isNewAsset);
+      console.log('💾 AssetEditModal: initialData:', initialData);
+      console.log('💾 AssetEditModal: formData:', formData);
+      
       const assetData = {
         ...formData,
         customFields,
@@ -172,22 +200,28 @@ export function AssetEditModal({ isOpen, onClose, assetId, isNewAsset = false, v
 
       if (isNewAsset || !asset) {
         // Create new asset
-        const newAssetId = createAsset({
-          ...assetData,
-          type: 'other',
-          x: 100,
-          y: 100,
-          width: 200,
-          height: 150,
-        });
-        
-        // Add tag associations for new asset only
-        // (Existing assets are already updated in real-time via handleTagToggle)
-        if (isNewAsset) {
-          formData.tags.forEach(tagId => {
-            addTagToAsset(newAssetId, tagId);
-          });
+        if (onCreateAsset) {
+          const creationOptions = {
+            name: formData.name,
+            description: formData.description,
+            type: initialData?.type || 'other',
+            x: initialData?.x ?? 100,
+            y: initialData?.y ?? 100,
+            width: initialData?.width ?? 200,
+            height: initialData?.height ?? 150,
+            customFields,
+            customFieldValues,
+            tags: formData.tags,
+          };
+          
+          console.log('💾 AssetEditModal: Calling onCreateAsset with options:', creationOptions);
+          console.log('💾 AssetEditModal: Using initialData?.x:', initialData?.x, 'fallback to 100');
+          console.log('💾 AssetEditModal: Using initialData?.y:', initialData?.y, 'fallback to 100');
+          
+          onCreateAsset(creationOptions);
         }
+        onClose();
+        return;
       } else {
         // Update existing asset
         updateAsset(asset.id, assetData);
@@ -413,9 +447,18 @@ export function AssetEditModal({ isOpen, onClose, assetId, isNewAsset = false, v
           <Button variant="outline" onClick={handleCloseAttempt}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={!formData.name.trim()}>
-            <Save className="w-4 h-4 mr-2" />
-            {isNewAsset ? 'Create' : 'Save'}
+          <Button onClick={handleSave} disabled={!formData.name.trim() || isCreating}>
+            {isCreating ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Creating...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                {isNewAsset ? 'Create' : 'Save'}
+              </>
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

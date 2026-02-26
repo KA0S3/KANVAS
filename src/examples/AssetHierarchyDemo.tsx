@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAssetTree } from '@/hooks/useAssetTree';
 import { AssetTree } from '@/components/AssetTree';
+import { useAssetStore } from '@/stores/assetStore';
+import { AssetCreationModal } from '@/components/asset/AssetCreationModal';
 
 export const AssetHierarchyDemo: React.FC = () => {
   const {
@@ -13,65 +15,30 @@ export const AssetHierarchyDemo: React.FC = () => {
     getAssetPath,
     searchAssets,
   } = useAssetTree();
+  
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalInitialData, setModalInitialData] = useState<any>(null);
+
+  const handleCreateAssetForTree = useCallback((options: { name: string; parentId?: string }) => {
+    setModalInitialData({
+      name: options.name,
+      type: 'other',
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 150,
+      customFields: [],
+      customFieldValues: [],
+      parentId: options.parentId,
+      context: 'demo-tree'
+    });
+    setIsModalOpen(true);
+  }, []);
 
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Initialize with sample hierarchical data
-  useEffect(() => {
-    if (Object.keys(assets).length === 0) {
-      // Create a sample hierarchy
-      const projectId = createAsset({
-        name: 'My Project',
-        type: 'document',
-        x: 100,
-        y: 100,
-      });
-
-      const imagesId = createAsset({
-        name: 'Images',
-        type: 'other',
-        x: 200,
-        y: 150,
-      }, projectId);
-
-      const documentsId = createAsset({
-        name: 'Documents',
-        type: 'other',
-        x: 300,
-        y: 200,
-      }, projectId);
-
-      // Add some child assets
-      createAsset({
-        name: 'logo.png',
-        type: 'image',
-        x: 250,
-        y: 180,
-      }, imagesId);
-
-      createAsset({
-        name: 'banner.jpg',
-        type: 'image',
-        x: 350,
-        y: 230,
-      }, imagesId);
-
-      createAsset({
-        name: 'requirements.pdf',
-        type: 'document',
-        x: 400,
-        y: 280,
-      }, documentsId);
-
-      createAsset({
-        name: 'README.md',
-        type: 'document',
-        x: 150,
-        y: 120,
-      }, projectId);
-    }
-  }, [assets, createAsset]);
+  const selectedAssetPath = selectedAssetId ? getAssetPath(selectedAssetId) : [];
 
   const handleAssetSelect = (assetId: string) => {
     setSelectedAssetId(assetId);
@@ -83,10 +50,9 @@ export const AssetHierarchyDemo: React.FC = () => {
 
   const searchResults = searchQuery ? searchAssets(searchQuery) : [];
 
-  const selectedAssetPath = selectedAssetId ? getAssetPath(selectedAssetId) : [];
-
   return (
-    <div className="p-6 space-y-6">
+    <>
+      <div className="p-6 space-y-6">
       <div className="glass-strong cosmic-glow rounded-2xl p-6">
         <h1 className="text-2xl font-bold text-foreground mb-4">Asset Hierarchy Demo</h1>
         
@@ -96,6 +62,7 @@ export const AssetHierarchyDemo: React.FC = () => {
             <AssetTree
               onAssetSelect={handleAssetSelect}
               selectedAssetId={selectedAssetId}
+              onCreateAsset={handleCreateAssetForTree}
             />
           </div>
 
@@ -170,12 +137,15 @@ export const AssetHierarchyDemo: React.FC = () => {
                     onClick={() => {
                       const name = prompt('Enter new child asset name:');
                       if (name) {
-                        createAsset({
+                        setModalInitialData({
                           name,
                           type: 'other',
                           x: Math.random() * 400,
                           y: Math.random() * 300,
-                        }, selectedAssetId);
+                          width: 200,
+                          height: 150,
+                        });
+                        setIsModalOpen(true);
                       }
                     }}
                     className="w-full px-3 py-1 bg-primary text-primary-foreground rounded text-sm hover:bg-primary/90 transition-colors"
@@ -223,5 +193,13 @@ export const AssetHierarchyDemo: React.FC = () => {
         </div>
       </div>
     </div>
+      
+    {/* Asset Creation Modal */}
+      <AssetCreationModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        initialData={modalInitialData}
+      />
+    </>
   );
 };

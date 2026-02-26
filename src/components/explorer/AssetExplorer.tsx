@@ -1,5 +1,5 @@
 import { Plus, Search, Settings, Tag, Users, Building, Sparkles, Swords, X, Image } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useAssetStore } from '@/stores/assetStore';
 import { AssetTreeNode } from './AssetTreeNode';
 import { Input } from '@/components/ui/input';
@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { TagFilterControls } from '@/components/tags/TagFilterControls';
 import { GlobalTagManager } from '@/components/tags/GlobalTagManager';
 import { cn } from '@/lib/utils';
-import { AssetEditModal } from '@/components/asset/AssetEditModal';
+import { AssetCreationModal } from '@/components/asset/AssetCreationModal';
 import { SettingsPanel } from '@/components/settings/SettingsPanel';
 import type { Asset } from '@/components/AssetItem';
 
@@ -17,35 +17,54 @@ interface AssetExplorerProps {
 }
 
 export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerProps) {
-  const { assets, createAsset, updateAsset, currentActiveId, currentViewportId, setIsEditingBackground } = useAssetStore();
+  const { assets, updateAsset, currentActiveId, currentViewportId, setIsEditingBackground } = useAssetStore();
   const [searchQuery, setSearchQuery] = useState('');
-  const [newAssetId, setNewAssetId] = useState<string | null>(null);
   const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
-  const [editModalOpen, setEditModalOpen] = useState(false);
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalInitialData, setModalInitialData] = useState<any>(null);
   
   const rootAssets = assets ? Object.values(assets).filter(asset => !asset.parentId) : [];
   
-  const handleCreateAsset = () => {
-    const newAsset = createAsset({
+  const openCreateAssetModal = useCallback(() => {
+    console.log('🎯 Opening create modal');
+    
+    // ONLY open the modal - do NOT create any assets
+    setModalInitialData({
       name: 'New Asset',
       type: 'other',
       x: 100,
       y: 100,
       width: 200,
       height: 150,
-      description: '',
+    });
+    setIsModalOpen(true);
+  }, [currentActiveId]);
+
+  const handleCreateAssetClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    e.nativeEvent.stopImmediatePropagation(); // Prevent other listeners
+    openCreateAssetModal();
+  };
+
+  const handleCreateAssetForTree = useCallback((options: { name: string; parentId?: string }) => {
+    // Open modal with pre-filled data
+    setModalInitialData({
+      name: options.name,
+      type: 'other',
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 150,
       customFields: [],
       customFieldValues: [],
-      tags: [],
-    }, currentActiveId);
-    setNewAssetId(newAsset);
-    setEditModalOpen(true);
-  };
+    });
+    setIsModalOpen(true);
+  }, []);
 
   const handleEditAsset = (asset: Asset) => {
     setEditingAssetId(asset.id);
-    setEditModalOpen(true);
   };
 
   const handleSelectAndFocus = (asset: Asset) => {
@@ -174,7 +193,9 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
             size="sm"
             variant="ghost"
             className="h-7 w-7 p-0"
-            onClick={handleCreateAsset}
+            onClick={handleCreateAssetClick}
+            disabled={isModalOpen}
+            title={isModalOpen ? "Creating asset..." : "Create new asset"}
           >
             <Plus className="w-4 h-4" />
           </Button>
@@ -226,22 +247,18 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
         </div>
       </div>
       
-      {/* Edit Modal for New and Existing Assets */}
-      <AssetEditModal
-        isOpen={editModalOpen}
-        onClose={() => {
-          setEditModalOpen(false);
-          setNewAssetId(null);
-          setEditingAssetId(null);
-        }}
-        assetId={editingAssetId || newAssetId}
-        isNewAsset={!!newAssetId}
-      />
-      
       {/* Settings Panel */}
       <SettingsPanel
         isOpen={settingsPanelOpen}
         onClose={() => setSettingsPanelOpen(false)}
+      />
+
+      {/* Asset Creation Modal */}
+      <AssetCreationModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        initialData={modalInitialData}
+        parentId={currentActiveId || undefined}
       />
 
     </div>

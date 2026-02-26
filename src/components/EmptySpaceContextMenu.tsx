@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   Plus, 
@@ -16,18 +16,18 @@ interface EmptySpaceContextMenuProps {
   position: { x: number; y: number };
   onClose: () => void;
   enteredAssetId: string | null;
-  onCreateAsset: () => void;
   onOpenSettings: () => void;
   onOpenBackgroundSettings: () => void;
+  onOpenAssetModal: (initialData?: any) => void;
 }
 
 export const EmptySpaceContextMenu: React.FC<EmptySpaceContextMenuProps> = ({
   position,
   onClose,
   enteredAssetId,
-  onCreateAsset,
   onOpenSettings,
   onOpenBackgroundSettings,
+  onOpenAssetModal,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const { setIsEditingBackground } = useAssetStore();
@@ -91,8 +91,30 @@ export const EmptySpaceContextMenu: React.FC<EmptySpaceContextMenuProps> = ({
     };
   }, [onClose]);
 
-  const handleCreateAsset = () => {
-    onCreateAsset();
+  const openCreateAssetModal = useCallback(() => {
+    console.log('🎯 Opening create modal');
+    
+    // ONLY open the modal - do NOT create any assets
+    onOpenAssetModal({
+      name: 'New Asset',
+      type: 'other',
+      x: position.x,
+      y: position.y,
+      width: 200,
+      height: 150,
+    });
+  }, [onOpenAssetModal, enteredAssetId]);
+
+  const handleCreateAsset = (e: React.MouseEvent) => {
+    console.log('🟢 EmptySpaceContextMenu handleCreateAsset called');
+    e.stopPropagation();
+    e.preventDefault();
+    e.nativeEvent.stopImmediatePropagation();
+    console.log('🟢 EmptySpaceContextMenu: Opening global asset modal');
+    
+    // Call modal opening function
+    openCreateAssetModal();
+    
     onClose();
   };
 

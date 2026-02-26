@@ -66,6 +66,7 @@ export const useAssetStore = create<AssetStore>()(
   // Create a new asset
   createAsset: (assetData: Omit<Asset, 'id' | 'children'>, parentId?: string) => {
     const id = crypto.randomUUID();
+    const now = Date.now();
     const newAsset: Asset = {
       ...assetData,
       id,
@@ -85,25 +86,28 @@ export const useAssetStore = create<AssetStore>()(
         gridSize: 40,
       },
       viewportDisplaySettings: assetData.viewportDisplaySettings || { ...DEFAULT_VIEWPORT_DISPLAY_SETTINGS },
+      createdAt: now,
+      updatedAt: now,
     };
 
     set((state) => {
       const newAssets = { ...state.assets };
       
-      // Add the new asset to registry
+      // Atomic operation: Add the new asset to registry
       newAssets[id] = newAsset;
       
-      // If it has a parent, add this asset to parent's children array
+      // If it has a parent, add this asset to parent's children array atomically
       if (parentId && newAssets[parentId]) {
         newAssets[parentId] = {
           ...newAssets[parentId],
           children: [...newAssets[parentId].children, id],
+          updatedAt: now,
         };
       }
       
       return { assets: newAssets };
     });
-
+    
     return id;
   },
 

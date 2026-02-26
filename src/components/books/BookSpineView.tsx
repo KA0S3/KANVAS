@@ -172,11 +172,20 @@ const BookSpineView: React.FC<BookSpineViewProps> = ({
 
     const spineColor = generateSpineColor(book);
     const isSelected = selectedBookId === book.id;
+    const [isDoubleClicking, setIsDoubleClicking] = useState(false);
 
     const style = {
       transform: CSS.Transform.toString(transform),
       transition,
       opacity: isDragging ? 0.5 : 1,
+    };
+
+    const handleDoubleClick = () => {
+      if (!isDragging) {
+        setIsDoubleClicking(true);
+        setTimeout(() => setIsDoubleClicking(false), 200);
+        onBookSelect(book);
+      }
     };
 
     return (
@@ -189,8 +198,10 @@ const BookSpineView: React.FC<BookSpineViewProps> = ({
           hover:translate-x-1 hover:-translate-y-1
           ${isSelected ? 'spineview-selected z-20' : 'z-10'}
           ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}
+          ${isDoubleClicking ? 'scale-105' : ''}
         `}
         onClick={() => !isDragging && onBookSelect(book)}
+        onDoubleClick={handleDoubleClick}
         {...attributes}
         {...listeners}
         style={{

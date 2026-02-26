@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { AssetEditModal } from '@/components/AssetEditModal';
+import { AssetEditModal } from '@/components/asset/AssetEditModal';
 import { GeneratorModal } from '@/components/GeneratorModal';
 import { useAssetStore } from '@/stores/assetStore';
 import { Edit, Download, Plus } from 'lucide-react';
 import type { Asset } from '@/components/AssetItem';
 
 export function AssetEditorDemo() {
-  const { assets, createAsset, updateAsset } = useAssetStore();
+  const { assets, updateAsset } = useAssetStore();
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isGeneratorModalOpen, setIsGeneratorModalOpen] = useState(false);
@@ -22,48 +22,6 @@ export function AssetEditorDemo() {
     updateAsset(updatedAsset.id, updatedAsset);
   };
 
-  const handleImportAsset = (assetData: Omit<Asset, 'id' | 'x' | 'y' | 'parentId' | 'children'>) => {
-    const newAssetId = createAsset({
-      ...assetData,
-      x: Math.random() * 400,
-      y: Math.random() * 300,
-    });
-    console.log('Created new asset with ID:', newAssetId);
-  };
-
-  const createSampleAsset = () => {
-    const sampleAsset = {
-      name: 'Sample Character',
-      type: 'other' as const,
-      x: 100,
-      y: 100,
-      description: 'A sample character for testing',
-      customFields: [
-        {
-          id: crypto.randomUUID(),
-          name: 'Class',
-          value: 'Warrior',
-          showOnCanvas: true,
-        },
-        {
-          id: crypto.randomUUID(),
-          name: 'Level',
-          value: '5',
-          showOnCanvas: true,
-        },
-        {
-          id: crypto.randomUUID(),
-          name: 'Background',
-          value: 'Former soldier turned adventurer',
-          showOnCanvas: false,
-        },
-      ],
-      tags: ['NPC', 'Character'],
-    };
-
-    createAsset(sampleAsset);
-  };
-
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -74,10 +32,6 @@ export function AssetEditorDemo() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={createSampleAsset} variant="outline">
-            <Plus className="w-4 h-4 mr-2" />
-            Create Sample Asset
-          </Button>
           <Button onClick={() => setIsGeneratorModalOpen(true)}>
             <Download className="w-4 h-4 mr-2" />
             Import from Generator
@@ -107,8 +61,8 @@ export function AssetEditorDemo() {
                     <p className="text-xs font-medium">Custom Fields:</p>
                     {asset.customFields.slice(0, 3).map((field) => (
                       <div key={field.id} className="flex justify-between text-xs">
-                        <span className="font-medium">{field.name}:</span>
-                        <span className="text-muted-foreground">{field.value}</span>
+                        <span className="font-medium">{field.label}:</span>
+                        <span className="text-muted-foreground">{field.type}</span>
                       </div>
                     ))}
                     {asset.customFields.length > 3 && (
@@ -153,13 +107,9 @@ export function AssetEditorDemo() {
         <Card>
           <CardContent className="text-center py-12">
             <p className="text-muted-foreground mb-4">
-              No assets created yet. Create a sample asset or import from a generator to get started.
+              No assets created yet. Import from a generator to get started.
             </p>
             <div className="flex gap-2 justify-center">
-              <Button onClick={createSampleAsset} variant="outline">
-                <Plus className="w-4 h-4 mr-2" />
-                Create Sample Asset
-              </Button>
               <Button onClick={() => setIsGeneratorModalOpen(true)}>
                 <Download className="w-4 h-4 mr-2" />
                 Import from Generator
@@ -170,19 +120,21 @@ export function AssetEditorDemo() {
       )}
 
       <AssetEditModal
-        asset={selectedAsset}
+        assetId={selectedAsset?.id}
         isOpen={isEditModalOpen}
         onClose={() => {
           setIsEditModalOpen(false);
           setSelectedAsset(null);
         }}
-        onSave={handleSaveAsset}
       />
 
       <GeneratorModal
         isOpen={isGeneratorModalOpen}
         onClose={() => setIsGeneratorModalOpen(false)}
-        onImport={handleImportAsset}
+        onImport={() => {
+          // Import functionality disabled - use modal instead
+          console.log('Import disabled - use Asset Creation Modal instead');
+        }}
       />
     </div>
   );

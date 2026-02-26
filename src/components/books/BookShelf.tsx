@@ -145,7 +145,9 @@ const BookShelf: React.FC<BookShelfProps> = ({
 
       {/* Main Content Area */}
       <div className="pt-20 h-full">
-        {renderViewMode()}
+        <div className="relative h-full transition-all duration-500 ease-in-out">
+          {renderViewMode()}
+        </div>
       </div>
 
       {/* Empty State */}
@@ -156,17 +158,12 @@ const BookShelf: React.FC<BookShelfProps> = ({
             <h2 className={`text-2xl font-bold mb-2 ${
               theme === 'dark' ? 'text-white' : 'text-foreground'
             }`}>No Books Yet</h2>
-            <p className={`mb-6 ${
+            <p className={`mb-6 mt-12 ${
               theme === 'dark' ? 'text-gray-400' : 'text-muted-foreground'
             }`}>
               Create your first book to get started with your library
             </p>
-            <div className={`text-sm ${
-              theme === 'dark' ? 'text-gray-500' : 'text-muted-foreground'
-            }`}>
-              Your books will appear here once you create them
-            </div>
-          </div>
+        </div>
         </div>
       )}
 

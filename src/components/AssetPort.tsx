@@ -1,6 +1,7 @@
  import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { Sparkles, ArrowLeft, Plus, PanelRight, BookOpen } from "lucide-react";
 import { AssetItem, type Asset } from "./AssetItem";
+import { AssetCreationModal } from "./asset/AssetCreationModal";
 import { AssetEditModal } from "./asset/AssetEditModal";
 import { EmptySpaceContextMenu } from "./EmptySpaceContextMenu";
 import { useAssetTree } from "@/hooks/useAssetTree";
@@ -23,31 +24,7 @@ import { getBackgroundColor, shouldShowParchmentOverlay, shouldShowGlassEffect }
 import { getAssetKeyWithBook } from "@/stores/backgroundStore";
 import type { BackgroundConfig } from "@/types/background";
 
-const initialAssets: Omit<Asset, 'id' | 'children'>[] = [
-  { 
-    name: "Project Folder", 
-    type: "other", 
-    x: 100, 
-    y: 100,
-    width: 250,
-    height: 180,
-    customFields: [],
-    customFieldValues: [],
-    viewportConfig: {
-      zoom: 1.2,
-      panX: 50,
-      panY: 30,
-    },
-    backgroundConfig: {
-      isClear: true,
-      color: undefined,
-      gridSize: 30,
-    },
-  },
-  { name: "Project Overview.pdf", type: "document", x: 60, y: 80, width: 200, height: 150, customFields: [], customFieldValues: [] },
-  { name: "Hero Banner.png", type: "image", x: 300, y: 150, width: 220, height: 160, customFields: [], customFieldValues: [] },
-  { name: "Background Music.mp3", type: "audio", x: 150, y: 250, width: 200, height: 150, customFields: [], customFieldValues: [] },
-];
+const initialAssets: Omit<Asset, 'id' | 'children'>[] = [];
 
 interface AssetPortProps {
   onToggleSidebar?: () => void;
@@ -61,14 +38,15 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [currentViewport, setCurrentViewport] = useState<ViewportConfig>(getDefaultViewportConfig());
   const [enteredAssetId, setEnteredAssetId] = useState<string | null>(null);
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [newAssetId, setNewAssetId] = useState<string | null>(null);
   const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
   const [viewportSize, setViewportSize] = useState({ width: 800, height: 600 });
   const [backgroundRefreshKey, setBackgroundRefreshKey] = useState(0);
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showBackgroundControls, setShowBackgroundControls] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalInitialData, setModalInitialData] = useState<any>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const hasInitialized = useRef(false);
   
@@ -105,7 +83,7 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
     getAssetPath,
   } = useAssetTree();
   
-  const { createAsset: createStoreAsset, currentActiveId, setCurrentViewportId, currentViewportId, isEditingBackground, updateAsset } = useAssetStore();
+  const { currentActiveId, setCurrentViewportId, currentViewportId, isEditingBackground, updateAsset } = useAssetStore();
   const { getCurrentBook, getWorldData, updateWorldData } = useBookStore();
   const { getBackground, setBackground } = useBackgroundStore();
   
@@ -145,40 +123,43 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
     return () => window.removeEventListener('resize', updateViewportSize);
   }, []);
 
-  // Initialize with some sample assets on first render
+  // Initialize with empty state - no test assets
   useEffect(() => {
-    if (!hasInitialized.current && Object.keys(assets).length === 0) {
+    if (!hasInitialized.current) {
       hasInitialized.current = true;
-      const folderId = createStoreAsset(initialAssets[0]); // Create the folder first
-      
-      // Create child assets and assign them to the folder
-      initialAssets.slice(1).forEach(assetData => {
-        createStoreAsset(assetData, folderId);
-      });
     }
-  }, [assets.length, createStoreAsset]);
+  }, []);
 
-  const handleCreateAsset = useCallback(() => {
+  const openCreateAssetModal = useCallback(() => {
+    console.log('🎯 Opening create modal');
+    
+    // Calculate random position within the container
     const containerRect = containerRef.current?.getBoundingClientRect();
     const randomX = 50 + Math.random() * ((containerRect?.width || 400) - 250);
     const randomY = 80 + Math.random() * ((containerRect?.height || 300) - 150);
     
-    const newAssetId = createStoreAsset({
+    console.log('AssetPort: Opening asset modal at position:', randomX, randomY);
+    
+    // ONLY open the modal - do NOT create any assets
+    setModalInitialData({
       name: 'New Asset',
       type: 'other',
       x: randomX,
       y: randomY,
       width: 200,
       height: 150,
-      description: '',
-      customFields: [],
-      customFieldValues: [],
-      tags: [],
-    }, enteredAssetId || undefined);
-    
-    setNewAssetId(newAssetId);
-    setEditModalOpen(true);
-  }, [createStoreAsset, enteredAssetId]);
+    });
+    setIsModalOpen(true);
+  }, [currentActiveId]);
+
+  const handleCreateAssetClick = (e: React.MouseEvent) => {
+    console.log('🔵 AssetPort handleCreateAssetClick called');
+    e.stopPropagation();
+    e.preventDefault();
+    e.nativeEvent.stopImmediatePropagation(); // Prevent other listeners
+    console.log('🔵 AssetPort: All event propagation stopped, calling openCreateAssetModal');
+    openCreateAssetModal();
+  };
 
   const handleDeleteAsset = useCallback((id: string) => {
     deleteAsset(id);
@@ -186,7 +167,7 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
 
   const handleEditAsset = useCallback((asset: Asset) => {
     setEditingAssetId(asset.id);
-    setEditModalOpen(true);
+    setIsEditModalOpen(true);
   }, []);
 
   const handleAssetDoubleClick = useCallback((asset: Asset) => {
@@ -320,6 +301,8 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
   const handleContainerContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     
+    console.log('Context menu triggered on:', e.target);
+    
     // Check if the click is on empty space
     const target = e.target as HTMLElement;
     const isContainer = target === containerRef.current;
@@ -328,8 +311,24 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
       !target.classList.contains('asset-item') &&
       !target.closest('.asset-item');
     
-    if (isContainer || isViewportContainer || isBackgroundElement) {
+    // Also check if it's on the background div itself
+    const isBackgroundDiv = target.classList.contains('glass-strong') || 
+                           target.classList.contains('cosmic-glow');
+    
+    console.log('Context menu checks:', {
+      isContainer,
+      isViewportContainer,
+      isBackgroundElement,
+      isBackgroundDiv,
+      targetClasses: target.className,
+      targetTag: target.tagName
+    });
+    
+    if (isContainer || isViewportContainer || isBackgroundElement || isBackgroundDiv) {
+      console.log('Context menu should show at:', { x: e.clientX, y: e.clientY });
       setContextMenuPosition({ x: e.clientX, y: e.clientY });
+    } else {
+      console.log('Context menu blocked - not on empty space');
     }
   }, []);
 
@@ -583,10 +582,11 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
               variant="cosmic"
               size="sm"
               className="gap-2 self-center"
-              onClick={handleCreateAsset}
+              onClick={handleCreateAssetClick}
+              disabled={isModalOpen}
             >
               <Plus className="w-4 h-4" />
-              Add Asset
+              {isModalOpen ? 'Creating...' : 'Add Asset'}
             </Button>
           )}
         </div>
@@ -724,7 +724,7 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
           }}
         >
          {displayAssets.length === 0 ? (
-          <div className="flex flex-col items-center justify-center text-muted-foreground" style={{ height: '100%' }}>
+          <div className="viewport-container flex flex-col items-center justify-center text-muted-foreground" style={{ height: '100%' }}>
              <Sparkles className="w-8 h-8 mb-2 opacity-50" />
              <p className="text-sm">
                {enteredAssetId ? 'No child assets' : 'No assets yet'}
@@ -775,18 +775,6 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
         </div>
       </div>
 
-      {/* Asset Edit Modal */}
-      <AssetEditModal
-        isOpen={editModalOpen}
-        onClose={() => {
-          setEditModalOpen(false);
-          setNewAssetId(null);
-          setEditingAssetId(null);
-        }}
-        assetId={editingAssetId || newAssetId}
-        isNewAsset={!!newAssetId}
-        viewportSize={viewportSize}
-      />
 
       {/* Empty Space Context Menu */}
       {contextMenuPosition && (
@@ -794,9 +782,12 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
           position={contextMenuPosition}
           onClose={handleCloseContextMenu}
           enteredAssetId={enteredAssetId}
-          onCreateAsset={handleCreateAsset}
           onOpenSettings={handleOpenSettings}
           onOpenBackgroundSettings={handleOpenBackgroundSettings}
+          onOpenAssetModal={(initialData) => {
+            setModalInitialData(initialData);
+            setIsModalOpen(true);
+          }}
         />
       )}
 
@@ -813,6 +804,25 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
           onSave={() => setShowBackgroundControls(false)}
         />
       )}
+
+      {/* Asset Creation Modal */}
+      <AssetCreationModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        initialData={modalInitialData}
+        parentId={currentActiveId || undefined}
+      />
+
+      {/* Asset Edit Modal */}
+      <AssetEditModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingAssetId(null);
+        }}
+        assetId={editingAssetId}
+        viewportSize={viewportSize}
+      />
 
       </div>
   );

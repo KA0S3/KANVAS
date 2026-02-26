@@ -618,32 +618,10 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                     KANVAS
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    Version 3.8.1F
+                    Version V0.3.9
                   </div>
                   <div className="text-xs text-muted-foreground max-w-md mx-auto">
-                    A sophisticated asset management system with nested viewports, 
-                    custom fields, and cosmic glassmorphic design.
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <div className="font-medium">Features:</div>
-                    <ul className="text-muted-foreground space-y-1 mt-1">
-                      <li>• Nested Viewports</li>
-                      <li>• Custom Fields</li>
-                      <li>• Tag System</li>
-                      <li>• Drag & Drop</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <div className="font-medium">Technology:</div>
-                    <ul className="text-muted-foreground space-y-1 mt-1">
-                      <li>• React 18</li>
-                      <li>• TypeScript</li>
-                      <li>• Zustand</li>
-                      <li>• Tailwind CSS</li>
-                    </ul>
+                    Invented by KAOS, with inspiration and help from Ghastly.
                   </div>
                 </div>
               </CardContent>
