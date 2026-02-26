@@ -1,17 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { localCache } from '@/utils/localCache';
 
 export type AppPhase = 'SPLASH' | 'INTRO_VIDEO' | 'LIBRARY' | 'BOOK_VIEW';
-
-const CACHE_KEY = 'last-app-phase';
-const CACHE_TTL_MINUTES = 60; // Cache expires after 1 hour
-
-// Get initial phase from cache or default to SPLASH
-const getInitialPhase = (): AppPhase => {
-  const cachedPhase = localCache.get<AppPhase>(CACHE_KEY);
-  return cachedPhase || 'SPLASH';
-};
 
 interface MediaState {
   appPhase: AppPhase;
@@ -43,7 +33,7 @@ interface MediaState {
 export const useMediaStore = create<MediaState>()(
   persist(
     (set, get) => ({
-      appPhase: getInitialPhase(),
+      appPhase: 'SPLASH',
       isAudioPlaying: false,
       currentTrack: 0,
       isTransitioning: false,
@@ -54,13 +44,7 @@ export const useMediaStore = create<MediaState>()(
 
       setAppPhase: (phase) => {
         set({ appPhase: phase });
-        // Save to cache whenever phase changes (except SPLASH)
-        if (phase !== 'SPLASH') {
-          localCache.set(CACHE_KEY, phase, CACHE_TTL_MINUTES);
-        } else {
-          // Clear cache when returning to splash
-          localCache.remove(CACHE_KEY);
-        }
+        // Navigation state caching is now handled centrally in Index component
       },
       setAudioPlaying: (playing) => set({ isAudioPlaying: playing }),
       setCurrentTrack: (track) => set({ currentTrack: track }),

@@ -20,17 +20,18 @@ import SplashScreen from "@/components/media/SplashScreen";
 import IntroVideo from "@/components/media/IntroVideo";
 import BookEntryAnimation from "@/components/media/BookEntryAnimation";
 import type { Book } from "@/types/book";
+import { navigationCache } from "@/utils/navigationCache";
 
 const Index = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [bookLibraryOpen, setBookLibraryOpen] = useState(true);
   const [backgroundRefreshTrigger, setBackgroundRefreshTrigger] = useState(0);
   const [showBookEntryAnimation, setShowBookEntryAnimation] = useState(false);
-  const { currentActiveId, loadWorldData, isEditingBackground, setIsEditingBackground, currentViewportId } = useAssetStore();
+  const { currentActiveId, loadWorldData, isEditingBackground, setIsEditingBackground, currentViewportId, setActiveAsset, assets, setCurrentViewportId } = useAssetStore();
   const { currentBookId, setCurrentBook, getAllBooks, deleteBook } = useBookStore();
   const { theme } = useThemeStore();
   const { getBackground } = useBackgroundStore(); // Initialize background store
-  const { appPhase, showLibrary, setTransitioning } = useMediaStore();
+  const { appPhase, showLibrary, setTransitioning, setAppPhase } = useMediaStore();
 
   useEffect(() => {
     document.documentElement.className = theme;
@@ -49,6 +50,100 @@ const Index = () => {
       audioEngine.cleanup();
     };
   }, []);
+
+  // Restore cached navigation state on mount (non-intrusive)
+  useEffect(() => {
+    // Only attempt restoration if we're not already in a specific phase
+    // This prevents interfering with normal app flow
+    if (appPhase !== 'SPLASH') {
+      return;
+    }
+
+    const cachedState = navigationCache.getState();
+    if (!cachedState) {
+      return;
+    }
+
+    // Only restore if we have meaningful state to restore
+    if (cachedState.appPhase !== 'SPLASH' && cachedState.currentBookId) {
+      // Restore app phase
+      setAppPhase(cachedState.appPhase);
+
+      // Restore current book if it still exists
+      const book = getAllBooks().find(b => b.id === cachedState.currentBookId);
+      if (book) {
+        setCurrentBook(cachedState.currentBookId);
+        
+        // Load world data if we were in a book view and the book has world data
+        if (cachedState.appPhase === 'BOOK_VIEW' && book.worldData) {
+          loadWorldData(book.worldData);
+        }
+      }
+
+      // Restore viewport state if it exists
+      if (cachedState.currentViewportId) {
+        setCurrentViewportId(cachedState.currentViewportId);
+      }
+
+      // Restore active asset if it exists
+      if (cachedState.currentActiveId) {
+        setActiveAsset(cachedState.currentActiveId);
+      }
+
+      // Restore UI states
+      setSidebarOpen(cachedState.sidebarOpen);
+      setBookLibraryOpen(cachedState.bookLibraryOpen);
+      setIsEditingBackground(cachedState.isEditingBackground);
+    }
+  }, []); // Empty dependency array - only run once on mount
+
+  // Save navigation state when relevant state changes (non-intrusive)
+  useEffect(() => {
+    // Don't save state during splash screen - let users have fresh starts
+    if (appPhase === 'SPLASH') {
+      navigationCache.clearState();
+      return;
+    }
+
+    // Only save if we have meaningful state to preserve
+    if (!currentBookId && appPhase === 'LIBRARY') {
+      return;
+    }
+
+    const currentState: import('@/utils/navigationCache').NavigationState = {
+      appPhase,
+      currentBookId,
+      currentViewportId,
+      currentActiveId,
+      bookLibraryOpen,
+      sidebarOpen,
+      isEditingBackground,
+    };
+
+    // Add viewport asset data if we're in a viewport
+    if (currentViewportId && assets[currentViewportId]) {
+      const viewportAsset = assets[currentViewportId];
+      currentState.viewportAsset = {
+        id: viewportAsset.id,
+        x: viewportAsset.x,
+        y: viewportAsset.y,
+        width: viewportAsset.width,
+        height: viewportAsset.height,
+        viewportConfig: viewportAsset.viewportConfig,
+      };
+    }
+
+    navigationCache.saveState(currentState);
+  }, [
+    appPhase,
+    currentBookId,
+    currentViewportId,
+    currentActiveId,
+    bookLibraryOpen,
+    sidebarOpen,
+    isEditingBackground,
+    assets, // Include assets to capture viewport changes
+  ]);
 
   const handleBackgroundSave = () => {
     // Force re-render of components that depend on background config
