@@ -224,7 +224,7 @@ export const AssetContextMenu: React.FC<AssetContextMenuProps> = ({
           </div>
 
           {/* Menu Items */}
-          <div className="py-1">
+          <div className="py-1 max-h-64 overflow-y-auto">
             {/* Edit */}
             <button
               onClick={handleEdit}

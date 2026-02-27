@@ -472,6 +472,7 @@
                 <button id="save-btn">Save</button>
                 <button id="load-btn">Load</button>
                 <button id="export-btn">Export to PDF</button>
+                <button id="import-btn" onclick="importToCanvas()" style="background: linear-gradient(135deg, #4caf50 0%, #45a049 100%); color: white;">Import to Canvas</button>
             </div>
         </header>
 
@@ -669,7 +670,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'con-stat', 'int-stat', 'wis-stat', 'cha-stat', 'dominion-size', 'prof-bonus', 
             'population', 'wealth', 'influence', 'districts', 'key-buildings', 'notable-features',
             'aesthetics', 'ideals', 'bonds', 'flaws', 'main-factions', 'key-npcs', 
-            'proficiencies-list', 'new-btn', 'save-btn', 'load-btn', 'export-btn', 
+            'proficiencies-list', 'new-btn', 'save-btn', 'load-btn', 'export-btn', 'import-btn',
             'roll-stats-btn', 'randomize-fields-btn', 'load-modal',
             'saved-dominion-list', 'str-mod', 'dex-mod', 'con-mod', 'int-mod', 'wis-mod', 'cha-mod',
             // Individual randomizer buttons
@@ -759,6 +760,7 @@ document.addEventListener('DOMContentLoaded', () => {
         DOMElements.saveBtn.addEventListener('click', saveDominion);
         DOMElements.loadBtn.addEventListener('click', showLoadModal);
         DOMElements.exportBtn.addEventListener('click', () => window.print());
+        DOMElements.importBtn.addEventListener('click', importToCanvas);
         DOMElements.closeModalBtn.addEventListener('click', () => DOMElements.loadModal.style.display = 'none');
         window.addEventListener('click', (event) => {
             if (event.target == DOMElements.loadModal) DOMElements.loadModal.style.display = 'none';
@@ -1051,9 +1053,90 @@ document.addEventListener('DOMContentLoaded', () => {
         DOMElements.savedDominionList.querySelectorAll('.delete-item-btn').forEach(btn => btn.addEventListener('click', (e) => deleteDominion(e.target.dataset.key)));
     }
 
+    function importToCanvas() {
+        try {
+            // Extract all city data
+            const cityData = {
+                type: 'city',
+                data: {
+                    name: DOMElements.dominionName.value || 'Unnamed City',
+                    description: `A ${DOMElements.dominionSize.value} with ${DOMElements.population.value} population`,
+                    predominantRace: DOMElements.predominantRace.value || 'Unknown',
+                    government: DOMElements.government.value || 'Unknown',
+                    alignment: DOMElements.alignment.value || 'Unknown',
+                    population: DOMElements.population.value || 'Unknown',
+                    wealth: DOMElements.wealth.value || 'Unknown',
+                    influence: DOMElements.influence.value || '',
+                    districts: DOMElements.districts.value || '',
+                    keyBuildings: DOMElements.keyBuildings.value || '',
+                    notableFeatures: DOMElements.notableFeatures.value || '',
+                    keyNPCs: DOMElements.keyNpcs.value || '',
+                    aesthetics: DOMElements.aesthetics.value || '',
+                    ideals: DOMElements.ideals.value || '',
+                    bonds: DOMElements.bonds.value || '',
+                    flaws: DOMElements.flaws.value || '',
+                    mainFactions: DOMElements.mainFactions.value || '',
+                    allies: DOMElements.allies.value || '',
+                    enemies: DOMElements.enemies.value || '',
+                    dominionSize: DOMElements.dominionSize.value || 'Unknown',
+                    proficiencyBonus: DOMElements.profBonus.value || '+2',
+                    abilityScores: {}
+                }
+            };
+
+            // Extract ability scores
+            ['str', 'dex', 'con', 'int', 'wis', 'cha'].forEach(stat => {
+                const statElement = DOMElements[`${stat}Stat`];
+                const modElement = DOMElements[`${stat}Mod`];
+                if (statElement && modElement) {
+                    cityData.data.abilityScores[stat.toUpperCase()] = parseInt(statElement.value) || 10;
+                    cityData.data[`${stat.toUpperCase()} Modifier`] = modElement.innerText || '+0';
+                }
+            });
+
+            // Extract proficiency skills
+            DATA.proficiencies.forEach(group => {
+                group.skills.forEach(skill => {
+                    const skillId = skill.toLowerCase().replace(/ /g, '-');
+                    const checkboxElement = document.getElementById(`prof-${skillId}`);
+                    const bonusElement = document.getElementById(`prof-${skillId}-bonus`);
+                    if (checkboxElement && bonusElement) {
+                        cityData.data[skill] = {
+                            proficient: checkboxElement.checked,
+                            bonus: bonusElement.innerText || '+0'
+                        };
+                    }
+                });
+            });
+
+            // Send data to parent window
+            if (window.opener) {
+                window.opener.postMessage({
+                    type: 'GENERATOR_IMPORT',
+                    data: cityData
+                }, '*');
+                
+                // Show success message
+                const importBtn = document.getElementById('import-btn');
+                const originalText = importBtn.innerHTML;
+                importBtn.innerHTML = '&#10003; Imported!';
+                importBtn.style.background = 'linear-gradient(135deg, #4caf50 0%, #45a049 100%)';
+                
+                setTimeout(() => {
+                    importBtn.innerHTML = originalText;
+                    importBtn.style.background = 'linear-gradient(135deg, #4caf50 0%, #45a049 100%)';
+                }, 2000);
+            } else {
+                alert('Please open this generator from the main application to use the import feature.');
+            }
+        } catch (error) {
+            console.error('Error importing city:', error);
+            alert('Error importing city data. Please try again.');
+        }
+    }
+
     initialize();
 });
 </script>
 
 </body>
-</html>

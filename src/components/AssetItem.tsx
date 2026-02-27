@@ -49,6 +49,7 @@ interface AssetItemProps {
   asset: Asset;
   onDelete: (id: string) => void;
   onMouseDown: (e: React.MouseEvent, asset: Asset) => void;
+  onTouchStart?: (e: React.TouchEvent, asset: Asset) => void;
   onDoubleClick?: (asset: Asset) => void;
   isSelected: boolean;
   onResize?: (assetId: string, width: number, height: number) => void;
@@ -76,7 +77,7 @@ const colorMap = {
   other: "text-muted-foreground",
 };
 
-export function AssetItem({ asset, onDelete, onMouseDown, onDoubleClick, isSelected, onResize, onEdit, onSelectAndFocus, isEditingBackground = false, onCreateAsset }: AssetItemProps) {
+export function AssetItem({ asset, onDelete, onMouseDown, onTouchStart, onDoubleClick, isSelected, onResize, onEdit, onSelectAndFocus, isEditingBackground = false, onCreateAsset }: AssetItemProps) {
   const Icon = iconMap[asset.type];
   const colorClass = colorMap[asset.type];
   const { getAssetTags } = useTagStore();
@@ -87,6 +88,29 @@ export function AssetItem({ asset, onDelete, onMouseDown, onDoubleClick, isSelec
   // Simple border logic - show if asset has tags
   const hasTags = assetTags && assetTags.length > 0;
   const firstTagColor = hasTags ? assetTags[0]?.color : null;
+
+  // Helper function to convert color to rgba format for opacity support
+  const getColorWithOpacity = (color: string, opacity: number): string => {
+    if (color.startsWith('#')) {
+      // Convert hex to rgba
+      const hex = color.slice(1);
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+    } else if (color.startsWith('hsl')) {
+      // Convert hsl to hsla
+      return color.replace('hsl(', 'hsla(').replace(')', `, ${opacity})`);
+    } else if (color.startsWith('rgba')) {
+      // Update existing rgba opacity
+      return color.replace(/[\d.]+\)$/, `${opacity})`);
+    } else if (color.startsWith('hsla')) {
+      // Update existing hsla opacity
+      return color.replace(/[\d.]+\)$/, `${opacity})`);
+    }
+    // Fallback to the original color
+    return color;
+  };
 
   // Calculate z-index based on asset size (smaller = higher z-index)
   const calculateZIndex = React.useCallback(() => {
@@ -198,6 +222,7 @@ export function AssetItem({ asset, onDelete, onMouseDown, onDoubleClick, isSelec
   return (
     <div
       onMouseDown={!isEditingBackground ? (e) => onMouseDown(e, asset) : undefined}
+      onTouchStart={!isEditingBackground ? (e) => onTouchStart?.(e, asset) : undefined}
       onDoubleClick={!isEditingBackground ? () => onDoubleClick?.(asset) : undefined}
       onContextMenu={!isEditingBackground ? handleContextMenu : undefined}
       style={{
@@ -211,10 +236,10 @@ export function AssetItem({ asset, onDelete, onMouseDown, onDoubleClick, isSelec
         zIndex: isSelected ? dynamicZIndex + 100 : dynamicZIndex,
         ...(hasTags && firstTagColor && asset.showTagBorder && {
           boxShadow: `
-            inset 0 0 12px ${firstTagColor}60,
-            inset 0 0 20px ${firstTagColor}50,
-            inset 0 0 28px ${firstTagColor}40,
-            inset 0 0 36px ${firstTagColor}30,
+            inset 0 0 12px ${getColorWithOpacity(firstTagColor, 0.38)},
+            inset 0 0 20px ${getColorWithOpacity(firstTagColor, 0.31)},
+            inset 0 0 28px ${getColorWithOpacity(firstTagColor, 0.25)},
+            inset 0 0 36px ${getColorWithOpacity(firstTagColor, 0.19)},
             inset 0 1px 0 hsl(var(--glass-border) / 0.3)
           `.trim()
         })
@@ -402,7 +427,7 @@ export function AssetItem({ asset, onDelete, onMouseDown, onDoubleClick, isSelec
                     <div
                       key={tag.id}
                       className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-glass-border/30"
-                      style={{ backgroundColor: `${tag.color}20` }}
+                      style={{ backgroundColor: getColorWithOpacity(tag.color, 0.12) }}
                       title={tag.name}
                     >
                       <div

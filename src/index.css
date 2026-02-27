@@ -146,6 +146,29 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-family: 'Inter', system-ui, sans-serif;
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Enable text selection for specific elements */
+  input, textarea, [contenteditable] {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  /* Enable interaction for color pickers */
+  .chrome-picker,
+  .chrome-picker *,
+  [class*="chrome-picker"],
+  .color-picker-wrapper,
+  .color-picker-wrapper *,
+  [class*="rc-color"] {
+    -webkit-user-select: auto !important;
+    user-select: auto !important;
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
   }
 }
 
@@ -220,16 +243,28 @@
     align-items: stretch;
     pointer-events: none;
     z-index: 20;
-    padding: 1.5rem;
+    padding: 1rem;
+  }
+
+  @media (min-width: 768px) {
+    .fantasy-overlay {
+      padding: 1.5rem;
+    }
   }
 
   .fantasy-overlay .fantasy-sidebar {
-    width: min(320px, 88vw);
+    width: min(280px, 85vw);
     margin: 0;
     transform: translateX(120%);
     transition: transform 240ms ease, opacity 240ms ease;
     opacity: 0;
     pointer-events: none;
+  }
+
+  @media (min-width: 768px) {
+    .fantasy-overlay .fantasy-sidebar {
+      width: min(320px, 88vw);
+    }
   }
 
   .fantasy-overlay.is-open .fantasy-sidebar {

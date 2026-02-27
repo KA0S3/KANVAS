@@ -405,6 +405,15 @@
             padding: 5px 0;
         }
         .vital-input:focus { outline: none; color: var(--accent); }
+        /* Ensure number input spinners are visible and functional */
+        input[type="number"].vital-input {
+            -moz-appearance: textfield;
+        }
+        input[type="number"].vital-input::-webkit-outer-spin-button,
+        input[type="number"].vital-input::-webkit-inner-spin-button {
+            -webkit-appearance: auto;
+            opacity: 1;
+        }
         .vital-lbl { font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); letter-spacing: 1px; }
         /* Features Sections */
         .section-header {
@@ -630,6 +639,12 @@
                 </label>
             </div>
             <button class="btn-gen" onclick="generateFullCharacter()"><i class="fas fa-dice-d20"></i> Manifest Soul</button>
+            <button class="btn-gen" onclick="importToCanvas()" style="background: linear-gradient(135deg, #4caf50 0%, #45a049 100%); margin-left: 10px;"><i class="fas fa-upload"></i> Import to Canvas</button>
+        </div>
+        <div style="text-align: center; margin-top: 5px;">
+            <div style="font-size: 0.65rem; color: var(--text-muted); opacity: 0.7;">
+                This will erase your current character and create a new one
+            </div>
         </div>
     </div>
     <div class="filter-container">
@@ -4118,6 +4133,94 @@ if(field === 'Race') {
 
         const init = mods.dex;
         document.getElementById('inpInit').value = (init>=0?"+":"") + init;
+    }
+
+    function importToCanvas() {
+        try {
+            // Extract all character data
+            const characterData = {
+                type: 'character',
+                data: {
+                    name: document.getElementById('inpName').value || 'Unnamed Character',
+                    description: `Level ${document.getElementById('levelInput').value} ${document.getElementById('inpClass').value} (${document.getElementById('inpRace').value})`,
+                    level: parseInt(document.getElementById('levelInput').value) || 1,
+                    class: document.getElementById('inpClass').value || 'Unknown',
+                    race: document.getElementById('inpRace').value || 'Unknown',
+                    background: document.getElementById('inpBackground').value || 'Unknown',
+                    subclass: document.getElementById('inpSubclass').value || 'None',
+                    alignment: document.getElementById('inpAlignment').value || 'Unaligned',
+                    armorClass: parseInt(document.getElementById('inpAC').value) || 10,
+                    hitPoints: parseInt(document.getElementById('inpHP').value) || 1,
+                    speed: document.getElementById('inpSpeed').value || '30ft',
+                    initiative: document.getElementById('inpInit').value || '+0',
+                    proficiencyBonus: document.getElementById('inpProf').value || '+2',
+                    proficiencies: document.getElementById('profContent').innerText || '',
+                    features: document.getElementById('featContent').innerText || '',
+                    subclassFeatures: {
+                        lowLevel: document.getElementById('lowLevelFeatContent').innerText || '',
+                        highLevel: document.getElementById('highLevelFeatContent').innerText || ''
+                    },
+                    spells: document.getElementById('spellsList').innerText || '',
+                    abilityScores: {},
+                    savingThrows: {},
+                    skills: {}
+                }
+            };
+
+            // Extract ability scores
+            ['str', 'dex', 'con', 'int', 'wis', 'cha'].forEach(stat => {
+                const scoreElement = document.getElementById(`val_${stat}`);
+                const modElement = document.getElementById(`mod_${stat}`);
+                if (scoreElement && modElement) {
+                    characterData.data.abilityScores[stat.toUpperCase()] = parseInt(scoreElement.value) || 10;
+                    characterData.data[`${stat.toUpperCase()} Modifier`] = modElement.innerText || '+0';
+                }
+            });
+
+            // Extract saving throws
+            ['str', 'dex', 'con', 'int', 'wis', 'cha'].forEach(stat => {
+                const bonusElement = document.getElementById(`save_${stat}_bonus`);
+                if (bonusElement) {
+                    characterData.data.savingThrows[stat.toUpperCase()] = bonusElement.innerText || '+0';
+                }
+            });
+
+            // Extract skills
+            Object.keys(SKILLS_MAP).forEach(skill => {
+                const safeId = skill.replace(/\s+/g, '');
+                const bonusElement = document.getElementById(`bonus_${safeId}`);
+                const checkboxElement = document.getElementById(`prof_${safeId}`);
+                if (bonusElement) {
+                    characterData.data.skills[skill] = {
+                        bonus: bonusElement.innerText || '+0',
+                        proficient: checkboxElement ? checkboxElement.checked : false
+                    };
+                }
+            });
+
+            // Send data to parent window
+            if (window.opener) {
+                window.opener.postMessage({
+                    type: 'GENERATOR_IMPORT',
+                    data: characterData
+                }, '*');
+                
+                // Show success message
+                const originalText = event.target.innerHTML;
+                event.target.innerHTML = '<i class="fas fa-check"></i> Imported!';
+                event.target.style.background = 'linear-gradient(135deg, #4caf50 0%, #45a049 100%)';
+                
+                setTimeout(() => {
+                    event.target.innerHTML = originalText;
+                    event.target.style.background = 'linear-gradient(135deg, #4caf50 0%, #45a049 100%)';
+                }, 2000);
+            } else {
+                alert('Please open this generator from the main application to use the import feature.');
+            }
+        } catch (error) {
+            console.error('Error importing character:', error);
+            alert('Error importing character data. Please try again.');
+        }
     }
 
     // Start

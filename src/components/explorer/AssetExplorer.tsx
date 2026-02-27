@@ -1,5 +1,5 @@
 import { Plus, Search, Settings, Tag, Users, Building, Sparkles, Swords, X, Image } from 'lucide-react';
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useAssetStore } from '@/stores/assetStore';
 import { AssetTreeNode } from './AssetTreeNode';
 import { Input } from '@/components/ui/input';
@@ -23,6 +23,24 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalInitialData, setModalInitialData] = useState<any>(null);
+  const [generatorImportData, setGeneratorImportData] = useState<any>(null);
+  
+  // Handle generator import messages
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data.type === 'GENERATOR_IMPORT') {
+        console.log('Received generator import data:', event.data.data);
+        setGeneratorImportData(event.data.data);
+        setIsModalOpen(true);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, []);
   
   const rootAssets = assets ? Object.values(assets).filter(asset => !asset.parentId) : [];
   
@@ -256,9 +274,13 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
       {/* Asset Creation Modal */}
       <AssetCreationModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          setGeneratorImportData(null);
+        }}
         initialData={modalInitialData}
         parentId={currentActiveId || undefined}
+        generatorImportData={generatorImportData}
       />
 
     </div>

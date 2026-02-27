@@ -1,4 +1,4 @@
-import type { ExtendedAsset, CustomField, GeneratorData } from '@/types/extendedAsset';
+import type { ExtendedAsset, CustomField, CustomFieldValue, GeneratorData } from '@/types/extendedAsset';
 
 export interface GeneratorMapping {
   [key: string]: {
@@ -12,25 +12,74 @@ export const GENERATOR_MAPPINGS: Record<string, GeneratorMapping> = {
   character: {
     name: { field: 'name', type: 'string' },
     description: { field: 'description', type: 'string' },
-    age: { field: 'age', type: 'number', showOnCanvas: true },
+    level: { field: 'level', type: 'number', showOnCanvas: true },
     class: { field: 'class', type: 'string', showOnCanvas: true },
     race: { field: 'race', type: 'string', showOnCanvas: true },
     background: { field: 'background', type: 'string' },
+    subclass: { field: 'subclass', type: 'string', showOnCanvas: true },
+    alignment: { field: 'alignment', type: 'string', showOnCanvas: true },
+    armorClass: { field: 'armorClass', type: 'number', showOnCanvas: true },
+    hitPoints: { field: 'hitPoints', type: 'number', showOnCanvas: true },
+    speed: { field: 'speed', type: 'string', showOnCanvas: true },
+    initiative: { field: 'initiative', type: 'string', showOnCanvas: true },
+    proficiencyBonus: { field: 'proficiencyBonus', type: 'string', showOnCanvas: true },
+    proficiencies: { field: 'proficiencies', type: 'string' },
+    features: { field: 'features', type: 'string' },
+    subclassFeatures: { field: 'subclassFeatures', type: 'string' },
+    spells: { field: 'spells', type: 'string' },
+    abilityScores: { field: 'abilityScores', type: 'string' },
+    savingThrows: { field: 'savingThrows', type: 'string' },
+    skills: { field: 'skills', type: 'string' },
+    age: { field: 'age', type: 'number', showOnCanvas: true },
     abilities: { field: 'abilities', type: 'array' },
     equipment: { field: 'equipment', type: 'array' },
     personality: { field: 'personality', type: 'string' },
     appearance: { field: 'appearance', type: 'string' },
+    deity: { field: 'deity', type: 'string', showOnCanvas: true },
   },
   city: {
     name: { field: 'name', type: 'string' },
     description: { field: 'description', type: 'string' },
-    population: { field: 'population', type: 'number', showOnCanvas: true },
+    predominantRace: { field: 'predominantRace', type: 'string', showOnCanvas: true },
     government: { field: 'government', type: 'string', showOnCanvas: true },
+    alignment: { field: 'alignment', type: 'string', showOnCanvas: true },
+    population: { field: 'population', type: 'number', showOnCanvas: true },
+    wealth: { field: 'wealth', type: 'string', showOnCanvas: true },
+    influence: { field: 'influence', type: 'string' },
+    districts: { field: 'districts', type: 'string' },
+    keyBuildings: { field: 'keyBuildings', type: 'string' },
+    notableFeatures: { field: 'notableFeatures', type: 'string' },
+    keyNPCs: { field: 'keyNPCs', type: 'string' },
+    aesthetics: { field: 'aesthetics', type: 'string' },
+    ideals: { field: 'ideals', type: 'string' },
+    bonds: { field: 'bonds', type: 'string' },
+    flaws: { field: 'flaws', type: 'string' },
+    mainFactions: { field: 'mainFactions', type: 'string' },
+    allies: { field: 'allies', type: 'string' },
+    enemies: { field: 'enemies', type: 'string' },
+    dominionSize: { field: 'dominionSize', type: 'string', showOnCanvas: true },
+    proficiencyBonus: { field: 'proficiencyBonus', type: 'string', showOnCanvas: true },
+    abilityScores: { field: 'abilityScores', type: 'string' },
     economy: { field: 'economy', type: 'string' },
     landmarks: { field: 'landmarks', type: 'array' },
-    districts: { field: 'districts', type: 'array' },
     history: { field: 'history', type: 'string' },
     culture: { field: 'culture', type: 'string' },
+  },
+  deity: {
+    name: { field: 'name', type: 'string' },
+    description: { field: 'description', type: 'string' },
+    class: { field: 'class', type: 'string', showOnCanvas: true },
+    race: { field: 'race', type: 'string', showOnCanvas: true },
+    background: { field: 'background', type: 'string' },
+    subclass: { field: 'subclass', type: 'string', showOnCanvas: true },
+    alignment: { field: 'alignment', type: 'string', showOnCanvas: true },
+    domains: { field: 'domains', type: 'array' },
+    symbol: { field: 'symbol', type: 'string' },
+    animal: { field: 'animal', type: 'string' },
+    weapon: { field: 'weapon', type: 'string' },
+    colour: { field: 'colour', type: 'string' },
+    tenets: { field: 'tenets', type: 'string' },
+    deity: { field: 'deity', type: 'string', showOnCanvas: true },
   },
   item: {
     name: { field: 'name', type: 'string' },
@@ -83,6 +132,7 @@ export class GeneratorParser {
 
     // Create custom fields from mapped data
     const customFields: CustomField[] = [];
+    const customFieldValues: CustomFieldValue[] = [];
 
     Object.entries(mapping).forEach(([key, config]) => {
       const value = data[config.field];
@@ -90,12 +140,9 @@ export class GeneratorParser {
       if (value !== undefined && value !== null) {
         let processedValue: string;
 
-        switch (config.type) {
-          case 'array':
-            processedValue = Array.isArray(value) ? value.join(', ') : String(value);
-            break;
-          case 'boolean':
-            processedValue = value ? 'Yes' : 'No';
+        switch (typeof value) {
+          case 'string':
+            processedValue = value;
             break;
           case 'number':
             processedValue = String(value);
@@ -104,11 +151,17 @@ export class GeneratorParser {
             processedValue = String(value);
         }
 
+        const fieldId = crypto.randomUUID();
         customFields.push({
-          id: crypto.randomUUID(),
-          name: key,
+          id: fieldId,
+          label: key,
+          type: 'text',
+          displayInViewport: config.showOnCanvas || false,
+        });
+        
+        customFieldValues.push({
+          fieldId: fieldId,
           value: processedValue,
-          showOnCanvas: config.showOnCanvas || false,
         });
       }
     });
@@ -129,16 +182,23 @@ export class GeneratorParser {
           processedValue = String(value);
         }
 
+        const fieldId = crypto.randomUUID();
         customFields.push({
-          id: crypto.randomUUID(),
-          name: key,
+          id: fieldId,
+          label: key,
+          type: 'text',
+          displayInViewport: false,
+        });
+        
+        customFieldValues.push({
+          fieldId: fieldId,
           value: processedValue,
-          showOnCanvas: false,
         });
       }
     });
 
     asset.customFields = customFields;
+    asset.customFieldValues = customFieldValues;
 
     return asset as Omit<ExtendedAsset, 'id' | 'x' | 'y' | 'parentId' | 'children'>;
   }

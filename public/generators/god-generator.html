@@ -185,6 +185,7 @@
             <button class="tab-button pantheon" data-tab="pantheon-forge">PANTHEON FORGE</button>
             <button class="tab-button festival" data-tab="festival-sanctum">FESTIVAL SANCTUM</button>
             <button class="tab-button relationship" data-tab="relationship-manual">RELATIONSHIP MANUAL</button>
+            <button class="tab-button" id="import-btn" onclick="importToCanvas()" style="background: linear-gradient(135deg, #4caf50 0%, #45a049 100%); color: white; margin-left: 10px;">Import to Canvas</button>
         </div>
     </div>
 
@@ -1199,7 +1200,107 @@
             document.getElementById('save-festival-btn').addEventListener('click', saveFestival);
             document.getElementById('clear-festival-btn').addEventListener('click', clearFestivalForm);
             document.getElementById('festival-deity-select').addEventListener('change', handleFestivalDeitySelection);
+
+            // Import to Canvas
+            document.getElementById('import-to-canvas-btn').addEventListener('click', importToCanvas);
         }
+
+        function importToCanvas() {
+            try {
+                // Get current active tab to determine what to import
+                const activeTab = document.querySelector('.tab-content.active');
+                const tabId = activeTab ? activeTab.id : 'deity-anvil';
+                
+                let importData = {};
+                
+                if (tabId === 'deity-anvil') {
+                    // Import deity data
+                    const selectedDomains = [];
+                    document.querySelectorAll('#domain-grid input[type="checkbox"]:checked').forEach(checkbox => {
+                        const label = checkbox.nextElementSibling || checkbox.parentElement.querySelector('label');
+                        if (label) {
+                            selectedDomains.push(label.textContent.trim());
+                        }
+                    });
+                    
+                    importData = {
+                        type: 'character', // Use character type for deities
+                        data: {
+                            name: document.getElementById('deity-name').value || 'Unnamed Deity',
+                            description: `${document.getElementById('divine-class').value} deity of ${selectedDomains.join(', ')}`,
+                            class: 'Deity',
+                            race: 'Divine',
+                            background: document.getElementById('deity-epithet').value || 'Unknown',
+                            subclass: document.getElementById('divine-class').value || 'Unknown',
+                            alignment: document.getElementById('alignment').value || 'Unknown',
+                            domains: selectedDomains,
+                            symbol: document.getElementById('symbol').value || '',
+                            animal: document.getElementById('animal').value || '',
+                            weapon: document.getElementById('weapon').value || '',
+                            colour: document.getElementById('colour').value || '',
+                            tenets: document.getElementById('tenets').value || ''
+                        }
+                    };
+                } else if (tabId === 'pantheon-forge') {
+                    // Import pantheon data
+                    importData = {
+                        type: 'location', // Use location type for pantheons
+                        data: {
+                            name: document.getElementById('pantheon-name').value || 'Unnamed Pantheon',
+                            description: 'A collection of deities and their relationships',
+                            type: 'Pantheon',
+                            size: 'Divine Realm',
+                            climate: 'Ethereal',
+                            culture: document.getElementById('creation-myth').value || '',
+                            inhabitants: [], // Would need to extract from pantheon deities
+                            resources: ['Divine Power', 'Faith', 'Worship'],
+                            dangers: ['Divine Conflict', 'Heresy']
+                        }
+                    };
+                } else if (tabId === 'festival-sanctum') {
+                    // Import festival data
+                    importData = {
+                        type: 'location', // Use location type for festivals
+                        data: {
+                            name: document.getElementById('festival-name-output').textContent || 'Unnamed Festival',
+                            description: document.getElementById('festival-timing-output').textContent || '',
+                            type: 'Festival',
+                            size: 'Community Event',
+                            climate: 'Seasonal',
+                            culture: 'Religious celebration',
+                            inhabitants: ['Worshippers', 'Clerics', 'Participants'],
+                            resources: ['Food', 'Decorations', 'Offerings'],
+                            dangers: ['Overindulgence', 'Conflict']
+                        }
+                    };
+                }
+
+                // Send data to parent window
+                if (window.opener) {
+                    window.opener.postMessage({
+                        type: 'GENERATOR_IMPORT',
+                        data: importData
+                    }, '*');
+                    
+                    // Show success message
+                    const importBtn = document.getElementById('import-btn');
+                    const originalText = importBtn.innerHTML;
+                    importBtn.innerHTML = '✓ Imported!';
+                    importBtn.style.background = 'linear-gradient(135deg, #4caf50 0%, #45a049 100%)';
+                    
+                    setTimeout(() => {
+                        importBtn.innerHTML = originalText;
+                        importBtn.style.background = 'linear-gradient(135deg, #4caf50 0%, #45a049 100%)';
+                    }, 2000);
+                } else {
+                    alert('Please open this generator from the main application to use the import feature.');
+                }
+            } catch (error) {
+                console.error('Error importing from Forge of Gods:', error);
+                alert('Error importing data. Please try again.');
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', () => { initApp(); bindEvents(); switchTab('deity-anvil'); });
     </script></body>
 </html>

@@ -204,6 +204,32 @@
   }
 }
 
+/* Landscape orientation optimizations */
+@media screen and (orientation: landscape) and (max-height: 600px) {
+  .fantasy-overlay {
+    padding: 0.5rem;
+  }
+  
+  .fantasy-sidebar {
+    padding: 1rem;
+  }
+  
+  .asset-item {
+    min-height: 40px;
+  }
+}
+
+/* Portrait orientation optimizations */
+@media screen and (orientation: portrait) and (max-width: 768px) {
+  .fantasy-overlay .fantasy-sidebar {
+    width: min(320px, 90vw);
+  }
+  
+  .fantasy-sidebar {
+    padding: 1.25rem;
+  }
+}
+
 /* Accessibility */
 @media (prefers-reduced-motion: reduce) {
   .book-flip-enter-active,

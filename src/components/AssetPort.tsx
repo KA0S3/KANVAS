@@ -36,6 +36,9 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [isTouchDragging, setIsTouchDragging] = useState(false);
+  const [touchStartDistance, setTouchStartDistance] = useState(0);
+  const [lastTouchDistance, setLastTouchDistance] = useState(0);
   const [currentViewport, setCurrentViewport] = useState<ViewportConfig>(getDefaultViewportConfig());
   const [enteredAssetId, setEnteredAssetId] = useState<string | null>(null);
   const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
@@ -46,6 +49,25 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
   const [showBackgroundControls, setShowBackgroundControls] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalInitialData, setModalInitialData] = useState<any>(null);
+  const [generatorImportData, setGeneratorImportData] = useState<any>(null);
+
+  // Handle generator import messages
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data.type === 'GENERATOR_IMPORT') {
+        console.log('AssetPort: Received generator import data:', event.data.data);
+        setGeneratorImportData(event.data.data);
+        setIsModalOpen(true);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, []);
+  
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const hasInitialized = useRef(false);
@@ -240,6 +262,66 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
     }
   }, [setActiveAsset]);
 
+  const handleTouchStart = useCallback((e: React.TouchEvent, asset: Asset) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    setSelectedAsset(asset.id);
+    setActiveAsset(asset.id);
+    setIsTouchDragging(true);
+    
+    const rect = (e.target as HTMLElement).closest('.asset-item')?.getBoundingClientRect();
+    if (rect && touch) {
+      setDragOffset({
+        x: touch.clientX - rect.left,
+        y: touch.clientY - rect.top,
+      });
+    }
+  }, [setActiveAsset]);
+
+  const handleTouchMove = useCallback((e: TouchEvent) => {
+    if (!isTouchDragging || !selectedAsset || !containerRef.current) return;
+    
+    const touch = e.touches[0];
+    if (!touch) return;
+    
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const screenX = touch.clientX - containerRect.left - dragOffset.x;
+    const screenY = touch.clientY - containerRect.top - dragOffset.y;
+    
+    // Convert screen coordinates to viewport coordinates
+    const viewportCoords = screenToViewportCoords(
+      { x: screenX, y: screenY },
+      currentViewport
+    );
+    
+    // Keep within bounds (in viewport space)
+    const boundedX = Math.max(0, Math.min(viewportCoords.x, containerRect.width - 200));
+    const boundedY = Math.max(0, Math.min(viewportCoords.y, containerRect.height - 50));
+    
+    // Convert to global coordinates if we're inside an asset
+    let finalX = boundedX;
+    let finalY = boundedY;
+    
+    if (enteredAssetId && assets && assets[enteredAssetId]) {
+      const parentAsset = assets[enteredAssetId];
+      // Convert from local (viewport) to global coordinates
+      const globalCoords = localToGlobalCoords(
+        { x: boundedX, y: boundedY },
+        parentAsset,
+        currentViewport
+      );
+      finalX = globalCoords.x;
+      finalY = globalCoords.y;
+    }
+    
+    // Update asset position in store
+    updateAssetPosition(selectedAsset, finalX, finalY);
+  }, [isTouchDragging, selectedAsset, dragOffset, updateAssetPosition, enteredAssetId, assets, currentViewport]);
+
+  const handleTouchEnd = useCallback(() => {
+    setIsTouchDragging(false);
+   }, []);
+
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging || !selectedAsset || !containerRef.current) return;
     
@@ -288,15 +370,13 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
     const isAssetClick = target.classList.contains('asset-item') || target.closest('.asset-item');
     
     if (!isAssetClick) {
-      setSelectedAsset(null);
-      setActiveAsset(null);
-      
-      // Exit asset if we're inside one and clicked on empty space
-      if (enteredAssetId) {
-        handleExitAsset();
+      // Only deselect if an asset is selected, don't exit the current asset viewport
+      if (selectedAsset) {
+        setSelectedAsset(null);
+        setActiveAsset(null);
       }
     }
-  }, [enteredAssetId, handleExitAsset, setActiveAsset]);
+  }, [selectedAsset, setActiveAsset]);
 
   const handleContainerContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -343,6 +423,17 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
     }
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
+  useEffect(() => {
+    if (isTouchDragging) {
+      window.addEventListener("touchmove", handleTouchMove, { passive: false });
+      window.addEventListener("touchend", handleTouchEnd);
+      return () => {
+        window.removeEventListener("touchmove", handleTouchMove);
+        window.removeEventListener("touchend", handleTouchEnd);
+      };
+    }
+  }, [isTouchDragging, handleTouchMove, handleTouchEnd]);
+
   // Get assets to display based on current context
   const displayAssets = enteredAssetId && assets && assets[enteredAssetId]
     ? assets[enteredAssetId].children.map(childId => assets[childId]).filter(Boolean) || []
@@ -350,7 +441,7 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
 
   // Build breadcrumb path with asset IDs
   const getBreadcrumbPath = () => {
-    const path: { name: string; assetId: string | null }[] = [{ name: 'Root', assetId: null }];
+    const path: { name: string; assetId: string | null }[] = [{ name: currentBook?.title || 'Root', assetId: null }];
     
     if (enteredAssetId && assets && assets[enteredAssetId]) {
       const buildPath = (assetId: string): { name: string; assetId: string | null }[] => {
@@ -519,17 +610,17 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
   };
 
    return (
-    <div className="glass-strong cosmic-glow rounded-2xl w-full h-full flex flex-col mx-auto my-auto">
+    <div className="glass-strong cosmic-glow rounded-2xl w-full h-full flex flex-col mx-auto my-auto min-h-0">
        {/* Header */}
-      <div className="flex items-center justify-between p-2 border-b border-glass-border/20">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between p-1 md:p-2 border-b border-glass-border/20 flex-wrap gap-2">
+        <div className="flex items-center gap-1 md:gap-2 flex-wrap">
           {enteredAssetId && (
             <button
               onClick={handleExitAsset}
-              className="p-1 hover:bg-muted rounded transition-colors self-center"
+              className="p-1.5 hover:bg-muted rounded transition-colors self-center"
               title="Exit asset"
             >
-              <ArrowLeft className="w-4 h-4 text-muted-foreground" />
+              <ArrowLeft className="w-3 h-3 md:w-4 md:h-4 text-muted-foreground" />
             </button>
           )}
           {currentWorldTitle && onOpenWorldLibrary && (
@@ -537,14 +628,17 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
               variant="outline"
               size="sm"
               onClick={onOpenWorldLibrary}
-              className="gap-2 self-center glass cosmic-glow border-glass-border/40"
+              className="gap-1 md:gap-2 self-center glass cosmic-glow border-glass-border/40 text-xs md:text-sm"
             >
-              <BookOpen className="w-4 h-4" />
-              {currentWorldTitle}
+              <ArrowLeft className="w-3 h-3 md:w-4 md:h-4" />
+              <div className="flex flex-col leading-tight">
+                <span className="text-xs">Back to</span>
+                <span className="text-xs font-medium">Library</span>
+              </div>
             </Button>
           )}
           {/* Interactive Breadcrumb Path */}
-          <nav className="flex items-center text-xs text-muted-foreground bg-glass/50 px-2 py-1 rounded border border-glass-border/30">
+          <nav className="flex items-center text-xs text-muted-foreground bg-glass/50 px-1 md:px-2 py-1 rounded border border-glass-border/30 max-w-[200px] md:max-w-none overflow-hidden">
             {breadcrumbPath.map((segment, index) => {
               const isLast = index === breadcrumbPath.length - 1;
               const isRoot = index === 0;
@@ -552,19 +646,17 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
               return (
                 <div key={index} className="flex items-center">
                   {index > 0 && (
-                    <span className="mx-1 text-muted-foreground/60">/</span>
+                    <span className="mx-0.5 md:mx-1 text-muted-foreground/60">/</span>
                   )}
                   <button
                     onClick={() => {
                       if (isRoot) {
-                        // Navigate to root
                         handleExitAsset();
                       } else if (segment.assetId) {
-                        // Navigate to this asset
                         handleAssetDoubleClick(assets[segment.assetId]);
                       }
                     }}
-                    className={`hover:text-foreground transition-colors ${
+                    className={`hover:text-foreground transition-colors truncate max-w-[60px] md:max-w-none ${
                       isLast 
                         ? 'text-foreground font-medium cursor-default' 
                         : 'hover:underline cursor-pointer'
@@ -581,22 +673,22 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
             <Button
               variant="cosmic"
               size="sm"
-              className="gap-2 self-center"
+              className="gap-1 md:gap-2 self-center text-xs md:text-sm"
               onClick={handleCreateAssetClick}
               disabled={isModalOpen}
             >
-              <Plus className="w-4 h-4" />
-              {isModalOpen ? 'Creating...' : 'Add Asset'}
+              <Plus className="w-3 h-3 md:w-4 md:h-4" />
+              <span className="hidden sm:inline">{isModalOpen ? 'Creating...' : 'Add Asset'}</span>
             </Button>
           )}
         </div>
         {onToggleSidebar && (
           <button
             onClick={onToggleSidebar}
-            className="p-2 hover:bg-muted rounded transition-colors"
+            className="p-1.5 md:p-2 hover:bg-muted rounded transition-colors"
             title="Toggle Shelf"
           >
-            <PanelRight className="w-5 h-5 text-muted-foreground hover:text-foreground" />
+            <PanelRight className="w-4 h-4 md:w-5 md:h-5 text-muted-foreground hover:text-foreground" />
           </button>
         )}
       </div>
@@ -762,6 +854,7 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
                 asset={displayAsset}
                 onDelete={handleDeleteAsset}
                 onMouseDown={handleMouseDown}
+                onTouchStart={handleTouchStart}
                 onDoubleClick={handleAssetDoubleClick}
                 isSelected={selectedAsset === asset.id}
                 onResize={handleResize}
@@ -808,9 +901,13 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
       {/* Asset Creation Modal */}
       <AssetCreationModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          setGeneratorImportData(null);
+        }}
         initialData={modalInitialData}
         parentId={currentActiveId || undefined}
+        generatorImportData={generatorImportData}
       />
 
       {/* Asset Edit Modal */}

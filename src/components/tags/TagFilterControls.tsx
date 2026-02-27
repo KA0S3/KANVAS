@@ -30,6 +30,29 @@ export function TagFilterControls({
   const [isOpen, setIsOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
   
+  // Helper function to convert color to rgba format for opacity support
+  const getColorWithOpacity = (color: string, opacity: number): string => {
+    if (color.startsWith('#')) {
+      // Convert hex to rgba
+      const hex = color.slice(1);
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+    } else if (color.startsWith('hsl')) {
+      // Convert hsl to hsla
+      return color.replace('hsl(', 'hsla(').replace(')', `, ${opacity})`);
+    } else if (color.startsWith('rgba')) {
+      // Update existing rgba opacity
+      return color.replace(/[\d.]+\)$/, `${opacity})`);
+    } else if (color.startsWith('hsla')) {
+      // Update existing hsla opacity
+      return color.replace(/[\d.]+\)$/, `${opacity})`);
+    }
+    // Fallback to the original color
+    return color;
+  };
+  
   const allTags = Object.values(tags);
   
   // Sort tags by usage count
@@ -144,7 +167,7 @@ export function TagFilterControls({
                       key={filterId}
                       variant="secondary"
                       className="gap-1 pr-1"
-                      style={{ backgroundColor: `${tag.color}30`, color: tag.color }}
+                      style={{ backgroundColor: getColorWithOpacity(tag.color, 0.19), color: tag.color }}
                     >
                       {tag.name}
                       <button
@@ -224,7 +247,7 @@ export function TagFilterControls({
                 key={filterId}
                 variant="secondary"
                 className="gap-1 pr-1 text-xs"
-                style={{ backgroundColor: `${tag.color}30`, color: tag.color }}
+                style={{ backgroundColor: getColorWithOpacity(tag.color, 0.19), color: tag.color }}
               >
                 {tag.name}
                 <button

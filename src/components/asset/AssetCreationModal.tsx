@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Save, Upload, Settings, Droplets, Eye, EyeOff, Globe, Lock, Plus, Trash2 } from 'lucide-react';
 import { useAssetCreation } from '@/hooks/useAssetCreation';
 import { useTagStore } from '@/stores/tagStore';
@@ -28,6 +28,7 @@ import { CustomFieldsManager } from './CustomFieldsManager';
 import { ViewportDisplaySettingsManager } from './ViewportDisplaySettingsManager';
 import type { Asset } from '@/components/AssetItem';
 import type { CustomField, CustomFieldValue, ViewportDisplaySettings } from '@/types/extendedAsset';
+import { GeneratorParser, EXAMPLE_GENERATOR_DATA } from '@/services/generatorParser';
 
 interface AssetCreationModalProps {
   isOpen: boolean;
@@ -41,11 +42,15 @@ interface AssetCreationModalProps {
     height?: number;
     description?: string;
     tags?: string[];
+    customFields?: CustomField[];
+    customFieldValues?: CustomFieldValue[];
+    viewportDisplaySettings?: ViewportDisplaySettings;
   };
   parentId?: string;
+  generatorImportData?: any;
 }
 
-export function AssetCreationModal({ isOpen, onClose, initialData, parentId }: AssetCreationModalProps) {
+export function AssetCreationModal({ isOpen, onClose, initialData, parentId, generatorImportData }: AssetCreationModalProps) {
   const { createNewAsset } = useAssetCreation();
   const { tags } = useTagStore();
   
@@ -60,15 +65,33 @@ export function AssetCreationModal({ isOpen, onClose, initialData, parentId }: A
     description: initialData?.description || '',
     tags: initialData?.tags || [],
     thumbnail: '',
-    customFields: [] as CustomField[],
-    customFieldValues: [] as CustomFieldValue[],
-    viewportDisplaySettings: {
+    customFields: initialData?.customFields || [],
+    customFieldValues: initialData?.customFieldValues || [],
+    viewportDisplaySettings: initialData?.viewportDisplaySettings || {
       name: true,
       description: false,
       thumbnail: true,
       portraitBlur: 0,
-    } as ViewportDisplaySettings,
+    },
   });
+
+  // Handle generator import data
+  useEffect(() => {
+    if (generatorImportData) {
+      try {
+        const parsedAsset = GeneratorParser.parseGeneratorData(generatorImportData);
+        setFormData(prev => ({
+          ...prev,
+          name: parsedAsset.name || prev.name,
+          description: parsedAsset.description || prev.description,
+          customFields: parsedAsset.customFields || [],
+          customFieldValues: parsedAsset.customFieldValues || [],
+        }));
+      } catch (error) {
+        console.error('Error parsing generator import data:', error);
+      }
+    }
+  }, [generatorImportData]);
 
   const [isCreating, setIsCreating] = useState(false);
   const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] = useState(false);
@@ -348,10 +371,39 @@ export function AssetCreationModal({ isOpen, onClose, initialData, parentId }: A
                 <CardTitle className="text-lg text-foreground">Custom Fields</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="text-center py-8">
-                  <p className="text-sm text-muted-foreground">Custom fields will be available after asset creation.</p>
-                  <p className="text-xs text-muted-foreground">You can add custom fields in the Edit modal after creating this asset.</p>
-                </div>
+                {formData.customFields.length > 0 ? (
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground mb-3">
+                      {generatorImportData ? 'Imported fields from generator:' : 'Custom fields:'}
+                    </p>
+                    {formData.customFields.map((field, index) => (
+                      <div key={field.id} className="p-3 border border-glass-border/30 rounded-lg bg-glass/30">
+                        <div className="flex items-center justify-between mb-2">
+                          <Label className="text-sm font-medium">{field.label}</Label>
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={field.displayInViewport}
+                              onCheckedChange={(checked) => {
+                                const updatedFields = [...formData.customFields];
+                                updatedFields[index] = { ...field, displayInViewport: checked };
+                                setFormData(prev => ({ ...prev, customFields: updatedFields }));
+                              }}
+                            />
+                            <span className="text-xs text-muted-foreground">Show on canvas</span>
+                          </div>
+                        </div>
+                        <div className="text-sm text-foreground bg-glass/50 p-2 rounded">
+                          {formData.customFieldValues.find(fv => fv.fieldId === field.id)?.value || 'No value'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-sm text-muted-foreground">Custom fields will be available after asset creation.</p>
+                    <p className="text-xs text-muted-foreground">You can add custom fields in the Edit modal after creating this asset.</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

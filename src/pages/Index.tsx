@@ -12,6 +12,7 @@ import BookShelf from "@/components/books/BookShelf";
 import "@/components/books/leather-styles.css";
 import { useAssetStore } from "@/stores/assetStore";
 import { useBookStore } from "@/stores/bookStoreSimple";
+import { useTagStore } from "@/stores/tagStore";
 import { useThemeStore } from "@/stores/themeStore";
 import { useBackgroundStore } from "@/stores/backgroundStore";
 import { useMediaStore } from "@/stores/mediaStore";
@@ -28,6 +29,7 @@ const Index = () => {
   const [backgroundRefreshTrigger, setBackgroundRefreshTrigger] = useState(0);
   const [showBookEntryAnimation, setShowBookEntryAnimation] = useState(false);
   const { currentActiveId, loadWorldData, isEditingBackground, setIsEditingBackground, currentViewportId, setActiveAsset, assets, setCurrentViewportId } = useAssetStore();
+  const { loadWorldData: loadTagWorldData } = useTagStore();
   const { currentBookId, setCurrentBook, getAllBooks, deleteBook } = useBookStore();
   const { theme } = useThemeStore();
   const { getBackground } = useBackgroundStore(); // Initialize background store
@@ -77,6 +79,7 @@ const Index = () => {
         // Load world data if we were in a book view and the book has world data
         if (cachedState.appPhase === 'BOOK_VIEW' && book.worldData) {
           loadWorldData(book.worldData);
+          loadTagWorldData(book.worldData);
         }
       }
 
@@ -165,6 +168,7 @@ const Index = () => {
     setTimeout(() => {
       setCurrentBook(book.id);
       loadWorldData(book.worldData);
+      loadTagWorldData(book.worldData);
     }, 100);
   };
 
@@ -289,11 +293,11 @@ const Index = () => {
 
       {/* Main App Content */}
       {currentBookId && (
-        <div className="flex h-screen">
+        <div className="flex h-screen flex-col md:flex-row">
           {/* Main Content Area */}
-          <div className="flex-1 flex flex-col relative">
+          <div className="flex-1 flex flex-col relative min-h-0">
             {/* Asset Port */}
-            <div className="flex-1 p-4">
+            <div className="flex-1 p-2 md:p-4 overflow-hidden">
               <AssetPort 
                 onToggleSidebar={() => setSidebarOpen(prev => !prev)} 
                 currentWorldTitle={getAllBooks().find(b => b.id === currentBookId)?.title || 'Current World'}
@@ -302,7 +306,7 @@ const Index = () => {
             </div>
           </div>
 
-          {/* Fantasy Sidebar */}
+          {/* Fantasy Sidebar - Mobile Overlay */}
           <aside className={`fantasy-overlay ${sidebarOpen ? "is-open" : ""}`} aria-hidden={!sidebarOpen}>
             <div className="fantasy-sidebar">
               <div className="fantasy-sidebar-content">

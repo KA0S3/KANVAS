@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { subscribeWithSelector } from 'zustand/middleware';
+import { useBookStore } from './bookStoreSimple';
 
 export interface Tag {
   id: string;
@@ -12,6 +14,11 @@ interface TagStore {
   assetTags: Record<string, string[]>; // assetId -> tagIds
   selectedTags: Set<string>;
   activeFilters: string[]; // For backward compatibility
+  
+  // World-aware actions
+  loadWorldData: (worldData: any) => void;
+  getWorldData: () => any;
+  clearWorldData: () => void;
   
   // Actions
   createTag: (tagData: Omit<Tag, 'id'>) => string;
@@ -39,7 +46,8 @@ interface TagStore {
   setFilters: (tagIds: string[]) => void;
 }
 
-export const useTagStore = create<TagStore>((set, get) => ({
+export const useTagStore = create<TagStore>()(
+  subscribeWithSelector((set, get) => ({
   // Initial state
   tags: {},
   assetTags: {},
@@ -238,4 +246,57 @@ export const useTagStore = create<TagStore>((set, get) => ({
       selectedTags: new Set(tagIds)
     });
   },
-}));
+
+  // World-aware methods
+  loadWorldData: (worldData) => {
+    if (worldData) {
+      set({
+        tags: worldData.tags || {},
+        assetTags: worldData.assetTags || {},
+        selectedTags: new Set(),
+        activeFilters: [],
+      });
+    }
+  },
+
+  getWorldData: () => {
+    const state = get();
+    return {
+      tags: state.tags,
+      assetTags: state.assetTags,
+    };
+  },
+
+  clearWorldData: () => {
+    set({
+      tags: {},
+      assetTags: {},
+      selectedTags: new Set(),
+      activeFilters: [],
+    });
+  },
+})));
+
+// Auto-save functionality: subscribe to store changes and save to book store
+useTagStore.subscribe(
+  (state) => state,
+  (state) => {
+    const bookStore = useBookStore.getState();
+    if (bookStore.currentBookId) {
+      const worldData = {
+        tags: state.tags,
+        assetTags: state.assetTags,
+      };
+      bookStore.updateWorldData(bookStore.currentBookId, worldData);
+    }
+  },
+  {
+    equalityFn: (a, b) => {
+      // Only trigger auto-save for relevant changes
+      return (
+        a.tags === b.tags &&
+        a.assetTags === b.assetTags
+      );
+    },
+  }
+);
