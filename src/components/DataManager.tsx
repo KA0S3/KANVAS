@@ -4,7 +4,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useBookStore } from "@/stores/bookStoreSimple";
-import { Download, Upload, AlertCircle, CheckCircle } from "lucide-react";
+import { useAuthStore } from "@/stores/authStore";
+import { useAssetStore } from "@/stores/assetStore";
+import { Download, Upload, AlertCircle, CheckCircle, Archive, Lock } from "lucide-react";
+import JSZip from 'jszip';
+import { supabase } from '@/lib/supabase';
+import type { Asset } from '@/components/AssetItem';
 
 interface DataManagerProps {
   children: React.ReactNode;
@@ -14,9 +19,12 @@ const DataManager = ({ children }: DataManagerProps) => {
   const [open, setOpen] = useState(false);
   const [importData, setImportData] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
   const { exportBooks, importBooks, getAllBooks } = useBookStore();
+  const { effectiveLimits } = useAuthStore();
+  const { getWorldData } = useAssetStore();
 
-  const handleExport = () => {
+  const handleExport = async () => {
     try {
       const data = exportBooks();
       const blob = new Blob([data], { type: 'application/json' });
@@ -34,6 +42,155 @@ const DataManager = ({ children }: DataManagerProps) => {
     } catch (error) {
       setMessage({ type: 'error', text: 'Failed to export world data.' });
       setTimeout(() => setMessage(null), 3000);
+    }
+  };
+
+  const fetchAssetFromCloud = async (assetPath: string): Promise<Blob | null> => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('assets')
+        .createSignedUrl(assetPath, 3600); // 1 hour expiry
+      
+      if (error) {
+        console.warn('Failed to create signed URL for asset:', assetPath, error);
+        return null;
+      }
+      
+      const response = await fetch(data.signedUrl);
+      if (!response.ok) {
+        console.warn('Failed to fetch asset:', assetPath, response.statusText);
+        return null;
+      }
+      
+      return await response.blob();
+    } catch (error) {
+      console.error('Error fetching cloud asset:', assetPath, error);
+      return null;
+    }
+  };
+
+  const getAssetFromIndexedDB = async (assetId: string): Promise<Blob | null> => {
+    try {
+      const dbName = 'KanvasAssetDB';
+      const storeName = 'assets';
+      
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(dbName);
+        
+        request.onerror = () => {
+          console.warn('Failed to open IndexedDB:', request.error);
+          resolve(null);
+        };
+        
+        request.onsuccess = () => {
+          const db = request.result;
+          
+          if (!db.objectStoreNames.contains(storeName)) {
+            console.warn('Asset store not found in IndexedDB');
+            resolve(null);
+            return;
+          }
+          
+          const transaction = db.transaction([storeName], 'readonly');
+          const store = transaction.objectStore(storeName);
+          const getRequest = store.get(assetId);
+          
+          getRequest.onsuccess = () => {
+            const result = getRequest.result;
+            if (result && result.blob) {
+              resolve(result.blob);
+            } else {
+              resolve(null);
+            }
+          };
+          
+          getRequest.onerror = () => {
+            console.warn('Failed to get asset from IndexedDB:', getRequest.error);
+            resolve(null);
+          };
+        };
+      });
+    } catch (error) {
+      console.error('Error accessing IndexedDB:', error);
+      return null;
+    }
+  };
+
+  const handleFullExport = async () => {
+    // Check if export is allowed
+    if (!effectiveLimits?.importExportEnabled) {
+      setMessage({ 
+        type: 'error', 
+        text: 'Export is not available on your current plan. Please upgrade to Pro or Lifetime to enable this feature.' 
+      });
+      setTimeout(() => setMessage(null), 5000);
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const zip = new JSZip();
+      
+      // Add project.json with world data
+      const worldData = getWorldData();
+      const booksData = exportBooks();
+      const projectData = {
+        version: '1.0.0',
+        exportedAt: new Date().toISOString(),
+        worlds: JSON.parse(booksData),
+        assets: worldData
+      };
+      zip.file('project.json', JSON.stringify(projectData, null, 2));
+      
+      // Collect all assets from all worlds
+      const allAssets = Object.values(worldData.assets) as Asset[];
+      const assetsFolder = zip.folder('assets');
+      
+      for (const asset of allAssets) {
+        if (asset.type === 'image' && (asset.thumbnail || asset.background)) {
+          let assetBlob: Blob | null = null;
+          
+          // Try to fetch from cloud first if it has cloud path
+          if (asset.cloudPath) {
+            assetBlob = await fetchAssetFromCloud(asset.cloudPath);
+          }
+          
+          // Fallback to IndexedDB for local-only assets
+          if (!assetBlob) {
+            assetBlob = await getAssetFromIndexedDB(asset.id);
+          }
+          
+          // If we have the blob, add it to the zip
+          if (assetBlob) {
+            const filename = `${asset.id}.${asset.cloudPath?.split('.').pop() || 'png'}`;
+            assetsFolder?.file(filename, assetBlob);
+          } else {
+            console.warn('Could not retrieve asset:', asset.id, asset.cloudPath);
+          }
+        }
+      }
+      
+      // Generate the zip file
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      
+      // Trigger browser download
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `kanvas-project-${new Date().toISOString().split('T')[0]}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      setMessage({ type: 'success', text: 'Project exported successfully with all assets!' });
+      setTimeout(() => setMessage(null), 3000);
+    } catch (error) {
+      console.error('Export error:', error);
+      setMessage({ type: 'error', text: 'Failed to export project. Please try again.' });
+      setTimeout(() => setMessage(null), 3000);
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -102,14 +259,49 @@ const DataManager = ({ children }: DataManagerProps) => {
             <p className="text-sm text-gray-300">
               Download a backup file containing all your worlds and settings.
             </p>
-            <Button 
-              onClick={handleExport} 
-              className="w-full bg-green-600 hover:bg-green-700 text-white"
-              disabled={worldCount === 0}
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Download Backup File
-            </Button>
+            
+            <div className="grid grid-cols-1 gap-2">
+              <Button 
+                onClick={handleExport} 
+                className="w-full bg-green-600 hover:bg-green-700 text-white"
+                disabled={worldCount === 0}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Download World Data (JSON)
+              </Button>
+              
+              <Button 
+                onClick={handleFullExport} 
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={worldCount === 0 || isExporting || !effectiveLimits?.importExportEnabled}
+              >
+                {isExporting ? (
+                  <>
+                    <div className="w-4 h-4 mr-2 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Exporting...
+                  </>
+                ) : !effectiveLimits?.importExportEnabled ? (
+                  <>
+                    <Lock className="w-4 h-4 mr-2" />
+                    Full Export (Pro Only)
+                  </>
+                ) : (
+                  <>
+                    <Archive className="w-4 h-4 mr-2" />
+                    Full Project Export (ZIP)
+                  </>
+                )}
+              </Button>
+            </div>
+            
+            {!effectiveLimits?.importExportEnabled && (
+              <div className="bg-yellow-900/30 border border-yellow-600 rounded-lg p-3">
+                <p className="text-xs text-yellow-200">
+                  <strong>Full Export</strong> is a Pro feature that includes all your assets in a ZIP file. 
+                  Upgrade to unlock this functionality.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Import Section */}

@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { X, Save, Upload, Settings, Droplets, Eye, EyeOff, Globe, Lock, Plus, Trash2 } from 'lucide-react';
+import { X, Save, Upload, Settings, Droplets, Eye, EyeOff, Globe, Lock, Plus, Trash2, Cloud, AlertCircle } from 'lucide-react';
 import { useAssetCreation } from '@/hooks/useAssetCreation';
 import { useTagStore } from '@/stores/tagStore';
+import { useCloudStore } from '@/stores/cloudStore';
+import { useAuthStore } from '@/stores/authStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -26,6 +28,7 @@ import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { CustomFieldsManager } from './CustomFieldsManager';
 import { ViewportDisplaySettingsManager } from './ViewportDisplaySettingsManager';
+import { UpgradeModal } from '@/components/UpgradeModal';
 import type { Asset } from '@/components/AssetItem';
 import type { CustomField, CustomFieldValue, ViewportDisplaySettings } from '@/types/extendedAsset';
 import { GeneratorParser, EXAMPLE_GENERATOR_DATA } from '@/services/generatorParser';
@@ -48,11 +51,14 @@ interface AssetCreationModalProps {
   };
   parentId?: string;
   generatorImportData?: any;
+  projectId?: string;
 }
 
-export function AssetCreationModal({ isOpen, onClose, initialData, parentId, generatorImportData }: AssetCreationModalProps) {
-  const { createNewAsset } = useAssetCreation();
+export function AssetCreationModal({ isOpen, onClose, initialData, parentId, generatorImportData, projectId }: AssetCreationModalProps) {
+  const { createNewAsset, upgradeModal, closeUpgradeModal, canUploadToCloud } = useAssetCreation();
   const { tags } = useTagStore();
+  const { syncEnabled } = useCloudStore();
+  const { isAuthenticated, plan } = useAuthStore();
   
   // Local form state
   const [formData, setFormData] = useState({
@@ -74,6 +80,10 @@ export function AssetCreationModal({ isOpen, onClose, initialData, parentId, gen
       portraitBlur: 0,
     },
   });
+
+  // File upload state
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'checking' | 'allowed' | 'denied'>('idle');
 
   // Handle generator import data
   useEffect(() => {
@@ -121,7 +131,12 @@ export function AssetCreationModal({ isOpen, onClose, initialData, parentId, gen
         customFields: formData.customFields,
         customFieldValues: formData.customFieldValues,
         viewportDisplaySettings: formData.viewportDisplaySettings,
-      }, parentId, { fromUserClick: true });
+      }, parentId, { 
+        fromUserClick: true,
+        file: selectedFile || undefined,
+        projectId,
+        skipCloud: uploadStatus === 'denied'
+      });
 
       console.log('AssetCreationModal: Asset created with ID:', assetId);
       
@@ -134,7 +149,40 @@ export function AssetCreationModal({ isOpen, onClose, initialData, parentId, gen
     }
   };
 
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setSelectedFile(file);
+    setUploadStatus('checking');
+
+    // Check if upload is possible
+    if (syncEnabled && isAuthenticated && projectId) {
+      try {
+        const canUpload = await canUploadToCloud(file);
+        setUploadStatus(canUpload ? 'allowed' : 'denied');
+      } catch (error) {
+        console.error('Error checking upload quota:', error);
+        setUploadStatus('denied');
+      }
+    } else {
+      setUploadStatus('idle');
+    }
+
+    // Also set as thumbnail if it's an image
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        setFormData(prev => ({ ...prev, thumbnail: result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleClose = () => {
+    setSelectedFile(null);
+    setUploadStatus('idle');
     setFormData({
       name: initialData?.name || 'New Asset',
       type: initialData?.type || 'other' as 'image' | 'document' | 'video' | 'audio' | 'code' | 'other',
@@ -189,361 +237,455 @@ export function AssetCreationModal({ isOpen, onClose, initialData, parentId, gen
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto glass cosmic-glow border-glass-border/40">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-bold">Create New Asset</DialogTitle>
-        </DialogHeader>
-        
-        <div className="space-y-6 py-4">
-          {/* Basic Information */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-foreground">Basic Information</h3>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="asset-name">Name *</Label>
-                <Input
-                  id="asset-name"
-                  value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="Enter asset name..."
-                  className="bg-glass/50 border-glass-border/40"
-                />
+    <>
+      <Dialog open={isOpen} onOpenChange={handleClose}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto glass cosmic-glow border-glass-border/40">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Create New Asset</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-6 py-4">
+            {/* Basic Information */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-foreground">Basic Information</h3>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="asset-name">Name *</Label>
+                  <Input
+                    id="asset-name"
+                    value={formData.name}
+                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="Enter asset name..."
+                    className="bg-glass/50 border-glass-border/40"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="asset-type">Type</Label>
+                  <Select
+                    value={formData.type}
+                    onValueChange={(value: 'image' | 'document' | 'video' | 'audio' | 'code' | 'other') => setFormData(prev => ({ ...prev, type: value }))}
+                  >
+                    <SelectTrigger className="bg-glass/50 border-glass-border/40">
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="image">Image</SelectItem>
+                      <SelectItem value="document">Document</SelectItem>
+                      <SelectItem value="video">Video</SelectItem>
+                      <SelectItem value="audio">Audio</SelectItem>
+                      <SelectItem value="code">Code</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="asset-tags">Tags</Label>
+                  <div className="flex flex-wrap gap-2 p-2 border border-glass-border/40 rounded-md bg-glass/30 min-h-[40px]">
+                    {availableTags.map((tag) => {
+                      const tagColor = tag.color && tag.color.trim() !== '' ? tag.color : '#6b7280';
+                      
+                      return (
+                        <Badge
+                          key={tag.id}
+                          variant={formData.tags.includes(tag.id) ? "default" : "outline"}
+                          className="cursor-pointer"
+                          style={{ 
+                            backgroundColor: formData.tags.includes(tag.id) ? tagColor : 'transparent',
+                            borderColor: tagColor,
+                            color: formData.tags.includes(tag.id) ? 'white' : tagColor,
+                            borderWidth: '2px'
+                          }}
+                          onClick={() => handleTagToggle(tag.id)}
+                        >
+                          {tag.name}
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Position</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      placeholder="X"
+                      value={formData.x}
+                      onChange={(e) => setFormData(prev => ({ ...prev, x: parseInt(e.target.value) || 0 }))}
+                      className="flex-1 bg-glass/50 border-glass-border/40"
+                    />
+                    <Input
+                      type="number"
+                      placeholder="Y"
+                      value={formData.y}
+                      onChange={(e) => setFormData(prev => ({ ...prev, y: parseInt(e.target.value) || 0 }))}
+                      className="flex-1 bg-glass/50 border-glass-border/40"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Size</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      placeholder="Width"
+                      value={formData.width}
+                      onChange={(e) => setFormData(prev => ({ ...prev, width: parseInt(e.target.value) || 200 }))}
+                      className="flex-1 bg-glass/50 border-glass-border/40"
+                    />
+                    <Input
+                      type="number"
+                      placeholder="Height"
+                      value={formData.height}
+                      onChange={(e) => setFormData(prev => ({ ...prev, height: parseInt(e.target.value) || 150 }))}
+                      className="flex-1 bg-glass/50 border-glass-border/40"
+                    />
+                  </div>
+                </div>
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="asset-type">Type</Label>
-                <Select
-                  value={formData.type}
-                  onValueChange={(value: 'image' | 'document' | 'video' | 'audio' | 'code' | 'other') => setFormData(prev => ({ ...prev, type: value }))}
-                >
-                  <SelectTrigger className="bg-glass/50 border-glass-border/40">
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="image">Image</SelectItem>
-                    <SelectItem value="document">Document</SelectItem>
-                    <SelectItem value="video">Video</SelectItem>
-                    <SelectItem value="audio">Audio</SelectItem>
-                    <SelectItem value="code">Code</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="asset-description">Description</Label>
+                <Textarea
+                  id="asset-description"
+                  value={formData.description}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Enter asset description..."
+                  rows={3}
+                  className="bg-glass/50 border-glass-border/40"
+                />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            {/* File Upload */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-foreground">File Upload</h3>
+              
               <div className="space-y-2">
-                <Label htmlFor="asset-tags">Tags</Label>
-                <div className="flex flex-wrap gap-2 p-2 border border-glass-border/40 rounded-md bg-glass/30 min-h-[40px]">
-                  {availableTags.map((tag) => {
-                    const tagColor = tag.color && tag.color.trim() !== '' ? tag.color : '#6b7280';
-                    
-                    return (
-                      <Badge
-                        key={tag.id}
-                        variant={formData.tags.includes(tag.id) ? "default" : "outline"}
-                        className="cursor-pointer"
-                        style={{ 
-                          backgroundColor: formData.tags.includes(tag.id) ? tagColor : 'transparent',
-                          borderColor: tagColor,
-                          color: formData.tags.includes(tag.id) ? 'white' : tagColor,
-                          borderWidth: '2px'
+                <Label>Asset File</Label>
+                {selectedFile ? (
+                  <div className="p-4 border border-glass-border/40 rounded-lg bg-glass/30">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center">
+                          <Upload className="w-5 h-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-medium">{selectedFile.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedFile(null);
+                          setUploadStatus('idle');
                         }}
-                        onClick={() => handleTagToggle(tag.id)}
                       >
-                        {tag.name}
-                      </Badge>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Position</Label>
-                <div className="flex gap-2">
-                  <Input
-                    type="number"
-                    placeholder="X"
-                    value={formData.x}
-                    onChange={(e) => setFormData(prev => ({ ...prev, x: parseInt(e.target.value) || 0 }))}
-                    className="flex-1 bg-glass/50 border-glass-border/40"
-                  />
-                  <Input
-                    type="number"
-                    placeholder="Y"
-                    value={formData.y}
-                    onChange={(e) => setFormData(prev => ({ ...prev, y: parseInt(e.target.value) || 0 }))}
-                    className="flex-1 bg-glass/50 border-glass-border/40"
-                  />
-                </div>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Size</Label>
-                <div className="flex gap-2">
-                  <Input
-                    type="number"
-                    placeholder="Width"
-                    value={formData.width}
-                    onChange={(e) => setFormData(prev => ({ ...prev, width: parseInt(e.target.value) || 200 }))}
-                    className="flex-1 bg-glass/50 border-glass-border/40"
-                  />
-                  <Input
-                    type="number"
-                    placeholder="Height"
-                    value={formData.height}
-                    onChange={(e) => setFormData(prev => ({ ...prev, height: parseInt(e.target.value) || 150 }))}
-                    className="flex-1 bg-glass/50 border-glass-border/40"
-                  />
-                </div>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="asset-description">Description</Label>
-              <Textarea
-                id="asset-description"
-                value={formData.description}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Enter asset description..."
-                rows={3}
-                className="bg-glass/50 border-glass-border/40"
-              />
-            </div>
-          </div>
-
-          {/* Images */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-foreground">Images</h3>
-            
-            <div className="grid grid-cols-1 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="thumbnail">Thumbnail</Label>
-                {formData.thumbnail ? (
-                  <div className="relative group">
-                    <img
-                      src={formData.thumbnail}
-                      alt="Thumbnail preview"
-                      className="w-full h-32 object-cover rounded-md border border-glass-border/40"
-                    />
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => setFormData(prev => ({ ...prev, thumbnail: '' }))}
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    
+                    {/* Upload Status */}
+                    {syncEnabled && isAuthenticated && (
+                      <div className="mt-3 flex items-center gap-2">
+                        {uploadStatus === 'checking' && (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <div className="animate-spin rounded-full h-3 w-3 border-b border-current"></div>
+                            Checking storage quota...
+                          </div>
+                        )}
+                        {uploadStatus === 'allowed' && (
+                          <div className="flex items-center gap-2 text-sm text-green-600">
+                            <Cloud className="w-3 h-3" />
+                            Cloud upload available
+                          </div>
+                        )}
+                        {uploadStatus === 'denied' && (
+                          <div className="flex items-center gap-2 text-sm text-orange-600">
+                            <AlertCircle className="w-3 h-3" />
+                            Storage quota exceeded - asset will be local only
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ) : (
-                  <div className="border-2 border-dashed border-glass-border/40 rounded-md p-4 bg-glass/20">
+                  <div className="border-2 border-dashed border-glass-border/40 rounded-md p-6 bg-glass/20">
                     <input
                       type="file"
-                      accept="image/*"
-                      onChange={(e) => handleImageUpload('thumbnail', e)}
+                      accept="image/*,video/*,audio/*,application/pdf,.doc,.docx,.txt,.js,.ts,.jsx,.tsx,.html,.css"
+                      onChange={handleFileSelect}
                       className="hidden"
-                      id="thumbnail-upload"
+                      id="asset-file-upload"
                     />
                     <label
-                      htmlFor="thumbnail-upload"
+                      htmlFor="asset-file-upload"
                       className="flex flex-col items-center justify-center cursor-pointer hover:text-muted-foreground transition-colors"
                     >
                       <Upload className="w-8 h-8 mb-2" />
-                      <span className="text-sm">Click to upload thumbnail</span>
-                      <span className="text-xs text-muted-foreground">PNG, JPG, GIF up to 10MB</span>
+                      <span className="text-sm font-medium">Click to upload asset file</span>
+                      <span className="text-xs text-muted-foreground">Images, videos, audio, documents, code files</span>
+                      {syncEnabled && isAuthenticated && (
+                        <span className="text-xs text-primary mt-1">Cloud sync enabled</span>
+                      )}
                     </label>
                   </div>
                 )}
               </div>
             </div>
-          </div>
 
-          {/* Custom Fields */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-foreground">Custom Fields</h3>
-            <Card className="glass cosmic-glow border-glass-border/40">
-              <CardHeader>
-                <CardTitle className="text-lg text-foreground">Custom Fields</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {formData.customFields.length > 0 ? (
-                  <div className="space-y-3">
-                    <p className="text-sm text-muted-foreground mb-3">
-                      {generatorImportData ? 'Imported fields from generator:' : 'Custom fields:'}
-                    </p>
-                    {formData.customFields.map((field, index) => (
-                      <div key={field.id} className="p-3 border border-glass-border/30 rounded-lg bg-glass/30">
-                        <div className="flex items-center justify-between mb-2">
-                          <Label className="text-sm font-medium">{field.label}</Label>
-                          <div className="flex items-center gap-2">
-                            <Switch
-                              checked={field.displayInViewport}
-                              onCheckedChange={(checked) => {
-                                const updatedFields = [...formData.customFields];
-                                updatedFields[index] = { ...field, displayInViewport: checked };
-                                setFormData(prev => ({ ...prev, customFields: updatedFields }));
-                              }}
-                            />
-                            <span className="text-xs text-muted-foreground">Show on canvas</span>
+            {/* Images */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-foreground">Images</h3>
+              
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="thumbnail">Thumbnail</Label>
+                  {formData.thumbnail ? (
+                    <div className="relative group">
+                      <img
+                        src={formData.thumbnail}
+                        alt="Thumbnail preview"
+                        className="w-full h-32 object-cover rounded-md border border-glass-border/40"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => setFormData(prev => ({ ...prev, thumbnail: '' }))}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="border-2 border-dashed border-glass-border/40 rounded-md p-4 bg-glass/20">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleImageUpload('thumbnail', e)}
+                        className="hidden"
+                        id="thumbnail-upload"
+                      />
+                      <label
+                        htmlFor="thumbnail-upload"
+                        className="flex flex-col items-center justify-center cursor-pointer hover:text-muted-foreground transition-colors"
+                      >
+                        <Upload className="w-8 h-8 mb-2" />
+                        <span className="text-sm">Click to upload thumbnail</span>
+                        <span className="text-xs text-muted-foreground">PNG, JPG, GIF up to 10MB</span>
+                      </label>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Custom Fields */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-foreground">Custom Fields</h3>
+              <Card className="glass cosmic-glow border-glass-border/40">
+                <CardHeader>
+                  <CardTitle className="text-lg text-foreground">Custom Fields</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {formData.customFields.length > 0 ? (
+                    <div className="space-y-3">
+                      <p className="text-sm text-muted-foreground mb-3">
+                        {generatorImportData ? 'Imported fields from generator:' : 'Custom fields:'}
+                      </p>
+                      {formData.customFields.map((field, index) => (
+                        <div key={field.id} className="p-3 border border-glass-border/30 rounded-lg bg-glass/30">
+                          <div className="flex items-center justify-between mb-2">
+                            <Label className="text-sm font-medium">{field.label}</Label>
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                checked={field.displayInViewport}
+                                onCheckedChange={(checked) => {
+                                  const updatedFields = [...formData.customFields];
+                                  updatedFields[index] = { ...field, displayInViewport: checked };
+                                  setFormData(prev => ({ ...prev, customFields: updatedFields }));
+                                }}
+                              />
+                              <span className="text-xs text-muted-foreground">Show on canvas</span>
+                            </div>
+                          </div>
+                          <div className="text-sm text-foreground bg-glass/50 p-2 rounded">
+                            {formData.customFieldValues.find(fv => fv.fieldId === field.id)?.value || 'No value'}
                           </div>
                         </div>
-                        <div className="text-sm text-foreground bg-glass/50 p-2 rounded">
-                          {formData.customFieldValues.find(fv => fv.fieldId === field.id)?.value || 'No value'}
-                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-sm text-muted-foreground">Custom fields will be available after asset creation.</p>
+                      <p className="text-xs text-muted-foreground">You can add custom fields in the Edit modal after creating this asset.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Viewport Display Settings */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-foreground">Viewport Display Settings</h3>
+              <Card className="glass cosmic-glow border-glass-border/40">
+                <CardHeader>
+                  <CardTitle className="text-lg text-foreground flex items-center gap-2">
+                    <Settings className="w-5 h-5" />
+                    Viewport Display Settings
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="text-sm text-muted-foreground mb-4">
+                    Control which information is shown when this asset appears in a parent viewport.
+                  </div>
+
+                  {/* Name Display */}
+                  <div className="flex items-center justify-between p-3 rounded-lg border border-glass-border/30 bg-glass/30">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        {formData.viewportDisplaySettings.name ? (
+                          <Eye className="w-4 h-4 text-green-400" />
+                        ) : (
+                          <EyeOff className="w-4 h-4 text-muted-foreground" />
+                        )}
+                        <Label className="text-sm font-medium">
+                          Asset Name
+                        </Label>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <p className="text-sm text-muted-foreground">Custom fields will be available after asset creation.</p>
-                    <p className="text-xs text-muted-foreground">You can add custom fields in the Edit modal after creating this asset.</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Viewport Display Settings */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-foreground">Viewport Display Settings</h3>
-            <Card className="glass cosmic-glow border-glass-border/40">
-              <CardHeader>
-                <CardTitle className="text-lg text-foreground flex items-center gap-2">
-                  <Settings className="w-5 h-5" />
-                  Viewport Display Settings
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-sm text-muted-foreground mb-4">
-                  Control which information is shown when this asset appears in a parent viewport.
-                </div>
-
-                {/* Name Display */}
-                <div className="flex items-center justify-between p-3 rounded-lg border border-glass-border/30 bg-glass/30">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2">
-                      {formData.viewportDisplaySettings.name ? (
-                        <Eye className="w-4 h-4 text-green-400" />
-                      ) : (
-                        <EyeOff className="w-4 h-4 text-muted-foreground" />
-                      )}
-                      <Label className="text-sm font-medium">
-                        Asset Name
-                      </Label>
+                      <div className="text-xs text-muted-foreground">
+                        Show the asset's name in the viewport
+                      </div>
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      Show the asset's name in the viewport
-                    </div>
-                  </div>
-                  <Switch
-                    checked={formData.viewportDisplaySettings.name}
-                    onCheckedChange={(checked) => handleViewportSettingChange('name', checked)}
-                  />
-                </div>
-
-                {/* Description Display */}
-                <div className="flex items-center justify-between p-3 rounded-lg border border-glass-border/30 bg-glass/30">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2">
-                      {formData.viewportDisplaySettings.description ? (
-                        <Eye className="w-4 h-4 text-green-400" />
-                      ) : (
-                        <EyeOff className="w-4 h-4 text-muted-foreground" />
-                      )}
-                      <Label className="text-sm font-medium">
-                        Description
-                      </Label>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      Show the asset's description in the viewport
-                    </div>
-                  </div>
-                  <Switch
-                    checked={formData.viewportDisplaySettings.description}
-                    onCheckedChange={(checked) => handleViewportSettingChange('description', checked)}
-                  />
-                </div>
-
-                {/* Thumbnail Display */}
-                <div className="flex items-center justify-between p-3 rounded-lg border border-glass-border/30 bg-glass/30">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2">
-                      {formData.viewportDisplaySettings.thumbnail ? (
-                        <Eye className="w-4 h-4 text-green-400" />
-                      ) : (
-                        <EyeOff className="w-4 h-4 text-muted-foreground" />
-                      )}
-                      <Label className="text-sm font-medium">
-                        Thumbnail
-                      </Label>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      Show the asset's thumbnail in the viewport
-                    </div>
-                  </div>
-                  <Switch
-                    checked={formData.viewportDisplaySettings.thumbnail}
-                    onCheckedChange={(checked) => handleViewportSettingChange('thumbnail', checked)}
-                  />
-                </div>
-
-                {/* Portrait Blur */}
-                <div className="p-3 rounded-lg border border-glass-border/30 bg-glass/30">
-                  <div className="flex items-center gap-3 mb-3">
-                    <Droplets className="w-4 h-4 text-primary" />
-                    <Label className="text-sm font-medium">
-                      Portrait Blur
-                    </Label>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Blur Amount</span>
-                      <span className="text-xs text-muted-foreground">
-                        {Math.round(formData.viewportDisplaySettings.portraitBlur * 100)}%
-                      </span>
-                    </div>
-                    <Slider
-                      value={[formData.viewportDisplaySettings.portraitBlur]}
-                      onValueChange={([value]) => handleViewportSettingChange('portraitBlur', value)}
-                      max={1}
-                      min={0}
-                      step={0.1}
-                      className="w-full"
+                    <Switch
+                      checked={formData.viewportDisplaySettings.name}
+                      onCheckedChange={(checked) => handleViewportSettingChange('name', checked)}
                     />
-                    <div className="text-xs text-muted-foreground">
-                      Adjust blur for portrait background (0 = clear, 1 = full blur)
+                  </div>
+
+                  {/* Description Display */}
+                  <div className="flex items-center justify-between p-3 rounded-lg border border-glass-border/30 bg-glass/30">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        {formData.viewportDisplaySettings.description ? (
+                          <Eye className="w-4 h-4 text-green-400" />
+                        ) : (
+                          <EyeOff className="w-4 h-4 text-muted-foreground" />
+                        )}
+                        <Label className="text-sm font-medium">
+                          Description
+                        </Label>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Show the asset's description in the viewport
+                      </div>
+                    </div>
+                    <Switch
+                      checked={formData.viewportDisplaySettings.description}
+                      onCheckedChange={(checked) => handleViewportSettingChange('description', checked)}
+                    />
+                  </div>
+
+                  {/* Thumbnail Display */}
+                  <div className="flex items-center justify-between p-3 rounded-lg border border-glass-border/30 bg-glass/30">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        {formData.viewportDisplaySettings.thumbnail ? (
+                          <Eye className="w-4 h-4 text-green-400" />
+                        ) : (
+                          <EyeOff className="w-4 h-4 text-muted-foreground" />
+                        )}
+                        <Label className="text-sm font-medium">
+                          Thumbnail
+                        </Label>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Show the asset's thumbnail in the viewport
+                      </div>
+                    </div>
+                    <Switch
+                      checked={formData.viewportDisplaySettings.thumbnail}
+                      onCheckedChange={(checked) => handleViewportSettingChange('thumbnail', checked)}
+                    />
+                  </div>
+
+                  {/* Portrait Blur */}
+                  <div className="p-3 rounded-lg border border-glass-border/30 bg-glass/30">
+                    <div className="flex items-center gap-3 mb-3">
+                      <Droplets className="w-4 h-4 text-primary" />
+                      <Label className="text-sm font-medium">
+                        Portrait Blur
+                      </Label>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Blur Amount</span>
+                        <span className="text-xs text-muted-foreground">
+                          {Math.round(formData.viewportDisplaySettings.portraitBlur * 100)}%
+                        </span>
+                      </div>
+                      <Slider
+                        value={[formData.viewportDisplaySettings.portraitBlur]}
+                        onValueChange={([value]) => handleViewportSettingChange('portraitBlur', value)}
+                        max={1}
+                        min={0}
+                        step={0.1}
+                        className="w-full"
+                      />
+                      <div className="text-xs text-muted-foreground">
+                        Adjust blur for portrait background (0 = clear, 1 = full blur)
+                      </div>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </div>
           </div>
-        </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>
-            Cancel
-          </Button>
-          <Button onClick={handleCreateAsset} disabled={!formData.name.trim() || isCreating}>
-            {isCreating ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Creating...
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4 mr-2" />
-                Create
-              </>
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleClose}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateAsset} disabled={!formData.name.trim() || isCreating}>
+              {isCreating ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Create
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        isOpen={upgradeModal.isOpen}
+        onClose={closeUpgradeModal}
+        currentPlan={plan}
+        currentUsage={upgradeModal.currentUsage}
+        quotaLimit={upgradeModal.quotaLimit}
+        requiredBytes={upgradeModal.requiredBytes}
+      />
+    </>
   );
 }

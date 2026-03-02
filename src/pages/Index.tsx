@@ -10,6 +10,7 @@ import WorldCreationDialog from "@/components/WorldCreationDialog";
 import DataManager from "@/components/DataManager";
 import BookShelf from "@/components/books/BookShelf";
 import "@/components/books/leather-styles.css";
+import AdBanner from "@/components/AdBanner";
 import { useAssetStore } from "@/stores/assetStore";
 import { useBookStore } from "@/stores/bookStoreSimple";
 import { useTagStore } from "@/stores/tagStore";
@@ -312,6 +313,11 @@ const Index = () => {
               <div className="fantasy-sidebar-content">
                 {/* Use the new AssetExplorer component */}
                 <AssetExplorer sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(prev => !prev)} />
+                
+                {/* Ad Banner - only shows for free plan users */}
+                <div className="mt-4 px-2">
+                  <AdBanner />
+                </div>
               </div>
             </div>
           </aside>

@@ -43,6 +43,13 @@ export interface Asset {
   isLocked?: boolean;
   borderShape?: 'square' | 'circle';
   showTagBorder?: boolean;
+  // Cloud sync properties
+  cloudStatus?: 'local' | 'uploading' | 'synced' | 'failed';
+  cloudId?: string;
+  cloudPath?: string;
+  cloudSize?: number;
+  cloudUpdatedAt?: string;
+  cloudError?: string;
 }
 
 interface AssetItemProps {
