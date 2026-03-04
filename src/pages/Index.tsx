@@ -10,6 +10,7 @@ import WorldCreationDialog from "@/components/WorldCreationDialog";
 import DataManager from "@/components/DataManager";
 import BookShelf from "@/components/books/BookShelf";
 import "@/components/books/leather-styles.css";
+import SideAdBanner from "@/components/SideAdBanner";
 import { useAssetStore } from "@/stores/assetStore";
 import { useBookStore } from "@/stores/bookStoreSimple";
 import { useTagStore } from "@/stores/tagStore";
@@ -236,11 +237,11 @@ const Index = () => {
       />
       
       {/* Content Overlay with Flex Container */}
-      <div className={`relative z-10 min-h-screen transition-opacity duration-2000 ${
+      <div className={`relative z-10 min-h-screen transition-opacity duration-2000 flex ${
         appPhase === 'LIBRARY' || appPhase === 'BOOK_VIEW' ? 'opacity-100' : 'opacity-0'
       }`}>
-        {/* Main App Content - constrained width to leave space for sidebar */}
-        <div className="flex-1 mr-0 xl:mr-[400px]">
+        {/* Main App Content - with max-width to accommodate side ad */}
+        <div className="flex-1 max-w-[calc(100vw-160px)]">
       {/* New Book Shelf */}
       {bookLibraryOpen && (
         <div className={`fixed inset-0 z-50 ${
@@ -321,8 +322,6 @@ const Index = () => {
               <div className="fantasy-sidebar-content">
                 {/* Use the new AssetExplorer component */}
                 <AssetExplorer sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(prev => !prev)} />
-                
-                {/* Ad Banner removed from sidebar - ads should be outside app */}
               </div>
             </div>
           </aside>
@@ -338,6 +337,9 @@ const Index = () => {
         </div>
       )}
         </div>
+        
+        {/* Side Ad Banner */}
+        <SideAdBanner />
       </div>
     </div>
   );

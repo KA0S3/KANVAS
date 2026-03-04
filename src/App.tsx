@@ -6,7 +6,6 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import OwnerDashboard from "./pages/OwnerDashboard";
 import NotFound from "./pages/NotFound";
-import ExternalAdBanner from "./components/ExternalAdBanner";
 
 const queryClient = new QueryClient();
 
@@ -22,8 +21,6 @@ const App = () => (
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
-        {/* External Ad Banner - positioned outside main app content */}
-        <ExternalAdBanner />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
