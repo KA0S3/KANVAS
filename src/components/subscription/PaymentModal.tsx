@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react';
 import { X, CreditCard, Loader2, AlertCircle } from 'lucide-react';
-import { loadStripe, type Stripe } from '@stripe/stripe-js';
-import { STRIPE_PRODUCTS, type StripeProduct } from '@/lib/stripe';
 import { PAYSTACK_PRODUCTS, type PaystackProduct, getPaystackClient, openPaystackPopup } from '@/lib/paystack';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/authStore';
@@ -13,30 +11,21 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-
-const publishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
-const stripePromise = loadStripe(publishableKey);
-
-type PaymentProvider = 'stripe' | 'paystack';
 
 interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  productKey: keyof typeof STRIPE_PRODUCTS | keyof typeof PAYSTACK_PRODUCTS;
+  productKey: keyof typeof PAYSTACK_PRODUCTS;
   onSuccess?: () => void;
 }
 
 export function PaymentModal({ isOpen, onClose, productKey, onSuccess }: PaymentModalProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [paymentProvider, setPaymentProvider] = useState<PaymentProvider>('stripe');
   const { user, fetchUserPlan } = useAuthStore();
 
-  const stripeProduct = STRIPE_PRODUCTS[productKey as keyof typeof STRIPE_PRODUCTS];
-  const paystackProduct = PAYSTACK_PRODUCTS[productKey as keyof typeof PAYSTACK_PRODUCTS];
-  const product = paymentProvider === 'stripe' ? stripeProduct : paystackProduct;
+  const product = PAYSTACK_PRODUCTS[productKey];
 
   const handlePayment = async () => {
     if (!user) {
@@ -55,11 +44,7 @@ export function PaymentModal({ isOpen, onClose, productKey, onSuccess }: Payment
         throw new Error('Authentication required');
       }
 
-      if (paymentProvider === 'stripe') {
-        await handleStripePayment(session, productKey as keyof typeof STRIPE_PRODUCTS);
-      } else {
-        await handlePaystackPayment(session, productKey as keyof typeof PAYSTACK_PRODUCTS);
-      }
+      await handlePaystackPayment(session, productKey);
 
     } catch (err) {
       console.error('Payment error:', err);
@@ -67,39 +52,6 @@ export function PaymentModal({ isOpen, onClose, productKey, onSuccess }: Payment
     } finally {
       setIsProcessing(false);
     }
-  };
-
-  const handleStripePayment = async (session: any, stripeProductKey: keyof typeof STRIPE_PRODUCTS) => {
-    // Call backend to create checkout session
-    const { data, error: functionError } = await supabase.functions.invoke('create-checkout-session', {
-      body: {
-        productKey: stripeProductKey,
-        userId: user.id,
-        email: user.email,
-      },
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-      },
-    });
-
-    if (functionError) {
-      throw new Error(functionError.message || 'Failed to create checkout session');
-    }
-
-    if (!data?.sessionId) {
-      throw new Error('No session ID returned from server');
-    }
-
-    // Load Stripe and redirect to checkout
-    const stripe = await stripePromise;
-    
-    if (!stripe) {
-      throw new Error('Stripe failed to load');
-    }
-
-    // Create checkout session URL
-    const checkoutUrl = `https://checkout.stripe.com/pay/${data.sessionId}`;
-    window.location.href = checkoutUrl;
   };
 
   const handlePaystackPayment = async (session: any, paystackProductKey: keyof typeof PAYSTACK_PRODUCTS) => {
@@ -204,36 +156,13 @@ export function PaymentModal({ isOpen, onClose, productKey, onSuccess }: Payment
             <div className="p-4 border border-glass-border/40 rounded-lg bg-glass/30">
               <h3 className="font-semibold text-lg mb-2">{product.name}</h3>
               <div className="flex items-baseline gap-1 mb-2">
-                <span className="text-2xl font-bold">
-                  {paymentProvider === 'stripe' ? `$${product.price}` : `₦${product.price}`}
-                </span>
+                <span className="text-2xl font-bold">₦{product.price}</span>
                 {product.recurring && <span className="text-sm text-muted-foreground">/month</span>}
               </div>
               <div className="text-sm text-muted-foreground">
                 Storage: {product.storage}
               </div>
             </div>
-          </div>
-
-          {/* Payment Provider Selection */}
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">Choose Payment Method</Label>
-            <RadioGroup value={paymentProvider} onValueChange={(value) => setPaymentProvider(value as PaymentProvider)}>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="stripe" id="stripe" />
-                <Label htmlFor="stripe" className="cursor-pointer">
-                  <CreditCard className="w-4 h-4 inline mr-2" />
-                  Stripe (USD)
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="paystack" id="paystack" />
-                <Label htmlFor="paystack" className="cursor-pointer">
-                  <CreditCard className="w-4 h-4 inline mr-2" />
-                  Paystack (NGN)
-                </Label>
-              </div>
-            </RadioGroup>
           </div>
 
           {/* Error Display */}
@@ -247,10 +176,7 @@ export function PaymentModal({ isOpen, onClose, productKey, onSuccess }: Payment
           {/* Payment Info */}
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
-              {paymentProvider === 'stripe' 
-                ? 'You will be redirected to Stripe to complete your payment securely.'
-                : 'A secure payment popup will open to complete your payment.'
-              }
+              A secure payment popup will open to complete your payment.
             </p>
             <p className="text-xs text-muted-foreground">
               By continuing, you agree to our terms of service and privacy policy.
@@ -280,7 +206,7 @@ export function PaymentModal({ isOpen, onClose, productKey, onSuccess }: Payment
             ) : (
               <>
                 <CreditCard className="w-4 h-4 mr-2" />
-                Pay {paymentProvider === 'stripe' ? `$${product.price}` : `₦${product.price}`}
+                Pay ₦{product.price}
               </>
             )}
           </Button>

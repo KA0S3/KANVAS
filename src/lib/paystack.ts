@@ -1,3 +1,5 @@
+import { supabase } from '@/lib/supabase'
+
 export interface PaystackProduct {
   name: string
   price: number
@@ -56,37 +58,10 @@ export const PAYSTACK_PRODUCTS: Record<string, PaystackProduct> = {
 
 export class PaystackClient {
   private baseUrl = 'https://api.paystack.co'
-  private secretKey: string
 
-  constructor(secretKey?: string) {
-    this.secretKey = secretKey || import.meta.env.VITE_PAYSTACK_SECRET_KEY || ''
-    if (!this.secretKey) {
-      throw new Error('Paystack secret key is required')
-    }
-  }
-
-  private async makeRequest<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
-    const url = `${this.baseUrl}${endpoint}`
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Authorization': `Bearer ${this.secretKey}`,
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(
-        errorData.message || `Paystack API error: ${response.statusText}`
-      )
-    }
-
-    return response.json()
+  constructor() {
+    // Paystack client will use server-side functions for API calls
+    // This is a client-side wrapper that calls Supabase functions
   }
 
   async initializeTransaction(
@@ -94,22 +69,33 @@ export class PaystackClient {
     amount: number,
     metadata?: Record<string, any>
   ): Promise<PaystackInitializeResponse> {
-    return this.makeRequest<PaystackInitializeResponse>('/transaction/initialize', {
-      method: 'POST',
-      body: JSON.stringify({
+    const { data, error } = await supabase.functions.invoke('paystack-initialize', {
+      body: {
         email,
         amount: amount * 100, // Convert to kobo (subunits)
         currency: 'NGN',
         metadata,
         callback_url: `${window.location.origin}/payment/success`,
-      }),
+      },
     })
+
+    if (error) {
+      throw new Error(error.message || 'Failed to initialize Paystack payment')
+    }
+
+    return data
   }
 
   async verifyTransaction(reference: string): Promise<PaystackVerifyResponse> {
-    return this.makeRequest<PaystackVerifyResponse>(
-      `/transaction/verify/${reference}`
-    )
+    const { data, error } = await supabase.functions.invoke('paystack-verify', {
+      body: { reference },
+    })
+
+    if (error) {
+      throw new Error(error.message || 'Failed to verify Paystack transaction')
+    }
+
+    return data
   }
 
   async createCustomer(
@@ -117,14 +103,8 @@ export class PaystackClient {
     firstName?: string,
     lastName?: string
   ): Promise<any> {
-    return this.makeRequest('/customer', {
-      method: 'POST',
-      body: JSON.stringify({
-        email,
-        first_name: firstName,
-        last_name: lastName,
-      }),
-    })
+    // This would be implemented via a Supabase function if needed
+    throw new Error('Customer creation not implemented on client side')
   }
 
   async createSubscription(
@@ -132,14 +112,8 @@ export class PaystackClient {
     plan: string,
     authorization?: string
   ): Promise<any> {
-    return this.makeRequest('/subscription', {
-      method: 'POST',
-      body: JSON.stringify({
-        customer,
-        plan,
-        authorization,
-      }),
-    })
+    // This would be implemented via a Supabase function if needed
+    throw new Error('Subscription creation not implemented on client side')
   }
 
   generateTransactionReference(): string {
