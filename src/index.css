@@ -237,10 +237,10 @@
 
   .fantasy-overlay {
     position: fixed;
-    inset: 0;
-    display: flex;
-    justify-content: flex-end;
-    align-items: stretch;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 400px;
     pointer-events: none;
     z-index: 20;
     padding: 1rem;
@@ -253,7 +253,8 @@
   }
 
   .fantasy-overlay .fantasy-sidebar {
-    width: min(280px, 85vw);
+    width: 100%;
+    height: 100%;
     margin: 0;
     transform: translateX(120%);
     transition: transform 240ms ease, opacity 240ms ease;
@@ -263,7 +264,8 @@
 
   @media (min-width: 768px) {
     .fantasy-overlay .fantasy-sidebar {
-      width: min(320px, 88vw);
+      width: 100%;
+      height: 100%;
     }
   }
 

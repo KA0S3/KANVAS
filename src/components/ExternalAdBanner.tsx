@@ -1,6 +1,6 @@
 import { useAuthStore } from '@/stores/authStore';
 
-const SideAdBanner = () => {
+const ExternalAdBanner = () => {
   const { plan } = useAuthStore();
 
   // Only render for free plan users
@@ -9,7 +9,7 @@ const SideAdBanner = () => {
   }
 
   return (
-    <div className="hidden xl:block fixed top-0 right-0 h-screen w-[200px] bg-card/50 border-l border-border backdrop-blur-sm z-40">
+    <div className="hidden xl:block fixed top-0 right-0 h-screen w-[200px] bg-card/50 border-l border-border backdrop-blur-sm z-30">
       <div className="h-full flex flex-col items-center justify-center p-4">
         {/* Placeholder for AdSense script - vertical banner */}
         <div className="w-full text-center text-muted-foreground" aria-label="Advertisement">
@@ -27,4 +27,4 @@ const SideAdBanner = () => {
   );
 };
 
-export default SideAdBanner;
+export default ExternalAdBanner;
