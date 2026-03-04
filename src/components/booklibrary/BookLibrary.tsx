@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Plus, BookOpen } from 'lucide-react';
+import { X, Plus, BookOpen, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -11,6 +11,7 @@ import { useBookStore } from '@/stores/bookStoreSimple';
 import { useThemeStore } from '@/stores/themeStore';
 import { BookCarousel } from './BookCarousel';
 import { BookEditor } from './BookEditor';
+import { AccountModal } from '@/components/account/AccountModal';
 import type { Book } from '@/types/book';
 
 interface BookLibraryProps {
@@ -32,6 +33,7 @@ export function BookLibrary({ isOpen, onClose, onBookSelect }: BookLibraryProps)
 
   const [editingBook, setEditingBook] = useState<Book | null>(null);
   const [isCreatingBook, setIsCreatingBook] = useState(false);
+  const [showAccountModal, setShowAccountModal] = useState(false);
 
   const allBooks = getAllBooks();
 
@@ -80,11 +82,26 @@ export function BookLibrary({ isOpen, onClose, onBookSelect }: BookLibraryProps)
                 </span>
               </div>
 
-              {/* Create Book Button */}
-              <Button onClick={handleCreateBook} className="gap-2">
-                <Plus className="w-4 h-4" />
-                New World
-              </Button>
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2">
+                {/* Account Button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAccountModal(true)}
+                  className="gap-2"
+                  title="Account"
+                >
+                  <User className="w-4 h-4" />
+                  <span className="hidden sm:inline">Account</span>
+                </Button>
+                
+                {/* Create Book Button */}
+                <Button onClick={handleCreateBook} className="gap-2">
+                  <Plus className="w-4 h-4" />
+                  New World
+                </Button>
+              </div>
             </div>
 
             {/* Book Display Area */}
@@ -121,6 +138,12 @@ export function BookLibrary({ isOpen, onClose, onBookSelect }: BookLibraryProps)
         isOpen={isCreatingBook || !!editingBook}
         onClose={handleCloseEditor}
         book={editingBook}
+      />
+
+      {/* Account Modal */}
+      <AccountModal
+        isOpen={showAccountModal}
+        onClose={() => setShowAccountModal(false)}
       />
     </>
   );

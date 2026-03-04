@@ -136,6 +136,8 @@ class OwnerKeyService {
 
   /**
    * Apply owner key scopes to override plan restrictions
+   * Note: This method only applies owner key overrides. License overrides should be applied separately
+   * and take precedence over owner key overrides.
    */
   applyOwnerKeyOverrides(
     basePlan: 'free' | 'pro' | 'lifetime',
@@ -185,6 +187,36 @@ class OwnerKeyService {
       adsEnabled: limits.adsEnabled,
       importExportEnabled: limits.importExportEnabled,
       features: {}
+    };
+  }
+
+  /**
+   * Apply license overrides with highest precedence
+   */
+  applyLicenseOverrides(
+    currentLimits: any,
+    licenseFeatures?: Record<string, any>
+  ): {
+    effectivePlan: 'free' | 'pro' | 'lifetime';
+    maxStorageBytes: number;
+    adsEnabled: boolean;
+    importExportEnabled: boolean;
+    features: Record<string, any>;
+  } {
+    if (!licenseFeatures) {
+      return currentLimits;
+    }
+
+    return {
+      ...currentLimits,
+      // License features take highest precedence
+      maxStorageBytes: licenseFeatures.max_storage_bytes || currentLimits.maxStorageBytes,
+      adsEnabled: licenseFeatures.ads !== undefined ? licenseFeatures.ads : currentLimits.adsEnabled,
+      importExportEnabled: licenseFeatures.import_export !== undefined ? licenseFeatures.import_export : currentLimits.importExportEnabled,
+      features: {
+        ...currentLimits.features,
+        ...licenseFeatures
+      }
     };
   }
 

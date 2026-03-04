@@ -25,12 +25,21 @@ interface EffectiveLimits {
   features: Record<string, any>;
 }
 
+interface LicenseInfo {
+  id: string;
+  license_type: 'trial' | 'basic' | 'premium' | 'enterprise' | 'custom';
+  status: 'active' | 'expired' | 'suspended' | 'cancelled';
+  features?: Record<string, any>;
+  expires_at?: string;
+}
+
 interface AuthStore {
   user: User | null;
   plan: Plan;
   isAuthenticated: boolean;
   loading: boolean;
   ownerKeyInfo: OwnerKeyInfo | null;
+  licenseInfo: LicenseInfo | null;
   effectiveLimits: EffectiveLimits | null;
   
   // Methods
@@ -40,9 +49,11 @@ interface AuthStore {
   signOut: () => Promise<void>;
   setPlan: (plan: Plan) => void;
   fetchUserPlan: (userId: string) => Promise<void>;
+  fetchUserLicense: (userId: string) => Promise<void>;
+  fetchOwnerKeys: (userId: string) => Promise<void>;
   validateOwnerKey: (token: string) => Promise<{ error?: string; success?: boolean }>;
-  clearOwnerKey: () => void;
-  updateEffectiveLimits: () => void;
+  clearOwnerKey: () => Promise<void>;
+  updateEffectiveLimits: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthStore>()(
@@ -54,6 +65,7 @@ export const useAuthStore = create<AuthStore>()(
       isAuthenticated: false,
       loading: true,
       ownerKeyInfo: null,
+      licenseInfo: null,
       effectiveLimits: null,
 
       // Initialize auth listener
@@ -73,6 +85,10 @@ export const useAuthStore = create<AuthStore>()(
               
               // Fetch user plan from Supabase
               await get().fetchUserPlan(session.user.id);
+              // Fetch license information
+              await get().fetchUserLicense(session.user.id);
+              // Fetch owner keys
+              await get().fetchOwnerKeys(session.user.id);
             } else {
               // User is signed out
               set({
@@ -81,6 +97,7 @@ export const useAuthStore = create<AuthStore>()(
                 isAuthenticated: false,
                 loading: false,
                 ownerKeyInfo: null,
+                licenseInfo: null,
                 effectiveLimits: null,
               });
             }
@@ -97,6 +114,8 @@ export const useAuthStore = create<AuthStore>()(
               ownerKeyInfo: null, // Clear owner key on session restore
             });
             await get().fetchUserPlan(session.user.id);
+            await get().fetchUserLicense(session.user.id);
+            await get().fetchOwnerKeys(session.user.id);
           } else {
             set({
               user: null,
@@ -104,6 +123,7 @@ export const useAuthStore = create<AuthStore>()(
               isAuthenticated: false,
               loading: false,
               ownerKeyInfo: null,
+              licenseInfo: null,
               effectiveLimits: null,
             });
           }
@@ -188,18 +208,18 @@ export const useAuthStore = create<AuthStore>()(
             console.warn('Failed to fetch user plan, using default:', error);
             // Don't fail the app if we can't fetch the plan
             set({ plan: 'free' });
-            get().updateEffectiveLimits();
+            await get().updateEffectiveLimits();
             return;
           }
 
           const userPlan = data?.plan as Plan || 'free';
           set({ plan: userPlan });
-          get().updateEffectiveLimits();
+          await get().updateEffectiveLimits();
         } catch (error) {
           console.warn('Unexpected error fetching user plan, using default:', error);
           // Never block the app if auth fails
           set({ plan: 'free' });
-          get().updateEffectiveLimits();
+          await get().updateEffectiveLimits();
         }
       },
 
@@ -216,34 +236,107 @@ export const useAuthStore = create<AuthStore>()(
                 userId: result.userId
               }
             });
-            get().updateEffectiveLimits();
+            await get().updateEffectiveLimits();
             return { success: true };
           } else {
             set({ ownerKeyInfo: null });
-            get().updateEffectiveLimits();
+            await get().updateEffectiveLimits();
             return { error: result.error || 'Invalid owner key' };
           }
         } catch (error) {
           console.error('Owner key validation error:', error);
           set({ ownerKeyInfo: null });
-          get().updateEffectiveLimits();
+          await get().updateEffectiveLimits();
           return { error: 'Owner key validation failed' };
         }
       },
 
       // Clear owner key
-      clearOwnerKey: () => {
+      clearOwnerKey: async () => {
         set({ ownerKeyInfo: null });
-        get().updateEffectiveLimits();
+        await get().updateEffectiveLimits();
       },
 
-      // Update effective limits based on plan and owner key
-      updateEffectiveLimits: () => {
-        const { plan, ownerKeyInfo } = get();
-        const limits = ownerKeyService.applyOwnerKeyOverrides(
-          plan,
-          ownerKeyInfo?.scopes
-        );
+      // Fetch user license from Supabase
+      fetchUserLicense: async (userId: string) => {
+        try {
+          const { data, error } = await supabase
+            .from('licenses')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('status', 'active')
+            .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString())
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          if (error) {
+            console.warn('Failed to fetch user license:', error);
+            set({ licenseInfo: null });
+            await get().updateEffectiveLimits();
+            return;
+          }
+
+          set({ licenseInfo: data });
+          await get().updateEffectiveLimits();
+        } catch (error) {
+          console.warn('Unexpected error fetching user license:', error);
+          set({ licenseInfo: null });
+          await get().updateEffectiveLimits();
+        }
+      },
+
+      // Fetch owner keys for user
+      fetchOwnerKeys: async (userId: string) => {
+        try {
+          const { data, error } = await supabase
+            .from('owner_keys')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('is_revoked', false)
+            .gt('expires_at', new Date().toISOString())
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+          if (error) {
+            console.warn('Failed to fetch owner keys:', error);
+            set({ ownerKeyInfo: null });
+            await get().updateEffectiveLimits();
+            return;
+          }
+
+          if (data && data.length > 0) {
+            const ownerKey = data[0];
+            set({
+              ownerKeyInfo: {
+                isValid: true,
+                scopes: ownerKey.scopes,
+                userId: ownerKey.user_id
+              }
+            });
+          } else {
+            set({ ownerKeyInfo: null });
+          }
+          await get().updateEffectiveLimits();
+        } catch (error) {
+          console.warn('Unexpected error fetching owner keys:', error);
+          set({ ownerKeyInfo: null });
+          await get().updateEffectiveLimits();
+        }
+      },
+
+      // Update effective limits based on plan, license, and owner key
+      updateEffectiveLimits: async () => {
+        const { plan, ownerKeyInfo, licenseInfo } = get();
+        
+        // Start with base plan limits + owner key overrides
+        let limits = ownerKeyService.applyOwnerKeyOverrides(plan, ownerKeyInfo?.scopes);
+        
+        // Apply license overrides with highest precedence
+        if (licenseInfo && licenseInfo.features) {
+          limits = ownerKeyService.applyLicenseOverrides(limits, licenseInfo.features);
+        }
+        
         set({ effectiveLimits: limits });
       },
     }),
@@ -253,6 +346,7 @@ export const useAuthStore = create<AuthStore>()(
       partialize: (state) => ({
         plan: state.plan,
         isAuthenticated: state.isAuthenticated,
+        licenseInfo: state.licenseInfo,
       }),
     }
   )

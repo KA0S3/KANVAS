@@ -11,12 +11,14 @@ import DataManager from "@/components/DataManager";
 import BookShelf from "@/components/books/BookShelf";
 import "@/components/books/leather-styles.css";
 import AdBanner from "@/components/AdBanner";
+import SideAdBanner from "@/components/SideAdBanner";
 import { useAssetStore } from "@/stores/assetStore";
 import { useBookStore } from "@/stores/bookStoreSimple";
 import { useTagStore } from "@/stores/tagStore";
 import { useThemeStore } from "@/stores/themeStore";
 import { useBackgroundStore } from "@/stores/backgroundStore";
 import { useMediaStore } from "@/stores/mediaStore";
+import { useAuthStore } from "@/stores/authStore";
 import { audioEngine } from "@/services/AudioEngine";
 import SplashScreen from "@/components/media/SplashScreen";
 import IntroVideo from "@/components/media/IntroVideo";
@@ -35,6 +37,12 @@ const Index = () => {
   const { theme } = useThemeStore();
   const { getBackground } = useBackgroundStore(); // Initialize background store
   const { appPhase, showLibrary, setTransitioning, setAppPhase } = useMediaStore();
+  const { initializeAuth } = useAuthStore(); // Initialize auth store
+
+  // Initialize auth on app mount
+  useEffect(() => {
+    initializeAuth();
+  }, [initializeAuth]);
 
   useEffect(() => {
     document.documentElement.className = theme;
@@ -229,10 +237,12 @@ const Index = () => {
         }}
       />
       
-      {/* Content Overlay */}
-      <div className={`relative z-10 min-h-screen transition-opacity duration-2000 ${
+      {/* Content Overlay with Flex Container */}
+      <div className={`relative z-10 min-h-screen transition-opacity duration-2000 flex ${
         appPhase === 'LIBRARY' || appPhase === 'BOOK_VIEW' ? 'opacity-100' : 'opacity-0'
       }`}>
+        {/* Main App Content */}
+        <div className="flex-1">
       {/* New Book Shelf */}
       {bookLibraryOpen && (
         <div className={`fixed inset-0 z-50 ${
@@ -332,6 +342,10 @@ const Index = () => {
           )}
         </div>
       )}
+        </div>
+        
+        {/* Side Ad Banner */}
+        <SideAdBanner />
       </div>
     </div>
   );

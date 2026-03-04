@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, CreditCard, Loader2, AlertCircle } from 'lucide-react';
+import { X, CreditCard, Loader2, AlertCircle, ChevronDown, ChevronUp, Tag } from 'lucide-react';
 import { PAYSTACK_PRODUCTS, type PaystackProduct, getPaystackClient, openPaystackPopup } from '@/lib/paystack';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/authStore';
@@ -11,7 +11,10 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { useToast } from '@/hooks/use-toast';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -23,13 +26,48 @@ interface PaymentModalProps {
 export function PaymentModal({ isOpen, onClose, productKey, onSuccess }: PaymentModalProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [promoCode, setPromoCode] = useState('');
+  const [isPromoOpen, setIsPromoOpen] = useState(false);
+  const [isApplyingPromo, setIsApplyingPromo] = useState(false);
+  const [appliedPromo, setAppliedPromo] = useState<any>(null);
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [finalPrice, setFinalPrice] = useState(0);
   const { user, fetchUserPlan } = useAuthStore();
+  const { toast } = useToast();
 
   const product = PAYSTACK_PRODUCTS[productKey];
+  const currentPrice = finalPrice || product.price;
 
   const handlePayment = async () => {
     if (!user) {
       setError('You must be signed in to make a purchase');
+      return;
+    }
+
+    // If we have an applied free plan promo, bypass payment
+    if (appliedPromo && appliedPromo.type === 'free_plan') {
+      setIsProcessing(true);
+      setError(null);
+      
+      try {
+        const result = await applyPromoCode();
+        if (result.success) {
+          toast({
+            title: "Success!",
+            description: result.message,
+          });
+          await fetchUserPlan(user.id);
+          onSuccess?.();
+          handleClose();
+        } else {
+          setError(result.error || 'Failed to apply promo code');
+        }
+      } catch (err) {
+        console.error('Promo application error:', err);
+        setError(err instanceof Error ? err.message : 'Failed to apply promo code');
+      } finally {
+        setIsProcessing(false);
+      }
       return;
     }
 
@@ -88,6 +126,15 @@ export function PaymentModal({ isOpen, onClose, productKey, onSuccess }: Payment
             const verifyData = await paystackClient.verifyTransaction(reference);
             
             if (verifyData.status && verifyData.data.status === 'success') {
+              // If there's a promo code applied, apply it now
+              if (appliedPromo && appliedPromo.type !== 'free_plan') {
+                const applyResult = await applyPromoCode();
+                if (!applyResult.success) {
+                  console.error('Failed to apply promo code after payment:', applyResult.error);
+                  // Don't fail the payment, but log the error
+                }
+              }
+              
               // Refresh user plan
               if (user) {
                 await fetchUserPlan(user.id);
@@ -120,7 +167,96 @@ export function PaymentModal({ isOpen, onClose, productKey, onSuccess }: Payment
   const handleClose = () => {
     setError(null);
     setIsProcessing(false);
+    setPromoCode('');
+    setAppliedPromo(null);
+    setDiscountAmount(0);
+    setFinalPrice(0);
+    setIsPromoOpen(false);
     onClose();
+  };
+
+  const validatePromoCode = async () => {
+    if (!promoCode.trim() || !user) return;
+
+    setIsApplyingPromo(true);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/validate-promo`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            code: promoCode,
+            userId: user.id,
+            productKey
+          })
+        }
+      );
+
+      const result = await response.json();
+
+      if (result.valid) {
+        setAppliedPromo(result.promoCode);
+        setDiscountAmount(result.discountAmount || 0);
+        setFinalPrice(result.adjustedPrice || product.price);
+        toast({
+          title: "Promo Code Applied!",
+          description: result.discountAmount 
+            ? `You saved ₦${result.discountAmount}`
+            : "Promo code applied successfully",
+        });
+      } else {
+        setError(result.error || 'Invalid promo code');
+      }
+    } catch (err) {
+      console.error('Promo validation error:', err);
+      setError('Failed to validate promo code');
+    } finally {
+      setIsApplyingPromo(false);
+    }
+  };
+
+  const applyPromoCode = async () => {
+    if (!appliedPromo || !user) {
+      return { success: false, error: 'No promo code applied' };
+    }
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/apply-promo`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            code: appliedPromo.code,
+            userId: user.id,
+            productKey,
+            originalPrice: product.price
+          })
+        }
+      );
+
+      const result = await response.json();
+      return result;
+    } catch (err) {
+      console.error('Promo application error:', err);
+      return { success: false, error: 'Failed to apply promo code' };
+    }
+  };
+
+  const removePromoCode = () => {
+    setPromoCode('');
+    setAppliedPromo(null);
+    setDiscountAmount(0);
+    setFinalPrice(0);
   };
 
   // Listen for successful payment return
@@ -156,13 +292,87 @@ export function PaymentModal({ isOpen, onClose, productKey, onSuccess }: Payment
             <div className="p-4 border border-glass-border/40 rounded-lg bg-glass/30">
               <h3 className="font-semibold text-lg mb-2">{product.name}</h3>
               <div className="flex items-baseline gap-1 mb-2">
-                <span className="text-2xl font-bold">₦{product.price}</span>
-                {product.recurring && <span className="text-sm text-muted-foreground">/month</span>}
+                {discountAmount > 0 ? (
+                  <>
+                    <span className="text-lg text-muted-foreground line-through">₦{product.price}</span>
+                    <span className="text-2xl font-bold text-green-600">₦{currentPrice}</span>
+                    <span className="text-sm text-green-600 ml-2">Save ₦{discountAmount}</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-2xl font-bold">₦{currentPrice}</span>
+                    {product.recurring && <span className="text-sm text-muted-foreground">/month</span>}
+                  </>
+                )}
               </div>
               <div className="text-sm text-muted-foreground">
                 Storage: {product.storage}
               </div>
+              {appliedPromo && (
+                <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-sm">
+                  <div className="flex items-center gap-2 text-green-700">
+                    <Tag className="w-4 h-4" />
+                    Promo code applied: {appliedPromo.code}
+                  </div>
+                  {appliedPromo.type === 'free_plan' && (
+                    <div className="text-green-600 mt-1">Free plan granted!</div>
+                  )}
+                </div>
+              )}
             </div>
+
+            {/* Promo Code Section */}
+            <Collapsible open={isPromoOpen} onOpenChange={setIsPromoOpen}>
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-between text-sm"
+                  disabled={!!appliedPromo}
+                >
+                  <span className="flex items-center gap-2">
+                    <Tag className="w-4 h-4" />
+                    {appliedPromo ? 'Promo code applied' : 'Have a promo code?'}
+                  </span>
+                  {isPromoOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-3 mt-3">
+                <div className="space-y-2">
+                  <Label htmlFor="promo-code">Promo Code</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="promo-code"
+                      placeholder="Enter promo code"
+                      value={promoCode}
+                      onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                      disabled={isApplyingPromo || !!appliedPromo}
+                      className="flex-1"
+                    />
+                    {!appliedPromo ? (
+                      <Button
+                        onClick={validatePromoCode}
+                        disabled={!promoCode.trim() || isApplyingPromo}
+                        size="sm"
+                      >
+                        {isApplyingPromo ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          'Apply'
+                        )}
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={removePromoCode}
+                        variant="outline"
+                        size="sm"
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
           </div>
 
           {/* Error Display */}
@@ -201,12 +411,17 @@ export function PaymentModal({ isOpen, onClose, productKey, onSuccess }: Payment
             {isProcessing ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Processing...
+                {appliedPromo?.type === 'free_plan' ? 'Granting...' : 'Processing...'}
+              </>
+            ) : appliedPromo?.type === 'free_plan' ? (
+              <>
+                <Tag className="w-4 h-4 mr-2" />
+                Grant Free Plan
               </>
             ) : (
               <>
                 <CreditCard className="w-4 h-4 mr-2" />
-                Pay ₦{product.price}
+                Pay ₦{currentPrice}
               </>
             )}
           </Button>

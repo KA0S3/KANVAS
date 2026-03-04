@@ -1,4 +1,4 @@
-import { Plus, Search, Settings, Tag, Users, Building, Sparkles, Swords, X, Image } from 'lucide-react';
+import { Plus, Search, Settings, User, Tag, Users, Building, Sparkles, Swords, X, Image } from 'lucide-react';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useAssetStore } from '@/stores/assetStore';
 import { AssetTreeNode } from './AssetTreeNode';
@@ -9,6 +9,7 @@ import { GlobalTagManager } from '@/components/tags/GlobalTagManager';
 import { cn } from '@/lib/utils';
 import { AssetCreationModal } from '@/components/asset/AssetCreationModal';
 import { SettingsPanel } from '@/components/settings/SettingsPanel';
+import { AccountModal } from '@/components/account/AccountModal';
 import type { Asset } from '@/components/AssetItem';
 
 interface AssetExplorerProps {
@@ -21,6 +22,7 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
   const [searchQuery, setSearchQuery] = useState('');
   const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
+  const [accountModalOpen, setAccountModalOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalInitialData, setModalInitialData] = useState<any>(null);
   const [generatorImportData, setGeneratorImportData] = useState<any>(null);
@@ -135,7 +137,17 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
             size="sm"
             variant="ghost"
             className="h-6 w-6 p-0"
+            onClick={() => setAccountModalOpen(true)}
+            title="Account"
+          >
+            <User className="w-3.5 h-3.5" />
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 w-6 p-0"
             onClick={() => setSettingsPanelOpen(true)}
+            title="Settings"
           >
             <Settings className="w-3.5 h-3.5" />
           </Button>
@@ -146,6 +158,7 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
               variant="ghost"
               className="h-6 w-6 p-0"
               onClick={onToggleSidebar}
+              title="Close sidebar"
             >
               <X className="w-3.5 h-3.5" />
             </Button>
@@ -269,6 +282,12 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
       <SettingsPanel
         isOpen={settingsPanelOpen}
         onClose={() => setSettingsPanelOpen(false)}
+      />
+
+      {/* Account Modal */}
+      <AccountModal
+        isOpen={accountModalOpen}
+        onClose={() => setAccountModalOpen(false)}
       />
 
       {/* Asset Creation Modal */}
