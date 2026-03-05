@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useBookStore } from "@/stores/bookStoreSimple";
+import { useCanCreateBook } from "@/lib/limits";
 import LeatherColorPicker from "./books/LeatherColorPicker";
 import type { LeatherColorPreset } from "@/types/book";
 
@@ -23,6 +24,7 @@ const WorldCreationDialog = ({ children, onWorldCreated }: WorldCreationDialogPr
   const [selectedLeatherColor, setSelectedLeatherColor] = useState<LeatherColorPreset | null>(null);
   const [customCoverImage, setCustomCoverImage] = useState<string | null>(null);
   const { createBook, leatherPresets } = useBookStore();
+  const { canCreate: canCreateNewBook, reason, upgradePrompt } = useCanCreateBook();
 
   const colorOptions = [
     { value: '#00D9FF', label: 'Electric Azure', gradient: 'linear-gradient(135deg, rgba(0,217,255,0.6), rgba(0,149,255,0.4)), radial-gradient(circle at 30% 30%, rgba(255,255,255,0.7), transparent 50%)' },
@@ -35,6 +37,12 @@ const WorldCreationDialog = ({ children, onWorldCreated }: WorldCreationDialogPr
 
   const handleCreateWorld = () => {
     if (!title.trim()) return;
+    
+    if (!canCreateNewBook) {
+      // TODO: Show upgrade prompt
+      console.log('Book limit reached, show upgrade prompt');
+      return;
+    }
 
     const defaultLeatherColor = leatherPresets[0];
     const leatherColorToUse = selectedLeatherColor || defaultLeatherColor;

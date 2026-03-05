@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { BookOpen, ChevronLeft, Database, Trash2 } from "lucide-react";
+import { BookOpen, ChevronLeft, Database, Trash2, Edit } from "lucide-react";
 import cosmicBackground from "@/assets/cosmic-background.png";
 import lightBackground from "@/assets/BG-light.png";
 import { AssetPort } from "@/components/AssetPort";
@@ -9,8 +9,12 @@ import { Button } from "@/components/ui/button";
 import WorldCreationDialog from "@/components/WorldCreationDialog";
 import DataManager from "@/components/DataManager";
 import BookShelf from "@/components/books/BookShelf";
+import BookEditDialog from "@/components/BookEditDialog";
 import "@/components/books/leather-styles.css";
 import SideAdBanner from "@/components/SideAdBanner";
+import { QuotaWarningBar } from "@/components/QuotaWarningBar";
+import { LocalStorageWarning } from "@/components/LocalStorageWarning";
+import { AccountModal } from "@/components/account/AccountModal";
 import { useAssetStore } from "@/stores/assetStore";
 import { useBookStore } from "@/stores/bookStoreSimple";
 import { useTagStore } from "@/stores/tagStore";
@@ -30,13 +34,16 @@ const Index = () => {
   const [bookLibraryOpen, setBookLibraryOpen] = useState(true);
   const [backgroundRefreshTrigger, setBackgroundRefreshTrigger] = useState(0);
   const [showBookEntryAnimation, setShowBookEntryAnimation] = useState(false);
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const { currentActiveId, loadWorldData, isEditingBackground, setIsEditingBackground, currentViewportId, setActiveAsset, assets, setCurrentViewportId } = useAssetStore();
   const { loadWorldData: loadTagWorldData } = useTagStore();
   const { currentBookId, setCurrentBook, getAllBooks, deleteBook } = useBookStore();
   const { theme } = useThemeStore();
   const { getBackground } = useBackgroundStore(); // Initialize background store
   const { appPhase, showLibrary, setTransitioning, setAppPhase } = useMediaStore();
-  const { initializeAuth } = useAuthStore(); // Initialize auth store
+  const { initializeAuth, effectiveLimits } = useAuthStore(); // Initialize auth store
+  const showAds = effectiveLimits?.adsEnabled ?? true;
 
   // Initialize auth on app mount
   useEffect(() => {
@@ -188,12 +195,8 @@ const Index = () => {
     setBookLibraryOpen(true);
   };
 
-  const handleDeleteWorld = (bookId: string, event: React.MouseEvent) => {
-    event.stopPropagation();
-    
-    if (window.confirm('Are you sure you want to delete this world? This action cannot be undone.')) {
-      deleteBook(bookId);
-    }
+  const handleDeleteWorld = (book: Book) => {
+    deleteBook(book.id);
   };
 
   const handleWorldCreated = (newBookId: string) => {
@@ -207,6 +210,13 @@ const Index = () => {
     }
   };
 
+  const handleEditBook = () => {
+    const currentBook = getAllBooks().find(b => b.id === currentBookId);
+    if (currentBook) {
+      setIsEditDialogOpen(true);
+    }
+  };
+
   const backgroundStyle = {
     backgroundImage: `url(${theme === 'dark' ? cosmicBackground : lightBackground})`,
     backgroundSize: '300%',
@@ -215,7 +225,13 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
+    <div className="h-screen bg-background text-foreground relative overflow-hidden">
+      {/* Quota Warning Bar */}
+      <QuotaWarningBar />
+      
+      {/* LocalStorage Warning */}
+      <LocalStorageWarning onOpenAccountModal={() => setShowAccountModal(true)} />
+      
       {/* Media Experience Layers */}
       {appPhase === 'SPLASH' && <SplashScreen />}
       {appPhase === 'INTRO_VIDEO' && <IntroVideo />}
@@ -237,30 +253,18 @@ const Index = () => {
       />
       
       {/* Content Overlay with Flex Container */}
-      <div className={`relative z-10 min-h-screen transition-opacity duration-2000 flex ${
+      <div className={`relative z-10 h-screen transition-opacity duration-2000 flex w-full overflow-hidden ${
         appPhase === 'LIBRARY' || appPhase === 'BOOK_VIEW' ? 'opacity-100' : 'opacity-0'
       }`}>
-        {/* Main App Content - with max-width to accommodate side ad */}
-        <div className="flex-1 max-w-[calc(100vw-160px)]">
+        {/* Main App Content - with dynamic max-width based on ad visibility */}
+        <div className="flex-1 h-screen overflow-hidden" style={{ maxWidth: `calc(100vw - ${showAds ? '160px' : '0px'})` }}>
       {/* New Book Shelf */}
       {bookLibraryOpen && (
-        <div className={`fixed inset-0 z-50 ${
+        <div className={`fixed inset-0 z-50 h-screen overflow-hidden ${
           theme === 'dark' ? 'bg-black/95' : 'bg-background/95'
         }`}>
           <div className="relative h-full">
-            {/* Close Button */}
-            <button
-              onClick={() => setBookLibraryOpen(false)}
-              className={`absolute top-4 right-4 z-10 p-2 rounded-lg transition-colors ${
-                theme === 'dark'
-                  ? 'bg-gray-800 hover:bg-gray-700 text-white'
-                  : 'bg-card hover:bg-accent text-foreground border border-border'
-              }`}
-              title="Close library"
-            >
-              ✖️
-            </button>
-
+            
             {/* Book Shelf Component */}
             <BookShelf
               onBookSelect={handleBookSelect}
@@ -270,6 +274,23 @@ const Index = () => {
               className="h-full"
               enableEditing={true}
             />
+
+            {/* Edit Book Button */}
+            <div className="absolute bottom-20 left-6 z-10">
+              <Button
+                onClick={handleEditBook}
+                disabled={!currentBookId}
+                className={`${
+                  theme === 'dark' 
+                    ? 'bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:opacity-50' 
+                    : 'bg-primary hover:bg-primary/90 disabled:bg-gray-400 disabled:opacity-50'
+                }`}
+                title="Edit current book"
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                <span className="text-sm font-medium">Edit</span>
+              </Button>
+            </div>
 
             {/* Create Book Button */}
             <div className="absolute bottom-6 left-6 z-10">
@@ -303,9 +324,9 @@ const Index = () => {
 
       {/* Main App Content */}
       {currentBookId && (
-        <div className="flex h-screen flex-col md:flex-row">
+        <div className="flex h-screen flex-col md:flex-row overflow-hidden">
           {/* Main Content Area */}
-          <div className="flex-1 flex flex-col relative min-h-0">
+          <div className="flex-1 flex flex-col relative min-h-0 overflow-hidden">
             {/* Asset Port */}
             <div className="flex-1 p-2 md:p-4 overflow-hidden">
               <AssetPort 
@@ -341,6 +362,19 @@ const Index = () => {
         {/* Side Ad Banner */}
         <SideAdBanner />
       </div>
+      
+      {/* Account Modal */}
+      <AccountModal
+        isOpen={showAccountModal}
+        onClose={() => setShowAccountModal(false)}
+      />
+
+      {/* Book Edit Dialog */}
+      <BookEditDialog
+        book={getAllBooks().find(b => b.id === currentBookId)}
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+      />
     </div>
   );
 };

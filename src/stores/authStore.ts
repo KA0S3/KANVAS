@@ -2,9 +2,12 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase } from '@/lib/supabase';
 import { ownerKeyService } from '@/services/ownerKeyService';
+import { updateQuotaBasedOnPlan } from '@/stores/cloudStore';
+import { getPlanConfig, migrateLegacyPlanId } from '@/lib/plans';
+import { getEffectiveLimitsWithFallback, type EffectiveLimits } from '@/services/effectiveLimitsService';
 import type { User } from '@supabase/supabase-js';
 
-type Plan = 'free' | 'pro' | 'lifetime';
+type Plan = 'guest' | 'free' | 'pro' | 'lifetime';
 
 interface OwnerKeyInfo {
   isValid: boolean;
@@ -15,14 +18,6 @@ interface OwnerKeyInfo {
     [key: string]: any;
   };
   userId?: string;
-}
-
-interface EffectiveLimits {
-  effectivePlan: Plan;
-  maxStorageBytes: number;
-  adsEnabled: boolean;
-  importExportEnabled: boolean;
-  features: Record<string, any>;
 }
 
 interface LicenseInfo {
@@ -200,7 +195,7 @@ export const useAuthStore = create<AuthStore>()(
         try {
           const { data, error } = await supabase
             .from('users')
-            .select('plan')
+            .select('plan_type')
             .eq('id', userId)
             .single();
 
@@ -212,7 +207,10 @@ export const useAuthStore = create<AuthStore>()(
             return;
           }
 
-          const userPlan = data?.plan as Plan || 'free';
+          // Migrate legacy plan names if needed
+          let userPlan = data?.plan_type as Plan || 'free';
+          userPlan = migrateLegacyPlanId(userPlan) as Plan;
+          
           set({ plan: userPlan });
           await get().updateEffectiveLimits();
         } catch (error) {
@@ -325,20 +323,64 @@ export const useAuthStore = create<AuthStore>()(
         }
       },
 
-      // Update effective limits based on plan, license, and owner key
-      updateEffectiveLimits: async () => {
-        const { plan, ownerKeyInfo, licenseInfo } = get();
-        
-        // Start with base plan limits + owner key overrides
-        let limits = ownerKeyService.applyOwnerKeyOverrides(plan, ownerKeyInfo?.scopes);
-        
-        // Apply license overrides with highest precedence
-        if (licenseInfo && licenseInfo.features) {
-          limits = ownerKeyService.applyLicenseOverrides(limits, licenseInfo.features);
+  // Update effective limits using server-side computation
+  updateEffectiveLimits: async () => {
+    const { user } = get();
+    
+    if (!user) {
+      // For guest users, set minimal limits
+      const guestLimits: EffectiveLimits = {
+        quotaBytes: 0,
+        maxBooks: 1,
+        adsEnabled: true,
+        importExportEnabled: false,
+        source: {
+          plan: 'guest'
         }
-        
-        set({ effectiveLimits: limits });
-      },
+      };
+      set({ effectiveLimits: guestLimits });
+      updateQuotaBasedOnPlan();
+      return;
+    }
+
+    try {
+      // Fetch authoritative effective limits from server
+      const limits = await getEffectiveLimitsWithFallback();
+      set({ effectiveLimits: limits });
+      
+      // Update cloudStore quota based on new effective limits
+      updateQuotaBasedOnPlan();
+      
+      console.log('[authStore] Updated effective limits from server:', limits);
+    } catch (error) {
+      console.error('[authStore] Failed to update effective limits:', error);
+      
+      // Fallback to client-side computation if server fails
+      const { plan, ownerKeyInfo, licenseInfo } = get();
+      let limits = ownerKeyService.applyOwnerKeyOverrides(plan, ownerKeyInfo?.scopes);
+      
+      if (licenseInfo && licenseInfo.features) {
+        limits = ownerKeyService.applyLicenseOverrides(limits, licenseInfo.features);
+      }
+      
+      // Convert to EffectiveLimits format
+      const fallbackLimits: EffectiveLimits = {
+        quotaBytes: limits.quotaBytes,
+        maxBooks: limits.maxBooks,
+        adsEnabled: limits.adsEnabled,
+        importExportEnabled: limits.importExportEnabled,
+        expiresAt: licenseInfo?.expires_at,
+        source: {
+          plan: limits.effectivePlan,
+          licenseId: licenseInfo?.id,
+          ownerKeyId: ownerKeyInfo?.userId ? 'owner-key' : undefined
+        }
+      };
+      
+      set({ effectiveLimits: fallbackLimits });
+      updateQuotaBasedOnPlan();
+    }
+  },
     }),
     {
       name: 'kanvas-auth',

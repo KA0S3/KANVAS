@@ -2,9 +2,11 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Database, Ticket } from "lucide-react";
+import { Users, Database, Ticket, Bug, Key } from "lucide-react";
 import UserManager from "@/components/UserManager";
 import PromoCodeManager from "@/components/PromoCodeManager";
+import OwnerKeyManager from "@/components/OwnerKeyManager";
+import { EffectiveLimitsDebug } from "@/components/debug/EffectiveLimitsDebug";
 
 const OwnerDashboard = () => {
   const navigate = useNavigate();
@@ -62,6 +64,16 @@ const OwnerDashboard = () => {
         {/* Promo Code Manager Section */}
         <div className="mb-8">
           <PromoCodeManager />
+        </div>
+
+        {/* Owner Key Manager Section */}
+        <div className="mb-8">
+          <OwnerKeyManager />
+        </div>
+
+        {/* Effective Limits Debug Section */}
+        <div className="mb-8">
+          <EffectiveLimitsDebug />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

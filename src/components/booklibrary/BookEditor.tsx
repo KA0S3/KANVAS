@@ -11,6 +11,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useBookStore } from '@/stores/bookStoreSimple';
+import { useCanCreateBook } from '@/lib/limits';
+import { UpgradePromptModal } from '@/components/UpgradePromptModal';
 import type { Book } from '@/types/book';
 
 interface BookEditorProps {
@@ -21,6 +23,7 @@ interface BookEditorProps {
 
 export function BookEditor({ isOpen, onClose, book }: BookEditorProps) {
   const { createBook, updateBook, coverPresets } = useBookStore();
+  const { canCreate: canCreateBook, reason, upgradePrompt } = useCanCreateBook();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [formData, setFormData] = useState({
@@ -35,8 +38,16 @@ export function BookEditor({ isOpen, onClose, book }: BookEditorProps) {
     book ? coverPresets.find(p => p.color === book.color) : coverPresets[0]
   );
 
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check limits for new book creation (not for editing existing books)
+    if (!book && !canCreateBook) {
+      setShowUpgradePrompt(true);
+      return;
+    }
     
     const bookData = {
       title: formData.title.trim(),
@@ -54,6 +65,16 @@ export function BookEditor({ isOpen, onClose, book }: BookEditorProps) {
     }
 
     onClose();
+  };
+
+  const handleUpgradeAction = () => {
+    if (reason === 'guest_limit') {
+      // TODO: Open account modal for sign in
+      console.log('Open account modal for sign in');
+    } else if (reason === 'plan_limit') {
+      // TODO: Navigate to upgrade page or open upgrade modal
+      console.log('Navigate to upgrade flow');
+    }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -86,145 +107,160 @@ export function BookEditor({ isOpen, onClose, book }: BookEditorProps) {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl glass cosmic-glow border-glass-border/40">
-        <DialogHeader>
-          <DialogTitle>
-            {book ? 'Edit Book' : 'Create New Book'}
-          </DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-2xl glass cosmic-glow border-glass-border/40">
+          <DialogHeader>
+            <DialogTitle>
+              {book ? 'Edit Book' : 'Create New Book'}
+            </DialogTitle>
+          </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Book Preview */}
-          <div className="flex justify-center">
-            <div className="relative">
-              <div
-                className="w-24 h-36 rounded-sm shadow-xl flex items-center justify-center text-white font-bold text-center p-2"
-                style={{
-                  background: formData.coverImage 
-                    ? `url(${formData.coverImage}) center/cover` 
-                    : formData.gradient || formData.color,
-                }}
-              >
-                {!formData.coverImage && (
-                  <span className="text-xs line-clamp-3">
-                    {formData.title || 'New Book'}
-                  </span>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Book Preview */}
+            <div className="flex justify-center">
+              <div className="relative">
+                <div
+                  className="w-24 h-36 rounded-sm shadow-xl flex items-center justify-center text-white font-bold text-center p-2"
+                  style={{
+                    background: formData.coverImage 
+                      ? `url(${formData.coverImage}) center/cover` 
+                      : formData.gradient || formData.color,
+                  }}
+                >
+                  {!formData.coverImage && (
+                    <span className="text-xs line-clamp-3">
+                      {formData.title || 'New Book'}
+                    </span>
+                  )}
+                </div>
+                {formData.coverImage && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    className="absolute -top-2 -right-2 w-6 h-6 p-0 rounded-full"
+                    onClick={handleRemoveImage}
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
                 )}
               </div>
-              {formData.coverImage && (
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  className="absolute -top-2 -right-2 w-6 h-6 p-0 rounded-full"
-                  onClick={handleRemoveImage}
-                >
-                  <X className="w-3 h-3" />
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* Text Settings */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Palette className="w-4 h-4" />
-              <Label>Text Settings</Label>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="title">Title *</Label>
-              <Input
-                id="title"
-                value={formData.title}
-                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                placeholder="Enter book title..."
-                required
-                className="bg-glass/50 border-glass-border/40"
-              />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Enter book description..."
-                rows={3}
-                className="bg-glass/50 border-glass-border/40"
-              />
-            </div>
-          </div>
-
-          {/* Cover Aesthetics */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Palette className="w-4 h-4" />
-              <Label>Cover Aesthetics</Label>
-            </div>
-
-            {/* Preset Colors */}
-            <div className="space-y-2">
-              <Label className="text-sm">Color presets (Leather and Gradient):</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {coverPresets.map((preset) => (
-                  <Button
-                    key={preset.id}
-                    type="button"
-                    variant={selectedPreset?.id === preset.id ? "default" : "outline"}
-                    className="h-12 p-0"
-                    style={{
-                      background: preset.gradient || preset.color,
-                    }}
-                    onClick={() => handlePresetSelect(preset)}
-                  >
-                    <span className="text-white text-xs drop-shadow">
-                      {preset.name}
-                    </span>
-                  </Button>
-                ))}
+            {/* Text Settings */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Palette className="w-4 h-4" />
+                <Label>Text Settings</Label>
               </div>
-            </div>
-
-            {/* Custom Image Upload */}
-            <div className="space-y-2">
-              <Label className="text-sm">Or add custom cover image:</Label>
-              <div className="flex gap-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                  id="cover-upload"
+              
+              <div className="space-y-2">
+                <Label htmlFor="title">Title *</Label>
+                <Input
+                  id="title"
+                  value={formData.title}
+                  onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="Enter book title..."
+                  required
+                  className="bg-glass/50 border-glass-border/40"
                 />
-                <Label htmlFor="cover-upload" className="flex-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    Upload Image
-                  </Button>
-                </Label>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Enter book description..."
+                  rows={3}
+                  className="bg-glass/50 border-glass-border/40"
+                />
               </div>
             </div>
-          </div>
 
-          {/* Actions */}
-          <div className="flex gap-2 pt-4">
-            <Button type="submit" className="flex-1">
-              {book ? 'Update Book' : 'Create Book'}
-            </Button>
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+            {/* Cover Aesthetics */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Palette className="w-4 h-4" />
+                <Label>Cover Aesthetics</Label>
+              </div>
+
+              {/* Preset Colors */}
+              <div className="space-y-2">
+                <Label className="text-sm">Color presets (Leather and Gradient):</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {coverPresets.map((preset) => (
+                    <Button
+                      key={preset.id}
+                      type="button"
+                      variant={selectedPreset?.id === preset.id ? "default" : "outline"}
+                      className="h-12 p-0"
+                      style={{
+                        background: preset.gradient || preset.color,
+                      }}
+                      onClick={() => handlePresetSelect(preset)}
+                    >
+                      <span className="text-white text-xs drop-shadow">
+                        {preset.name}
+                      </span>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom Image Upload */}
+              <div className="space-y-2">
+                <Label className="text-sm">Or add custom cover image:</Label>
+                <div className="flex gap-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    id="cover-upload"
+                  />
+                  <Label htmlFor="cover-upload" className="flex-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      Upload Image
+                    </Button>
+                  </Label>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 pt-4">
+              <Button type="submit" className="flex-1">
+                {book ? 'Update Book' : 'Create Book'}
+              </Button>
+              <Button type="button" variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Upgrade Prompt Modal */}
+      {upgradePrompt && (
+        <UpgradePromptModal
+          isOpen={showUpgradePrompt}
+          onClose={() => setShowUpgradePrompt(false)}
+          title={upgradePrompt.title}
+          message={upgradePrompt.message}
+          action={upgradePrompt.action}
+          onAction={handleUpgradeAction}
+          type={reason === 'guest_limit' ? 'guest' : 'plan_limit'}
+        />
+      )}
+    </>
   );
 }

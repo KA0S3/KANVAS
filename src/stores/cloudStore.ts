@@ -56,14 +56,18 @@ export const useCloudStore = create<CloudStore>()(
       // Check if upload is possible within quota
       canUpload: (bytes: number): boolean => {
         const { syncEnabled, quota } = get();
+        const effectiveLimits = useAuthStore.getState().effectiveLimits;
         
         // If sync is disabled, no cloud features active
         if (!syncEnabled) {
           return false;
         }
         
+        // Use effectiveLimits.quotaBytes if available, otherwise fallback to quota.available
+        const quotaLimit = effectiveLimits?.quotaBytes || quota.available;
+        
         // Check if upload would exceed quota
-        return (quota.used + bytes) <= quota.available;
+        return (quota.used + bytes) <= quotaLimit;
       },
     }),
     {
@@ -82,11 +86,18 @@ export const getQuotaLimitForPlan = (plan: 'free' | 'pro' | 'lifetime'): number 
   return QUOTA_LIMITS[plan];
 };
 
-// Helper function to update quota based on current plan from authStore
+// Helper function to update quota based on effective limits from authStore
 export const updateQuotaBasedOnPlan = () => {
-  const plan = useAuthStore.getState().plan;
-  const limit = getQuotaLimitForPlan(plan);
+  const effectiveLimits = useAuthStore.getState().effectiveLimits;
   const currentUsed = useCloudStore.getState().quota.used;
   
-  useCloudStore.getState().setQuota(currentUsed, limit);
+  if (effectiveLimits) {
+    // Use effectiveLimits.quotaBytes which includes base plan + all overrides
+    const limit = effectiveLimits.quotaBytes;
+    useCloudStore.getState().setQuota(currentUsed, limit);
+  } else {
+    // Fallback to free plan limits if effectiveLimits not available
+    const limit = QUOTA_LIMITS.free;
+    useCloudStore.getState().setQuota(currentUsed, limit);
+  }
 };

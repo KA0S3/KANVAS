@@ -1,8 +1,13 @@
 import React from 'react';
+import { useAuthStore } from '@/stores/authStore';
 
 const SideAdBanner = () => {
+  const showAds = useAuthStore(state => state.effectiveLimits?.adsEnabled ?? true);
+  
+  if (!showAds) return null;
+
   return (
-    <div className="fixed right-0 top-0 h-full w-[160px] bg-background/95 backdrop-blur-sm border-l border-border/20 flex items-center justify-center z-40 shadow-lg">
+    <div className="absolute right-0 top-0 h-full w-[160px] bg-background/95 backdrop-blur-sm border-l border-border/20 flex items-center justify-center shadow-lg">
       <div className="text-center text-muted-foreground text-xs p-4">
         <div className="text-xs mb-2 opacity-60">Advertisement</div>
         <div className="w-[120px] h-[600px] bg-muted/30 rounded-lg flex items-center justify-center border border-border/10">

@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts"
+import { getPlanConfig, migrateLegacyPlanId } from "../shared/plans.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,6 +26,7 @@ interface UploadResponse {
 
 interface StorageUsage {
   total_bytes_used: bigint
+  pending_bytes: bigint
   asset_count: number
 }
 
@@ -39,6 +41,57 @@ interface User {
   id: string
   plan_type: string
   storage_quota_mb: number
+}
+
+interface EffectiveLimits {
+  quotaBytes: bigint
+  canExport: boolean
+  canImport: boolean
+  maxAssetSize: number
+}
+
+// Plan quota mapping - DEPRECATED, use getPlanConfig instead
+// Keeping for backward compatibility during migration
+const PLAN_QUOTA_MB = {
+  free: 100,        // 100MB
+  pro: 10240,       // 10GB
+  lifetime: 15360,  // 15GB
+} as const
+
+function calculateEffectiveLimits(userInfo: User, license: License | null): EffectiveLimits {
+  // Migrate legacy plan names if needed
+  const planId = migrateLegacyPlanId(userInfo.plan_type);
+  const planConfig = getPlanConfig(planId);
+  
+  if (!planConfig) {
+    console.error(`[getUploadUrls] Unknown plan: ${planId}, falling back to free`);
+    const freeConfig = getPlanConfig('free')!;
+    return {
+      quotaBytes: BigInt(freeConfig.quotaBytes),
+      canExport: freeConfig.importExportEnabled,
+      canImport: freeConfig.importExportEnabled,
+      maxAssetSize: freeConfig.maxAssetSize
+    };
+  }
+  
+  // Start with base plan quota
+  const baseQuotaBytes = BigInt(planConfig.quotaBytes);
+  
+  // Add extra quota from license if available
+  const extraQuotaBytes = license?.extra_quota_bytes || BigInt(0);
+  const totalQuotaBytes = baseQuotaBytes + extraQuotaBytes;
+  
+  // Determine feature permissions
+  const canExport = planConfig.importExportEnabled || (license?.features && (license.features as any).can_export);
+  const canImport = planConfig.importExportEnabled || (license?.features && (license.features as any).can_import);
+  const maxAssetSize = planConfig.maxAssetSize;
+  
+  return {
+    quotaBytes: totalQuotaBytes,
+    canExport,
+    canImport,
+    maxAssetSize
+  };
 }
 
 serve(async (req) => {
@@ -126,10 +179,10 @@ serve(async (req) => {
 
     const userInfo: User = userData
 
-    // Get current storage usage
+    // Get current storage usage including pending bytes
     const { data: storageData, error: storageError } = await supabase
       .from('storage_usage')
-      .select('total_bytes_used, asset_count')
+      .select('total_bytes_used, pending_bytes, asset_count')
       .eq('user_id', user.id)
       .single()
 
@@ -142,6 +195,7 @@ serve(async (req) => {
 
     const currentUsage: StorageUsage = storageData || {
       total_bytes_used: BigInt(0),
+      pending_bytes: BigInt(0),
       asset_count: 0
     }
 
@@ -166,27 +220,50 @@ serve(async (req) => {
       }
     }
 
-    // Calculate allowed quota
-    const baseQuotaBytes = BigInt(userInfo.storage_quota_mb) * BigInt(1024 * 1024)
-    const extraQuotaBytes = license?.extra_quota_bytes || BigInt(0)
-    const totalAllowedQuota = baseQuotaBytes + extraQuotaBytes
+    // Calculate effective limits using new plan mapping
+    const effectiveLimits = calculateEffectiveLimits(userInfo, license)
 
-    // Check if upload would exceed quota
-    const newTotalUsage = currentUsage.total_bytes_used + BigInt(totalUploadSize)
-    if (newTotalUsage > totalAllowedQuota) {
+    // Check if upload would exceed quota (including pending uploads)
+    const effectiveUsage = currentUsage.total_bytes_used + currentUsage.pending_bytes
+    const newTotalUsage = effectiveUsage + BigInt(totalUploadSize)
+    
+    if (newTotalUsage > effectiveLimits.quotaBytes) {
       return new Response(
         JSON.stringify({ 
           error: 'Storage quota exceeded',
           details: {
             current_used: Number(currentUsage.total_bytes_used),
+            pending_uploads: Number(currentUsage.pending_bytes),
+            effective_usage: Number(effectiveUsage),
             upload_size: totalUploadSize,
-            quota_allowed: Number(totalAllowedQuota),
+            quota_allowed: Number(effectiveLimits.quotaBytes),
             plan_type: userInfo.plan_type,
-            base_quota_mb: userInfo.storage_quota_mb,
-            extra_quota_bytes: Number(extraQuotaBytes)
+            effective_limits: effectiveLimits
           }
         }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Atomically reserve the bytes for upload
+    try {
+      const { error: incrementError } = await supabase.rpc('increment_pending_bytes', {
+        p_user_id: user.id,
+        p_bytes: totalUploadSize
+      })
+
+      if (incrementError) {
+        console.error('Failed to reserve upload bytes:', incrementError)
+        return new Response(
+          JSON.stringify({ error: 'Failed to reserve upload space' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    } catch (error) {
+      console.error('Error reserving upload bytes:', error)
+      return new Response(
+        JSON.stringify({ error: 'Failed to reserve upload space' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 

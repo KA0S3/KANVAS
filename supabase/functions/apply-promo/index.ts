@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { translateLegacyPlan, logMigrationSummary } from "../shared/authMiddleware.ts"
+import { getPlanConfig } from "../shared/plans.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -192,10 +194,13 @@ serve(async (req) => {
 
     // If it's a free plan type, update user's plan directly
     if (promoCode.type === 'free_plan' && promoCode.plan_target) {
+      // Translate legacy plan target to canonical ID
+      const canonicalPlanId = translateLegacyPlan(promoCode.plan_target, 'apply-promo');
+      
       const { error: planUpdateError } = await supabase
         .from('users')
         .update({
-          plan_type: promoCode.plan_target,
+          plan_type: canonicalPlanId,
           updated_at: new Date().toISOString()
         })
         .eq('id', userId)
@@ -214,16 +219,22 @@ serve(async (req) => {
         )
       }
 
-      // If it's extra storage, update storage quota
+      // If it's extra storage, update storage quota using canonical config
       if (promoCode.type === 'extra_storage') {
         const { data: currentUser } = await supabase
           .from('users')
-          .select('storage_quota_mb')
+          .select('plan_type, storage_quota_mb')
           .eq('id', userId)
           .single()
 
         if (currentUser) {
-          const newQuota = (currentUser.storage_quota_mb || 0) + promoCode.value
+          // Get base quota from canonical config
+          const planConfig = getPlanConfig(currentUser.plan_type) || getPlanConfig('free')!;
+          const baseQuotaMb = Math.floor(planConfig.quotaBytes / (1024 * 1024));
+          
+          // Add extra storage (convert MB from promo code to MB)
+          const newQuota = baseQuotaMb + promoCode.value;
+          
           await supabase
             .from('users')
             .update({
@@ -274,5 +285,10 @@ serve(async (req) => {
         status: 500
       }
     )
+  }
+
+  // Log migration summary periodically (every 5 requests since promo codes are less frequent)
+  if (Math.random() < 0.2) {
+    logMigrationSummary();
   }
 })

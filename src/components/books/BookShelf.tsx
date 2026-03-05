@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { Settings } from 'lucide-react';
+import { Settings, User } from 'lucide-react';
 import { useBookStore } from '@/stores/bookStoreSimple';
 import { useThemeStore } from '@/stores/themeStore';
+import { useAuthStore } from '@/stores/authStore';
 import { Button } from '@/components/ui/button';
 import { SettingsPanel } from '@/components/settings/SettingsPanel';
+import { AccountModal } from '@/components/account/AccountModal';
 import type { Book } from '@/types/book';
 import SingleBookFocus from './SingleBookFocus';
 import BookSpineView from './BookSpineView';
@@ -14,7 +16,7 @@ interface BookShelfProps {
   onBookSelect: (book: Book) => void;
   onBookEnter?: (book: Book) => void;
   showDeleteButton?: boolean;
-  onBookDelete?: (bookId: string, event: React.MouseEvent) => void;
+  onBookDelete?: (book: Book) => void;
   className?: string;
   enableEditing?: boolean; // New prop to enable editing functionality
 }
@@ -29,9 +31,29 @@ const BookShelf: React.FC<BookShelfProps> = ({
 }) => {
   const { viewMode, setViewMode, getAllBooks, currentBookId, setCurrentBook, getCurrentBook } = useBookStore();
   const { theme } = useThemeStore();
+  const { isAuthenticated, plan, effectiveLimits } = useAuthStore();
   const books = getAllBooks();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+
+  // Helper function to get max books display
+  const getMaxBooksDisplay = () => {
+    // Check effective limits first (owner keys, licenses, etc.)
+    if (effectiveLimits?.maxBooks !== undefined) {
+      return effectiveLimits.maxBooks === -1 ? '∞' : effectiveLimits.maxBooks;
+    }
+    
+    // Fallback to plan-based limits
+    const maxBooksByPlan = {
+      free: 2,
+      pro: -1, // Unlimited
+      lifetime: -1 // Unlimited
+    };
+    
+    const maxBooks = maxBooksByPlan[plan as keyof typeof maxBooksByPlan] || 2;
+    return maxBooks === -1 ? '∞' : maxBooks;
+  };
 
   const handleBookSelect = (book: Book) => {
     // Set the current book in store
@@ -66,6 +88,7 @@ const BookShelf: React.FC<BookShelfProps> = ({
             onBookDelete={onBookDelete}
             showDeleteButton={showDeleteButton}
             enableEditing={enableEditing}
+            onBookEdit={handleEditBook}
           />
         );
       case 'spine':
@@ -103,13 +126,22 @@ const BookShelf: React.FC<BookShelfProps> = ({
         backgroundRepeat: 'no-repeat'
       }}
     >
-      {/* Header with View Mode Selector */}
+      {/* Header */}
       <div className="absolute top-0 left-0 right-0 z-10">
         <div className="flex items-center justify-between px-6 py-4">
           <div>
-            <h1 className={`text-xl font-bold drop-shadow-lg ${
-              theme === 'dark' ? 'text-white' : 'text-foreground'
-            }`}>World Library</h1>
+            <div className="flex items-center gap-3">
+              <h1 className={`text-xl font-bold drop-shadow-lg ${
+                theme === 'dark' ? 'text-white' : 'text-foreground'
+              }`}>World Library</h1>
+              <span className={`text-sm px-2 py-1 rounded-md ${
+                theme === 'dark' 
+                  ? 'bg-white/10 text-white/80 border border-white/20' 
+                  : 'bg-muted text-muted-foreground border border-border'
+              }`}>
+                Books: {books.length} / {getMaxBooksDisplay()}
+              </span>
+            </div>
             <p className={`text-sm drop-shadow ${
               theme === 'dark' ? 'text-white/80' : 'text-muted-foreground'
             }`}>
@@ -117,7 +149,22 @@ const BookShelf: React.FC<BookShelfProps> = ({
             </p>
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsAccountModalOpen(true)}
+              className={`${
+                theme === 'dark' 
+                  ? 'border-white/20 text-white hover:bg-white/10' 
+                  : 'border-border text-foreground hover:bg-accent'
+              }`}
+              title="Account"
+            >
+              <User className="w-4 h-4" />
+              <span className="hidden sm:inline">Account</span>
+            </Button>
+            
             <Button
               variant="outline"
               size="sm"
@@ -131,20 +178,24 @@ const BookShelf: React.FC<BookShelfProps> = ({
               <Settings className="w-4 h-4 mr-2" />
               Settings
             </Button>
-            
-            <ViewModeSelector
-              currentMode={viewMode}
-              onModeChange={handleViewModeChange}
-              bookCount={books.length}
-              enableEditing={enableEditing}
-              onEditBook={handleEditBook}
-            />
           </div>
         </div>
       </div>
 
+      {/* View Mode Selector - Centered below header */}
+      <div className="absolute top-20 left-0 right-0 z-10 flex justify-center">
+        <ViewModeSelector
+          currentMode={viewMode}
+          onModeChange={handleViewModeChange}
+          bookCount={books.length}
+          enableEditing={enableEditing}
+          onEditBook={handleEditBook}
+          showEditButton={false}
+        />
+      </div>
+
       {/* Main Content Area */}
-      <div className="pt-20 h-full">
+      <div className="pt-32 h-full">
         <div className="relative h-full transition-all duration-500 ease-in-out">
           {renderViewMode()}
         </div>
@@ -178,6 +229,12 @@ const BookShelf: React.FC<BookShelfProps> = ({
       <SettingsPanel
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+      />
+
+      {/* Account Modal */}
+      <AccountModal
+        isOpen={isAccountModalOpen}
+        onClose={() => setIsAccountModalOpen(false)}
       />
     </div>
   );

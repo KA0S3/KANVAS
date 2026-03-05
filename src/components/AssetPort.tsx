@@ -1,5 +1,5 @@
  import { useState, useCallback, useRef, useEffect, useMemo } from "react";
-import { Sparkles, ArrowLeft, Plus, PanelRight, BookOpen } from "lucide-react";
+import { Sparkles, ArrowLeft, Plus, PanelRight, BookOpen, User } from "lucide-react";
 import { AssetItem, type Asset } from "./AssetItem";
 import { AssetCreationModal } from "./asset/AssetCreationModal";
 import { AssetEditModal } from "./asset/AssetEditModal";
@@ -10,6 +10,7 @@ import { useBookStore } from "@/stores/bookStoreSimple";
 import { useBackgroundStore } from "@/stores/backgroundStore";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
 import { BackgroundControls } from "@/components/asset/BackgroundControls";
+import { AccountModal } from "@/components/account/AccountModal";
 import { Button } from "@/components/ui/button";
 import { useSampleData } from "@/hooks/useSampleData";
 import { 
@@ -47,6 +48,7 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showBackgroundControls, setShowBackgroundControls] = useState(false);
+  const [showAccountModal, setShowAccountModal] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalInitialData, setModalInitialData] = useState<any>(null);
   const [generatorImportData, setGeneratorImportData] = useState<any>(null);
@@ -682,15 +684,29 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
             </Button>
           )}
         </div>
-        {onToggleSidebar && (
-          <button
-            onClick={onToggleSidebar}
-            className="p-1.5 md:p-2 hover:bg-muted rounded transition-colors"
-            title="Toggle Shelf"
+        <div className="flex items-center gap-2">
+          {/* Account Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAccountModal(true)}
+            className="gap-2"
+            title="Account"
           >
-            <PanelRight className="w-4 h-4 md:w-5 md:h-5 text-muted-foreground hover:text-foreground" />
-          </button>
-        )}
+            <User className="w-4 h-4" />
+            <span className="hidden sm:inline">Account</span>
+          </Button>
+          
+          {onToggleSidebar && (
+            <button
+              onClick={onToggleSidebar}
+              className="p-1.5 md:p-2 hover:bg-muted rounded transition-colors"
+              title="Toggle Shelf"
+            >
+              <PanelRight className="w-4 h-4 md:w-5 md:h-5 text-muted-foreground hover:text-foreground" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Canvas Area */}
@@ -919,6 +935,12 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
         }}
         assetId={editingAssetId}
         viewportSize={viewportSize}
+      />
+
+      {/* Account Modal */}
+      <AccountModal
+        isOpen={showAccountModal}
+        onClose={() => setShowAccountModal(false)}
       />
 
       </div>

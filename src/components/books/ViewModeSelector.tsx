@@ -9,6 +9,7 @@ interface ViewModeSelectorProps {
   className?: string;
   onEditBook?: () => void;
   enableEditing?: boolean;
+  showEditButton?: boolean; // New prop to control Edit button visibility
 }
 
 const ViewModeSelector: React.FC<ViewModeSelectorProps> = ({
@@ -17,7 +18,8 @@ const ViewModeSelector: React.FC<ViewModeSelectorProps> = ({
   bookCount = 0,
   className = '',
   onEditBook,
-  enableEditing = false
+  enableEditing = false,
+  showEditButton = true
 }) => {
   const { theme } = useThemeStore();
   const modes = [
@@ -81,7 +83,7 @@ const ViewModeSelector: React.FC<ViewModeSelectorProps> = ({
       </div>
       
       {/* Edit Button - replaces description text */}
-      {enableEditing && (
+      {enableEditing && showEditButton && (
         <button
           onClick={onEditBook}
           className={`flex items-center gap-2 px-3 py-2 rounded-full transition-colors ${

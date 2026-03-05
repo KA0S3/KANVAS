@@ -44,14 +44,20 @@ export const PAYSTACK_PRODUCTS: Record<string, PaystackProduct> = {
   },
   LIFETIME: {
     name: 'Lifetime',
-    price: 30000, // ₦300.00 in NGN kobo
+    price: 8000, // ₦80.00 in NGN kobo (launch price)
     storage: '15GB',
     recurring: false
   },
   STORAGE_10GB: {
     name: 'Storage 10GB',
-    price: 500, // ₦5.00 in NGN kobo
+    price: 100, // ₦1.00 in NGN kobo
     storage: '10GB',
+    recurring: true
+  },
+  STORAGE_50GB: {
+    name: 'Storage 50GB',
+    price: 300, // ₦3.00 in NGN kobo
+    storage: '50GB',
     recurring: true
   }
 }

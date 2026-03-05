@@ -1,9 +1,11 @@
 import { validateOwnerKey, type JWTPayload } from '@/lib/jwt';
 import { supabase } from '@/lib/supabase';
+import { getPlanConfig } from '@/lib/plans';
 
 export interface OwnerKeyScopes {
   ads: boolean;
   max_storage_bytes?: number;
+  max_books?: number;
   import_export: boolean;
   [key: string]: any;
 }
@@ -140,52 +142,55 @@ class OwnerKeyService {
    * and take precedence over owner key overrides.
    */
   applyOwnerKeyOverrides(
-    basePlan: 'free' | 'pro' | 'lifetime',
+    basePlan: 'guest' | 'free' | 'pro' | 'lifetime',
     scopes?: OwnerKeyScopes
   ): {
-    effectivePlan: 'free' | 'pro' | 'lifetime';
+    effectivePlan: 'guest' | 'free' | 'pro' | 'lifetime';
     maxStorageBytes: number;
+    quotaBytes: number; // Total storage quota including base plan + extras
+    maxBooks: number;
     adsEnabled: boolean;
     importExportEnabled: boolean;
     features: Record<string, any>;
   } {
-    // Default plan limits
-    const planLimits = {
-      free: {
-        maxStorageBytes: 100 * 1024 * 1024, // 100MB
-        adsEnabled: true,
-        importExportEnabled: false
-      },
-      pro: {
-        maxStorageBytes: 10 * 1024 * 1024 * 1024, // 10GB
-        adsEnabled: false,
-        importExportEnabled: true
-      },
-      lifetime: {
-        maxStorageBytes: 50 * 1024 * 1024 * 1024, // 50GB
-        adsEnabled: false,
-        importExportEnabled: true
-      }
-    };
-
-    const limits = planLimits[basePlan];
+    // Get plan config from canonical source
+    const planConfig = getPlanConfig(basePlan);
+    
+    if (!planConfig) {
+      console.error(`[ownerKeyService] Unknown plan: ${basePlan}`);
+      // Fallback to free plan
+      const freeConfig = getPlanConfig('free')!;
+      return {
+        effectivePlan: 'free',
+        maxStorageBytes: freeConfig.quotaBytes,
+        quotaBytes: freeConfig.quotaBytes,
+        maxBooks: freeConfig.maxBooks,
+        adsEnabled: freeConfig.adsEnabled,
+        importExportEnabled: freeConfig.importExportEnabled,
+        features: {}
+      };
+    }
 
     // Apply owner key overrides if available
     if (scopes) {
       return {
         effectivePlan: basePlan,
-        maxStorageBytes: scopes.max_storage_bytes || limits.maxStorageBytes,
-        adsEnabled: scopes.ads !== undefined ? scopes.ads : limits.adsEnabled,
-        importExportEnabled: scopes.import_export !== undefined ? scopes.import_export : limits.importExportEnabled,
+        maxStorageBytes: scopes.max_storage_bytes || planConfig.quotaBytes,
+        quotaBytes: scopes.max_storage_bytes || planConfig.quotaBytes,
+        maxBooks: scopes.max_books !== undefined ? scopes.max_books : planConfig.maxBooks,
+        adsEnabled: scopes.ads !== undefined ? scopes.ads : planConfig.adsEnabled,
+        importExportEnabled: scopes.import_export !== undefined ? scopes.import_export : planConfig.importExportEnabled,
         features: { ...scopes }
       };
     }
 
     return {
       effectivePlan: basePlan,
-      maxStorageBytes: limits.maxStorageBytes,
-      adsEnabled: limits.adsEnabled,
-      importExportEnabled: limits.importExportEnabled,
+      maxStorageBytes: planConfig.quotaBytes,
+      quotaBytes: planConfig.quotaBytes,
+      maxBooks: planConfig.maxBooks,
+      adsEnabled: planConfig.adsEnabled,
+      importExportEnabled: planConfig.importExportEnabled,
       features: {}
     };
   }
@@ -197,8 +202,10 @@ class OwnerKeyService {
     currentLimits: any,
     licenseFeatures?: Record<string, any>
   ): {
-    effectivePlan: 'free' | 'pro' | 'lifetime';
+    effectivePlan: 'guest' | 'free' | 'pro' | 'lifetime';
     maxStorageBytes: number;
+    quotaBytes: number; // Total storage quota including base plan + extras
+    maxBooks: number;
     adsEnabled: boolean;
     importExportEnabled: boolean;
     features: Record<string, any>;
@@ -207,10 +214,17 @@ class OwnerKeyService {
       return currentLimits;
     }
 
+    // Calculate total quota bytes including extra quota from license
+    const baseQuotaBytes = currentLimits.quotaBytes || currentLimits.maxStorageBytes;
+    const extraQuotaBytes = licenseFeatures.extra_quota_bytes || 0;
+    const totalQuotaBytes = baseQuotaBytes + extraQuotaBytes;
+
     return {
       ...currentLimits,
       // License features take highest precedence
-      maxStorageBytes: licenseFeatures.max_storage_bytes || currentLimits.maxStorageBytes,
+      maxStorageBytes: totalQuotaBytes, // Update to reflect total quota
+      quotaBytes: totalQuotaBytes, // Total storage quota including extras
+      maxBooks: licenseFeatures.max_books !== undefined ? licenseFeatures.max_books : currentLimits.maxBooks,
       adsEnabled: licenseFeatures.ads !== undefined ? licenseFeatures.ads : currentLimits.adsEnabled,
       importExportEnabled: licenseFeatures.import_export !== undefined ? licenseFeatures.import_export : currentLimits.importExportEnabled,
       features: {

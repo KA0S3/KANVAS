@@ -6,6 +6,7 @@ export interface JWTPayload {
   scopes: {
     ads?: boolean;
     max_storage_bytes?: number;
+    max_books?: number;
     import_export?: boolean;
     [key: string]: any;
   };
@@ -23,6 +24,10 @@ export interface OwnerKeyData {
   issuer: string;
   expires_at: string;
   is_revoked: boolean;
+  revoked_at?: string;
+  revoked_by?: string;
+  revoked_reason?: string;
+  created_by: string;
   created_at: string;
 }
 
@@ -35,6 +40,33 @@ export async function sha256(message: string): Promise<string> {
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
   return hashHex;
+}
+
+/**
+ * Standardize scope names to snake_case format with backward compatibility
+ * Accepts both snake_case and camelCase, logs warnings for deprecated camelCase
+ */
+export function standardizeScopes(scopes: any): JWTPayload['scopes'] {
+  const standardized: JWTPayload['scopes'] = {};
+  const deprecatedMappings: Record<string, string> = {
+    'maxStorageBytes': 'max_storage_bytes',
+    'maxBooks': 'max_books',
+    'importExport': 'import_export'
+  };
+
+  for (const [key, value] of Object.entries(scopes || {})) {
+    // Check if this is a deprecated camelCase key
+    if (deprecatedMappings[key]) {
+      const snakeCaseKey = deprecatedMappings[key];
+      console.warn(`[JWT] Deprecated scope key '${key}' detected. Please use '${snakeCaseKey}' instead.`);
+      standardized[snakeCaseKey as keyof JWTPayload['scopes']] = value as any;
+    } else {
+      // Use the key as-is (should already be snake_case)
+      standardized[key as keyof JWTPayload['scopes']] = value as any;
+    }
+  }
+
+  return standardized;
 }
 
 /**
@@ -55,7 +87,13 @@ export async function verifyJWT(token: string, jwk: JWK): Promise<JWTPayload> {
       throw new Error('JWT has expired');
     }
 
-    return payload as JWTPayload;
+    // Standardize scope names to snake_case
+    const standardizedPayload = {
+      ...payload,
+      scopes: standardizeScopes(payload.scopes)
+    };
+
+    return standardizedPayload as JWTPayload;
   } catch (error) {
     console.error('JWT verification failed:', error);
     throw new Error('Invalid JWT token');
@@ -161,6 +199,7 @@ export async function validateOwnerKey(
  */
 export async function revokeOwnerKey(
   tokenHash: string, 
+  revokedBy: string,
   reason?: string
 ): Promise<boolean> {
   try {
@@ -169,6 +208,7 @@ export async function revokeOwnerKey(
       .update({
         is_revoked: true,
         revoked_at: new Date().toISOString(),
+        revoked_by: revokedBy,
         revoked_reason: reason
       })
       .eq('token_hash', tokenHash);
@@ -186,7 +226,8 @@ export async function revokeOwnerKey(
 export async function storeOwnerKey(
   token: string,
   payload: JWTPayload,
-  keyName: string
+  keyName: string,
+  createdBy: string
 ): Promise<boolean> {
   try {
     const tokenHash = await sha256(token);
@@ -200,7 +241,8 @@ export async function storeOwnerKey(
         scopes: payload.scopes,
         issuer: payload.iss,
         expires_at: new Date(payload.exp * 1000).toISOString(),
-        is_revoked: false
+        is_revoked: false,
+        created_by: createdBy
       });
 
     return !error;

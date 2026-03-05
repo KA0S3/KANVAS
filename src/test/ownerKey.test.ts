@@ -21,6 +21,7 @@ describe('Owner Key System', () => {
       const scopes = {
         ads: false,
         max_storage_bytes: 2147483648, // 2GB
+        max_books: 50,
         import_export: true
       };
 
@@ -29,6 +30,8 @@ describe('Owner Key System', () => {
       expect(result.effectivePlan).toBe('free');
       expect(result.adsEnabled).toBe(false);
       expect(result.maxStorageBytes).toBe(2147483648);
+      expect(result.quotaBytes).toBe(2147483648);
+      expect(result.maxBooks).toBe(50);
       expect(result.importExportEnabled).toBe(true);
     });
 
@@ -38,6 +41,8 @@ describe('Owner Key System', () => {
       expect(result.effectivePlan).toBe('free');
       expect(result.adsEnabled).toBe(true);
       expect(result.maxStorageBytes).toBe(100 * 1024 * 1024); // 100MB
+      expect(result.quotaBytes).toBe(100 * 1024 * 1024); // 100MB
+      expect(result.maxBooks).toBe(10); // Default max books for free plan
       expect(result.importExportEnabled).toBe(false);
     });
 
@@ -54,6 +59,33 @@ describe('Owner Key System', () => {
       expect(result.adsEnabled).toBe(true); // Override applied
       expect(result.maxStorageBytes).toBe(10737418240);
       expect(result.importExportEnabled).toBe(true);
+    });
+
+    it('should apply license overrides with extra quota bytes', () => {
+      const baseLimits = {
+        effectivePlan: 'free' as const,
+        maxStorageBytes: 100 * 1024 * 1024, // 100MB
+        quotaBytes: 100 * 1024 * 1024, // 100MB
+        maxBooks: 10,
+        adsEnabled: true,
+        importExportEnabled: false,
+        features: {}
+      };
+
+      const licenseFeatures = {
+        extra_quota_bytes: 50 * 1024 * 1024, // Extra 50MB
+        max_books: 25,
+        ads: false
+      };
+
+      const result = ownerKeyService.applyLicenseOverrides(baseLimits, licenseFeatures);
+
+      expect(result.effectivePlan).toBe('free');
+      expect(result.maxStorageBytes).toBe(150 * 1024 * 1024); // 100MB + 50MB
+      expect(result.quotaBytes).toBe(150 * 1024 * 1024); // 100MB + 50MB
+      expect(result.maxBooks).toBe(25); // Override from license
+      expect(result.adsEnabled).toBe(false); // Override from license
+      expect(result.importExportEnabled).toBe(false); // Unchanged
     });
   });
 
@@ -81,23 +113,43 @@ describe('Owner Key System', () => {
 
       const result = await store.validateOwnerKey('mock-token');
       
+      // Wait for state to update by getting fresh state
+      const updatedStore = useAuthStore.getState();
+      
       expect(result.success).toBe(true);
-      expect(store.ownerKeyInfo?.isValid).toBe(true);
-      expect(store.effectiveLimits?.adsEnabled).toBe(false);
-      expect(store.effectiveLimits?.maxStorageBytes).toBe(2147483648);
+      expect(updatedStore.ownerKeyInfo?.isValid).toBe(true);
+      expect(updatedStore.effectiveLimits?.adsEnabled).toBe(false);
+      expect(updatedStore.effectiveLimits?.maxStorageBytes).toBe(2147483648);
+      expect(updatedStore.effectiveLimits?.quotaBytes).toBe(2147483648);
+      expect(updatedStore.effectiveLimits?.maxBooks).toBe(10); // Default free plan maxBooks
     });
 
-    it('should clear owner key on sign out', () => {
+    it('should clear owner key on sign out', async () => {
       const store = useAuthStore.getState();
       
-      // Set some owner key info
-      store.setPlan('pro');
-      store.updateEffectiveLimits();
+      // Set some owner key info first
+      vi.spyOn(ownerKeyService, 'validateOwnerKey').mockResolvedValue({
+        isValid: true,
+        scopes: {
+          ads: false,
+          max_storage_bytes: 2147483648,
+          import_export: true
+        },
+        userId: 'test-user-id'
+      });
+      
+      await store.validateOwnerKey('mock-token');
+      
+      // Verify owner key is set
+      let updatedStore = useAuthStore.getState();
+      expect(updatedStore.ownerKeyInfo?.isValid).toBe(true);
       
       // Simulate sign out
-      store.clearOwnerKey();
+      await store.clearOwnerKey();
       
-      expect(store.ownerKeyInfo).toBeNull();
+      // Get fresh state after clearing
+      updatedStore = useAuthStore.getState();
+      expect(updatedStore.ownerKeyInfo).toBeNull();
     });
   });
 });

@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, Cloud, Zap, Crown, Check } from 'lucide-react';
+import { PLANS_CONFIG, getPlanConfig } from '@/lib/plans';
 
 interface UpgradeModalProps {
   isOpen: boolean;
@@ -37,10 +38,10 @@ export function UpgradeModal({
     return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
   };
 
-  const plans: Plan[] = [
+  const plans = [
     {
       id: 'free',
-      name: 'Free',
+      name: PLANS_CONFIG.free.label,
       price: '$0',
       storage: '100 MB',
       features: [
@@ -52,8 +53,8 @@ export function UpgradeModal({
     },
     {
       id: 'pro',
-      name: 'Pro',
-      price: '$9/month',
+      name: PLANS_CONFIG.pro.label,
+      price: `$${PLANS_CONFIG.pro.pricing.recurringCents! / 100}/month`,
       storage: '10 GB',
       features: [
         'Cloud sync across devices',
@@ -67,8 +68,8 @@ export function UpgradeModal({
     },
     {
       id: 'lifetime',
-      name: 'Lifetime',
-      price: '$199',
+      name: PLANS_CONFIG.lifetime.label,
+      price: `$${PLANS_CONFIG.lifetime.pricing.oneTimeCents! / 100}`,
       storage: '15 GB',
       features: [
         'Everything in Pro',

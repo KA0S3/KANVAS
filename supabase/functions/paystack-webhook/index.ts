@@ -1,19 +1,30 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts"
+import { getPlanConfig, migrateLegacyPlanId } from "../shared/plans.ts"
+
+// Webhook security configuration
+const WEBHOOK_TTL_SECONDS = 300 // 5 minutes
+const MAX_REPLAY_WINDOW_SECONDS = 3600 // 1 hour for duplicate detection
+
+// In-memory store for processed webhook signatures (in production, use Redis)
+const processedWebhooks = new Map<string, number>()
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-interface PlanConfig {
+// Legacy PlanConfig interface - DEPRECATED
+// Using canonical config from shared/plans.ts instead
+interface LegacyPlanConfig {
   licenseType: 'trial' | 'basic' | 'premium' | 'enterprise' | 'custom'
   storageQuotaMB: number
   features: Record<string, any>
 }
 
-const PLAN_CONFIGS: Record<string, PlanConfig> = {
+// Legacy plan configurations - DEPRECATED, use getPlanConfig instead
+const LEGACY_PLAN_CONFIGS: Record<string, LegacyPlanConfig> = {
   'basic': {
     licenseType: 'basic',
     storageQuotaMB: 1000,
@@ -79,6 +90,16 @@ interface PaystackEvent {
   }
 }
 
+interface WebhookLog {
+  id?: string
+  event_type: string
+  reference: string
+  signature: string
+  processed: boolean
+  error_message?: string
+  created_at: string
+}
+
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -100,29 +121,29 @@ serve(async (req: Request) => {
       )
     }
 
-    // Verify Paystack webhook signature
-    const signature = req.headers.get('x-paystack-signature')
-    if (!signature) {
-      console.error('Missing Paystack signature')
+    // Enhanced webhook validation with replay protection
+    const validationResult = await validateWebhookRequest(req, paystackSecretKey, supabase)
+    if (!validationResult.isValid) {
+      console.error('Webhook validation failed:', validationResult.error)
+      
+      // Log failed validation attempt
+      await logWebhookEvent(supabase, {
+        event_type: 'validation_failed',
+        reference: 'unknown',
+        signature: req.headers.get('x-paystack-signature') || 'missing',
+        processed: false,
+        error_message: validationResult.error,
+        created_at: new Date().toISOString()
+      })
+      
       return new Response(
-        JSON.stringify({ error: 'Missing signature' }),
+        JSON.stringify({ error: validationResult.error }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    const body = await req.text()
-    const isValidSignature = await verifyPaystackSignature(body, signature, paystackSecretKey)
-    
-    if (!isValidSignature) {
-      console.error('Invalid Paystack signature')
-      return new Response(
-        JSON.stringify({ error: 'Invalid signature' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    const event: PaystackEvent = JSON.parse(body)
-    console.log('Processing Paystack event:', event.event)
+    const event: PaystackEvent = validationResult.event!
+    console.log('Processing Paystack event:', event.event, 'Reference:', event.data.reference)
 
     switch (event.event) {
       case 'charge.success':
@@ -159,30 +180,60 @@ async function handleChargeSuccess(event: PaystackEvent, supabase: any) {
   const planType = data.metadata?.plan_type
 
   if (!userId || !productKey) {
-    console.error('Missing required metadata:', { userId, productKey })
-    throw new Error('Invalid transaction metadata')
+    const errorMsg = 'Missing required metadata for charge processing'
+    console.error(errorMsg, { userId, productKey, reference: data.reference })
+    
+    await logWebhookEvent(supabase, {
+      event_type: 'charge.success',
+      reference: data.reference,
+      signature: 'processed',
+      processed: false,
+      error_message: errorMsg,
+      created_at: new Date().toISOString()
+    })
+    
+    throw new Error(errorMsg)
   }
 
-  // Check if purchase already processed
-  const { data: existingPurchase } = await supabase
-    .from('purchases')
-    .select('*')
-    .eq('transaction_id', data.reference)
-    .single()
+  try {
+    // Check if purchase already processed (idempotency check)
+    const { data: existingPurchase, error: checkError } = await supabase
+      .from('purchases')
+      .select('*')
+      .eq('transaction_id', data.reference)
+      .single()
 
-  if (existingPurchase) {
-    console.log('Purchase already processed, skipping...')
-    return
-  }
+    if (checkError && checkError.code !== 'PGRST116') {
+      throw new Error(`Database error checking purchase: ${checkError.message}`)
+    }
+
+    if (existingPurchase) {
+      console.log('Purchase already processed, skipping idempotently:', data.reference)
+      
+      await logWebhookEvent(supabase, {
+        event_type: 'charge.success',
+        reference: data.reference,
+        signature: 'processed',
+        processed: true,
+        error_message: 'Already processed (idempotent)',
+        created_at: new Date().toISOString()
+      })
+      
+      return
+    }
 
   // Determine plan type from product key if not provided
   const finalPlanType = planType || getPlanTypeFromProductKey(productKey)
-  const planConfig = PLAN_CONFIGS[finalPlanType]
+  const planConfig = getPlanConfig(finalPlanType);
   
   if (!planConfig) {
-    console.error('Unknown plan type:', finalPlanType)
-    throw new Error('Unknown plan type')
+    console.error('Unknown plan type:', finalPlanType);
+    throw new Error('Unknown plan type');
   }
+
+  // Convert canonical plan to legacy license type for database compatibility
+  const legacyLicenseType = getLegacyLicenseType(finalPlanType);
+  const storageQuotaMB = Math.floor(planConfig.quotaBytes / (1024 * 1024));
 
   try {
     // Create license
@@ -190,10 +241,10 @@ async function handleChargeSuccess(event: PaystackEvent, supabase: any) {
       .from('licenses')
       .insert({
         user_id: userId,
-        license_type: planConfig.licenseType,
+        license_type: legacyLicenseType,
         status: 'active',
         starts_at: new Date().toISOString(),
-        expires_at: finalPlanType === 'enterprise' ? null : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+        expires_at: finalPlanType === 'lifetime' ? null : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
         features: planConfig.features
       })
       .select()
@@ -228,7 +279,7 @@ async function handleChargeSuccess(event: PaystackEvent, supabase: any) {
       .from('users')
       .update({
         plan_type: finalPlanType,
-        storage_quota_mb: planConfig.storageQuotaMB
+        storage_quota_mb: storageQuotaMB
       })
       .eq('id', userId)
 
@@ -256,8 +307,29 @@ async function handleChargeSuccess(event: PaystackEvent, supabase: any) {
 
     console.log('Successfully processed Paystack charge:', data.reference)
 
+    // Log successful processing
+    await logWebhookEvent(supabase, {
+      event_type: 'charge.success',
+      reference: data.reference,
+      signature: 'processed',
+      processed: true,
+      created_at: new Date().toISOString()
+    })
+
   } catch (error) {
-    console.error('Error processing Paystack charge:', error)
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error processing charge'
+    console.error('Error processing Paystack charge:', errorMsg)
+    
+    // Log processing failure
+    await logWebhookEvent(supabase, {
+      event_type: 'charge.success',
+      reference: data.reference,
+      signature: 'processed',
+      processed: false,
+      error_message: errorMsg,
+      created_at: new Date().toISOString()
+    })
+    
     throw error
   }
 }
@@ -276,11 +348,22 @@ async function handleInvoiceCreate(event: PaystackEvent, supabase: any) {
 
 function getPlanTypeFromProductKey(productKey: string): string {
   const productMapping: Record<string, string> = {
-    'PRO_SUBSCRIPTION': 'premium',
-    'LIFETIME': 'enterprise',
-    'STORAGE_10GB': 'basic'
+    'PRO_SUBSCRIPTION': 'pro',
+    'LIFETIME': 'lifetime',
+    'STORAGE_10GB': 'free' // Storage add-ons don't change plan type
   }
-  return productMapping[productKey] || 'basic'
+  return productMapping[productKey] || 'free'
+}
+
+// Helper function to convert canonical plan to legacy license type
+function getLegacyLicenseType(planId: string): 'trial' | 'basic' | 'premium' | 'enterprise' | 'custom' {
+  const mapping: Record<string, 'trial' | 'basic' | 'premium' | 'enterprise' | 'custom'> = {
+    'guest': 'basic',
+    'free': 'basic',
+    'pro': 'premium',
+    'lifetime': 'enterprise'
+  }
+  return mapping[planId] || 'basic'
 }
 
 async function verifyPaystackSignature(
@@ -302,4 +385,94 @@ async function sha512Hex(message: string): Promise<string> {
   const hashBuffer = await crypto.subtle.digest('SHA-512', msgBuffer)
   const hashArray = Array.from(new Uint8Array(hashBuffer))
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+// Enhanced webhook validation with replay protection
+interface ValidationResult {
+  isValid: boolean
+  event?: PaystackEvent
+  error?: string
+}
+
+async function validateWebhookRequest(
+  req: Request,
+  secretKey: string,
+  supabase: any
+): Promise<ValidationResult> {
+  try {
+    // Get signature from headers
+    const signature = req.headers.get('x-paystack-signature')
+    if (!signature) {
+      return { isValid: false, error: 'Missing Paystack signature' }
+    }
+
+    // Get raw body
+    const body = await req.text()
+    
+    // Verify signature exactly as per Paystack docs
+    const expectedSignature = await sha512Hex(body + secretKey)
+    if (signature !== expectedSignature) {
+      return { isValid: false, error: 'Invalid signature' }
+    }
+
+    // Parse event
+    const event: PaystackEvent = JSON.parse(body)
+    
+    // Check for replay attacks using timestamp
+    const eventTimestamp = new Date(event.data.created_at).getTime()
+    const currentTime = Date.now()
+    const timeDiff = Math.abs(currentTime - eventTimestamp)
+    
+    if (timeDiff > WEBHOOK_TTL_SECONDS * 1000) {
+      return { 
+        isValid: false, 
+        error: `Event timestamp too old or too far in the future. Age: ${Math.floor(timeDiff / 1000)}s` 
+      }
+    }
+
+    // Check for duplicate processing using signature + reference
+    const duplicateKey = `${signature}_${event.data.reference}`
+    const existingTimestamp = processedWebhooks.get(duplicateKey)
+    
+    if (existingTimestamp && (currentTime - existingTimestamp) < MAX_REPLAY_WINDOW_SECONDS * 1000) {
+      return { 
+        isValid: false, 
+        error: 'Duplicate webhook detected' 
+      }
+    }
+
+    // Store this webhook signature to prevent replay
+    processedWebhooks.set(duplicateKey, currentTime)
+    
+    // Clean up old entries from memory (prevent memory leaks)
+    for (const [key, timestamp] of processedWebhooks.entries()) {
+      if (currentTime - timestamp > MAX_REPLAY_WINDOW_SECONDS * 1000) {
+        processedWebhooks.delete(key)
+      }
+    }
+
+    return { isValid: true, event }
+    
+  } catch (error) {
+    console.error('Webhook validation error:', error)
+    return { 
+      isValid: false, 
+      error: error instanceof Error ? error.message : 'Validation failed' 
+    }
+  }
+}
+
+// Enhanced webhook logging for monitoring
+async function logWebhookEvent(supabase: any, logData: WebhookLog): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('webhook_logs')
+      .insert(logData)
+    
+    if (error) {
+      console.error('Failed to log webhook event:', error)
+    }
+  } catch (error) {
+    console.error('Error logging webhook event:', error)
+  }
 }

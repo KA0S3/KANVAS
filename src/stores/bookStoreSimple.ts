@@ -40,7 +40,8 @@ interface BookStore {
   setViewMode: (mode: BookViewMode) => void;
   updateSettings: (settings: Partial<BookLibrarySettings>) => void;
   exportBooks: () => string;
-  importBooks: (data: string) => boolean;
+  exportSingleBook: (bookId: string) => string;
+  importBooks: (data: string, mode?: 'replace' | 'new') => boolean;
 }
 
 const defaultSettings: BookLibrarySettings = {
@@ -203,7 +204,20 @@ export const useBookStore = create<BookStore>()(
           }, null, 2);
         },
 
-        importBooks: (data) => {
+        exportSingleBook: (bookId) => {
+          const state = get();
+          const book = state.books[bookId];
+          if (!book) {
+            throw new Error(`Book with ID ${bookId} not found`);
+          }
+          return JSON.stringify({
+            books: { [bookId]: book },
+            settings: state.settings,
+            exportedAt: new Date().toISOString(),
+          }, null, 2);
+        },
+
+        importBooks: (data, mode = 'replace') => {
           try {
             const parsed = JSON.parse(data);
             
@@ -211,10 +225,33 @@ export const useBookStore = create<BookStore>()(
               throw new Error('Invalid data format');
             }
 
-            set((state) => ({
-              books: parsed.books,
-              settings: parsed.settings ? { ...state.settings, ...parsed.settings } : state.settings,
-            }));
+            if (mode === 'new') {
+              // Import as new - add to existing books
+              set((state) => {
+                const newBooks = { ...state.books };
+                Object.entries(parsed.books).forEach(([id, book]) => {
+                  // Generate new ID for imported book to avoid conflicts
+                  const newId = `imported_${Date.now()}_${id}`;
+                  newBooks[newId] = {
+                    ...book as Book,
+                    id: newId,
+                    createdAt: Date.now(),
+                    updatedAt: Date.now(),
+                    order: Object.keys(state.books).length, // Add to end
+                  };
+                });
+                return {
+                  books: newBooks,
+                  settings: parsed.settings ? { ...state.settings, ...parsed.settings } : state.settings,
+                };
+              });
+            } else {
+              // Replace mode - replace all existing books
+              set((state) => ({
+                books: parsed.books,
+                settings: parsed.settings ? { ...state.settings, ...parsed.settings } : state.settings,
+              }));
+            }
 
             return true;
           } catch (error) {

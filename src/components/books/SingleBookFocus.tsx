@@ -5,16 +5,18 @@ import BookCover from './BookCover';
 import BookEditDialog from '@/components/BookEditDialog';
 import { useBookStore } from '@/stores/bookStoreSimple';
 import { useThemeStore } from '@/stores/themeStore';
+import { BookContextMenu } from './BookContextMenu';
 
 interface SingleBookFocusProps {
   books: Book[];
   selectedBookId?: string;
   onBookSelect: (book: Book) => void;
   onBookEnter?: (book: Book) => void;
-  onBookDelete?: (bookId: string, event: React.MouseEvent) => void;
+  onBookDelete?: (book: Book) => void;
   showDeleteButton?: boolean;
   className?: string;
-  enableEditing?: boolean; // New prop to enable editing functionality
+  enableEditing?: boolean;
+  onBookEdit?: (book: Book) => void;
 }
 
 const SingleBookFocus: React.FC<SingleBookFocusProps> = ({
@@ -25,7 +27,8 @@ const SingleBookFocus: React.FC<SingleBookFocusProps> = ({
   onBookDelete,
   showDeleteButton = false,
   className = '',
-  enableEditing = false
+  enableEditing = false,
+  onBookEdit
 }) => {
   const { updateBook } = useBookStore();
   const { theme } = useThemeStore();
@@ -38,6 +41,10 @@ const SingleBookFocus: React.FC<SingleBookFocusProps> = ({
   });
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{
+    book: Book;
+    position: { x: number; y: number };
+  } | null>(null);
 
   // Update currentIndex when selectedBookId changes
   useEffect(() => {
@@ -94,6 +101,41 @@ const SingleBookFocus: React.FC<SingleBookFocusProps> = ({
     setIsEditDialogOpen(true);
   };
 
+  // Handle right-click context menu
+  const handleContextMenu = (book: Book, event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setContextMenu({
+      book,
+      position: { x: event.clientX, y: event.clientY }
+    });
+  };
+
+  // Handle context menu actions
+  const handleContextMenuEnter = (book: Book) => {
+    if (onBookEnter) {
+      onBookEnter(book);
+    }
+  };
+
+  const handleContextMenuEdit = (book: Book) => {
+    if (onBookEdit) {
+      onBookEdit(book);
+    } else {
+      setIsEditDialogOpen(true);
+    }
+  };
+
+  const handleContextMenuDelete = (book: Book) => {
+    if (onBookDelete) {
+      onBookDelete(book);
+    }
+  };
+
+  const closeContextMenu = () => {
+    setContextMenu(null);
+  };
+
   if (!currentBook) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -125,11 +167,13 @@ const SingleBookFocus: React.FC<SingleBookFocusProps> = ({
         <div className="perspective-1000">
           <div 
             onDoubleClick={() => handleBookCardDoubleClick(currentBook)}
+            onContextMenu={(e) => handleContextMenu(currentBook, e)}
             className={`cursor-pointer group relative transform scale-110 transition-all duration-500 ease-out ${
               isAnimating ? 'scale-95 opacity-0' : 'scale-110 opacity-100'
             }`}
           >
             <BookCover book={currentBook} size="large" />
+            
             {/* Hover instruction */}
             <div className={`absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none ${
               theme === 'dark' ? 'bg-black/80 text-white' : 'bg-popover text-popover-foreground border border-border'
@@ -182,6 +226,18 @@ const SingleBookFocus: React.FC<SingleBookFocusProps> = ({
         onOpenChange={setIsEditDialogOpen}
         onBookUpdated={handleBookUpdate}
       />
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <BookContextMenu
+          book={contextMenu.book}
+          position={contextMenu.position}
+          onClose={closeContextMenu}
+          onEnter={handleContextMenuEnter}
+          onEdit={handleContextMenuEdit}
+          onDelete={handleContextMenuDelete}
+        />
+      )}
     </div>
   );
 };

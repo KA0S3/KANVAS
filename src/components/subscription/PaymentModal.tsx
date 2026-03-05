@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, CreditCard, Loader2, AlertCircle, ChevronDown, ChevronUp, Tag } from 'lucide-react';
-import { PAYSTACK_PRODUCTS, type PaystackProduct, getPaystackClient, openPaystackPopup } from '@/lib/paystack';
+import { PAYSTACK_PRODUCTS, type PaystackProduct } from '@/lib/paystack';
+import { paymentsService, type PaymentSession } from '@/services/payments/payments-service';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/authStore';
 import {
@@ -82,7 +83,7 @@ export function PaymentModal({ isOpen, onClose, productKey, onSuccess }: Payment
         throw new Error('Authentication required');
       }
 
-      await handlePaystackPayment(session, productKey);
+      await handlePaystackPayment(productKey);
 
     } catch (err) {
       console.error('Payment error:', err);
@@ -92,66 +93,27 @@ export function PaymentModal({ isOpen, onClose, productKey, onSuccess }: Payment
     }
   };
 
-  const handlePaystackPayment = async (session: any, paystackProductKey: keyof typeof PAYSTACK_PRODUCTS) => {
-    const paystackClient = getPaystackClient();
-    const product = PAYSTACK_PRODUCTS[paystackProductKey];
-    
+  const handlePaystackPayment = async (paystackProductKey: keyof typeof PAYSTACK_PRODUCTS) => {
     try {
-      // Initialize Paystack transaction
-      const paystackData = await paystackClient.initializeTransaction(
-        user.email!,
-        product.price,
+      // Create transaction using the abstract payments service
+      const transactionData = await paymentsService.createTransaction(
+        paystackProductKey,
+        user.id,
         {
-          product_key: paystackProductKey,
-          user_id: user.id,
-          plan_type: getPlanTypeFromProductKey(paystackProductKey)
+          promo_code: promoCode,
+          discount_amount: discountAmount
         }
       );
 
-      if (!paystackData.status) {
-        throw new Error('Failed to initialize Paystack payment');
+      if (!transactionData.status) {
+        throw new Error('Failed to initialize payment');
       }
 
-      // Open Paystack popup
-      openPaystackPopup(
-        paystackData.data.authorization_url,
-        () => {
-          // Popup closed without payment
-          console.log('Paystack payment cancelled');
-        },
-        async (reference: string) => {
-          // Payment successful
-          try {
-            // Verify transaction
-            const verifyData = await paystackClient.verifyTransaction(reference);
-            
-            if (verifyData.status && verifyData.data.status === 'success') {
-              // If there's a promo code applied, apply it now
-              if (appliedPromo && appliedPromo.type !== 'free_plan') {
-                const applyResult = await applyPromoCode();
-                if (!applyResult.success) {
-                  console.error('Failed to apply promo code after payment:', applyResult.error);
-                  // Don't fail the payment, but log the error
-                }
-              }
-              
-              // Refresh user plan
-              if (user) {
-                await fetchUserPlan(user.id);
-              }
-              onSuccess?.();
-              handleClose();
-            } else {
-              setError('Payment verification failed');
-            }
-          } catch (verifyError) {
-            console.error('Payment verification error:', verifyError);
-            setError('Failed to verify payment');
-          }
-        }
-      );
+      // Launch payment using the abstract service
+      paymentsService.redirectToPayment(transactionData.data);
+
     } catch (error) {
-      throw new Error(error instanceof Error ? error.message : 'Failed to initialize Paystack payment');
+      throw new Error(error instanceof Error ? error.message : 'Failed to initialize payment');
     }
   };
 

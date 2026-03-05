@@ -28,7 +28,7 @@ import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { CustomFieldsManager } from './CustomFieldsManager';
 import { ViewportDisplaySettingsManager } from './ViewportDisplaySettingsManager';
-import { UpgradeModal } from '@/components/UpgradeModal';
+import { UpgradePromptModal } from '@/components/UpgradePromptModal';
 import type { Asset } from '@/components/AssetItem';
 import type { CustomField, CustomFieldValue, ViewportDisplaySettings } from '@/types/extendedAsset';
 import { GeneratorParser, EXAMPLE_GENERATOR_DATA } from '@/services/generatorParser';
@@ -55,7 +55,7 @@ interface AssetCreationModalProps {
 }
 
 export function AssetCreationModal({ isOpen, onClose, initialData, parentId, generatorImportData, projectId }: AssetCreationModalProps) {
-  const { createNewAsset, upgradeModal, closeUpgradeModal, canUploadToCloud } = useAssetCreation();
+  const { createNewAsset, upgradeModal, closeUpgradeModal, canUploadToCloud, isOverQuota } = useAssetCreation();
   const { tags } = useTagStore();
   const { syncEnabled } = useCloudStore();
   const { isAuthenticated, plan } = useAuthStore();
@@ -678,13 +678,20 @@ export function AssetCreationModal({ isOpen, onClose, initialData, parentId, gen
       </Dialog>
 
       {/* Upgrade Modal */}
-      <UpgradeModal
+      <UpgradePromptModal
         isOpen={upgradeModal.isOpen}
         onClose={closeUpgradeModal}
-        currentPlan={plan}
-        currentUsage={upgradeModal.currentUsage}
-        quotaLimit={upgradeModal.quotaLimit}
-        requiredBytes={upgradeModal.requiredBytes}
+        title={isOverQuota ? "Storage Quota Exceeded" : "Approaching Storage Limit"}
+        message={isOverQuota 
+          ? `You've exceeded your storage quota. Upgrade to continue uploading files.`
+          : `You're approaching your storage limit. Upgrade to get more space.`
+        }
+        action="Upgrade Now"
+        type="plan_limit"
+        onAction={() => {
+          // TODO: Navigate to upgrade page or open payment flow
+          console.log('Navigate to upgrade flow');
+        }}
       />
     </>
   );

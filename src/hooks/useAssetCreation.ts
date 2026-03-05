@@ -2,6 +2,7 @@ import { useAssetStore } from '@/stores/assetStore';
 import { useCloudStore } from '@/stores/cloudStore';
 import { useAuthStore } from '@/stores/authStore';
 import { assetUploadService, type UploadRequest } from '@/services/assetUploadService';
+import { UpgradePromptModal } from '@/components/UpgradePromptModal';
 import type { Asset } from '@/components/AssetItem';
 import { useState } from 'react';
 
@@ -15,7 +16,7 @@ interface UpgradeModalState {
 export function useAssetCreation() {
   const { createAsset, updateAsset } = useAssetStore();
   const { syncEnabled, quota } = useCloudStore();
-  const { isAuthenticated, user, plan } = useAuthStore();
+  const { isAuthenticated, user, plan, effectiveLimits } = useAuthStore();
   const [upgradeModal, setUpgradeModal] = useState<UpgradeModalState>({
     isOpen: false,
     currentUsage: 0,
@@ -66,11 +67,14 @@ export function useAssetCreation() {
       // Check quota first
       const canUpload = await assetUploadService.canUpload(file.size);
       if (!canUpload) {
+        // Use effectiveLimits.quotaBytes if available, otherwise fallback to quota.available
+        const quotaLimit = effectiveLimits?.quotaBytes || quota.available;
+        
         // Show upgrade modal
         setUpgradeModal({
           isOpen: true,
           currentUsage: quota.used,
-          quotaLimit: quota.available,
+          quotaLimit,
           requiredBytes: file.size
         });
         
@@ -150,12 +154,16 @@ export function useAssetCreation() {
     setUpgradeModal(prev => ({ ...prev, isOpen: false }));
   };
 
+  // Check if user is over quota to determine modal type
+  const isOverQuota = effectiveLimits?.quotaBytes && quota.used >= effectiveLimits.quotaBytes;
+
   return { 
     createNewAsset,
     uploadAssetToCloud,
     retryCloudUpload,
     canUploadToCloud,
     upgradeModal,
-    closeUpgradeModal
+    closeUpgradeModal,
+    isOverQuota
   };
 }

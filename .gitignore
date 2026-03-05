@@ -30,3 +30,15 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Development documentation and implementation files
+*.md
+!README.md
+
+# Test files and scripts
+test-*.js
+test-*.ts
+test-*.cjs
+
+# Server configuration (keep local)
+server/

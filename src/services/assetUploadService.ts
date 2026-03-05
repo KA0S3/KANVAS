@@ -163,6 +163,14 @@ class AssetUploadService {
       throw new Error('User not authenticated');
     }
 
+    // Check quota before proceeding
+    const totalBytes = variants.reduce((sum, variant) => sum + variant.size, 0);
+    const canUpload = await this.canUpload(totalBytes);
+    
+    if (!canUpload) {
+      throw new Error('Storage quota exceeded. Please upgrade your plan to continue uploading.');
+    }
+
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       throw new Error('No active session');

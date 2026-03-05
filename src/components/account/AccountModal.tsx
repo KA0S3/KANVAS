@@ -23,6 +23,8 @@ import {
 } from '@/components/ui/form';
 import { Progress } from '@/components/ui/progress';
 import { PaymentModal } from '@/components/subscription/PaymentModal';
+import { FeatureTeaserCard } from '@/components/upgrade/FeatureTeaserCard';
+import { UpgradePromptModal } from '@/components/UpgradePromptModal';
 import { useAuthStore } from '@/stores/authStore';
 import { useCloudStore } from '@/stores/cloudStore';
 import { formatBytes } from '@/lib/utils';
@@ -56,10 +58,17 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+  const [upgradePrompt, setUpgradePrompt] = useState<{
+    title: string;
+    message: string;
+    action: string;
+  } | null>(null);
   
   const { 
     user, 
     plan,
+    effectiveLimits,
     isAuthenticated, 
     loading: authLoading, 
     signIn, 
@@ -171,7 +180,8 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
     const storagePercentage = quota.available > 0 ? (quota.used / quota.available) * 100 : 0;
     
     const getPlanDisplay = () => {
-      switch (plan) {
+      const effectivePlan = effectiveLimits?.source.plan || plan;
+      switch (effectivePlan) {
         case 'free':
           return { name: 'Free', color: 'text-gray-600', icon: User };
         case 'pro':
@@ -199,7 +209,7 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
               <div className={`text-xs font-semibold ${planInfo.color}`}>{planInfo.name}</div>
             </div>
           </div>
-          {plan === 'free' && (
+          {(effectiveLimits?.source.plan === 'free' || plan === 'free') && (
             <Button
               variant="outline"
               size="sm"
@@ -495,6 +505,39 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
             </Card>
           )}
 
+          {/* Feature Teaser Cards for Free Users */}
+          {isAuthenticated && effectiveLimits?.source.plan === 'free' && (
+            <div className="space-y-3">
+              <div className="text-sm font-medium text-muted-foreground">Upgrade Benefits</div>
+              <div className="grid grid-cols-1 gap-3">
+                <FeatureTeaserCard 
+                  feature="no-ads" 
+                  compact={true}
+                  onUpgrade={() => {
+                    setUpgradePrompt({
+                      title: 'Remove Ads',
+                      message: 'Enjoy an uninterrupted creative experience with no ads. Upgrade to Premium for an ad-free experience.',
+                      action: 'Upgrade Now'
+                    });
+                    setShowUpgradePrompt(true);
+                  }}
+                />
+                <FeatureTeaserCard 
+                  feature="backup" 
+                  compact={true}
+                  onUpgrade={() => {
+                    setUpgradePrompt({
+                      title: 'Cloud Backup',
+                      message: 'Cloud backup and sync are available for Pro users. Upgrade your plan to automatically backup your work and access it from any device.',
+                      action: 'Upgrade to Pro'
+                    });
+                    setShowUpgradePrompt(true);
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Footer note */}
           <div className="text-xs text-muted-foreground text-center">
             ⚠️ Authentication is optional - app works fully offline
@@ -511,6 +554,17 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
           toast.success('Successfully upgraded to Pro!');
           setShowPaymentModal(false);
         }}
+      />
+
+      {/* Upgrade Prompt Modal */}
+      <UpgradePromptModal
+        isOpen={showUpgradePrompt}
+        onClose={() => setShowUpgradePrompt(false)}
+        title={upgradePrompt?.title || ''}
+        message={upgradePrompt?.message || ''}
+        action={upgradePrompt?.action || ''}
+        type="plan_limit"
+        onAction={() => setShowUpgradePrompt(false)}
       />
     </Dialog>
   );

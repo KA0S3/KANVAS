@@ -69,12 +69,14 @@ CREATE TABLE owner_keys (
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     key_name VARCHAR(100) NOT NULL,
     token_hash VARCHAR(64) NOT NULL, -- SHA256 hash of JWT token
-    scopes JSONB NOT NULL DEFAULT '{}', -- JWT scopes like {"ads": false, "max_storage_bytes": 1073741824, "import_export": true}
+    scopes JSONB NOT NULL DEFAULT '{}', -- JWT scopes like {"ads": false, "max_storage_bytes": 1073741824, "import_export": true, "max_books": 10}
     issuer VARCHAR(255) NOT NULL,
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
     is_revoked BOOLEAN NOT NULL DEFAULT false,
     revoked_at TIMESTAMP WITH TIME ZONE,
+    revoked_by UUID REFERENCES users(id), -- Admin who revoked the key
     revoked_reason TEXT,
+    created_by UUID NOT NULL REFERENCES users(id), -- User who created the key
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(token_hash)
