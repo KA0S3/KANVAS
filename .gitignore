@@ -42,3 +42,6 @@ test-*.cjs
 
 # Server configuration (keep local)
 server/
+
+# GitHub workflows (require special permissions)
+.github/workflows/

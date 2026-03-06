@@ -41,7 +41,7 @@ const PLANS_CONFIG: Record<string, PlanConfig> = {
     label: 'Free',
     description: 'Free tier with basic features',
     quotaBytes: 100 * 1024 * 1024,
-    maxBooks: 2,
+    maxBooks: 1,
     adsEnabled: true,
     importExportEnabled: false,
     maxAssetSize: 50 * 1024 * 1024,

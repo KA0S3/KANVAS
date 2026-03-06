@@ -55,7 +55,7 @@ export const TEST_USERS: Record<string, TestUser> = {
     email: 'free@test.com',
     planType: 'free',
     storageQuota: 100 * 1024 * 1024, // 100MB
-    maxBooks: 2,
+    maxBooks: 1,
     adsEnabled: true,
     importExportEnabled: false,
   },

@@ -40,7 +40,7 @@ export const PLANS_CONFIG: Record<string, PlanConfig> = {
     id: 'free',
     label: 'Free',
     quotaBytes: 100 * 1024 * 1024, // 100MB
-    maxBooks: 2,
+    maxBooks: 1,
     adsEnabled: true,
     importExportEnabled: true, // basic / limited
     canCreateMultipleGuestBooks: false,

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { X, Download, Upload, Trash2, Settings as SettingsIcon, Sun, Moon, BookOpen, Globe, Volume2 } from 'lucide-react';
+import { X, Settings as SettingsIcon, Volume2, Trash2, AlertTriangle, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import {
@@ -11,6 +11,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAssetStore } from '@/stores/assetStore';
@@ -21,6 +31,8 @@ import { useMediaStore } from '@/stores/mediaStore';
 import { audioEngine } from '@/services/AudioEngine';
 import { toast } from 'sonner';
 import type { Book } from '@/types/book';
+import { supabase } from '@/lib/supabase';
+import DataManager from '@/components/DataManager';
 
 // Error boundary component
 class AudioErrorBoundary extends React.Component<
@@ -68,11 +80,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   const { tags } = useTagStore();
   const { theme, toggleTheme } = useThemeStore();
   const { 
-    getAllBooks, 
-    exportBooks, 
-    importBooks, 
-    settings: bookSettings, 
-    updateSettings,
+    getAllBooks,
     getCurrentBook,
     getWorldData,
     updateWorldData
@@ -86,10 +94,8 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   const viewportScale = bookWorldData?.viewportScale || 1;
   
   const [activeTab, setActiveTab] = useState('general');
-  const [autoSave, setAutoSave] = useState(bookSettings.autoSave);
-  const [showGrid, setShowGrid] = useState(true);
-  const [snapToGrid, setSnapToGrid] = useState(false);
-  const [gridSize, setGridSize] = useState(40);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteUnlocked, setDeleteUnlocked] = useState(false);
   
   const allBooks = getAllBooks();
 
@@ -115,6 +121,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     });
   };
 
+
   const handleAudioToggle = async (enabled: boolean) => {
     setAudioEnabled(enabled);
     
@@ -131,63 +138,97 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     }
   };
 
-  const handleExportData = () => {
-    try {
-      const data = {
-        assets,
-        tags,
-        globalCustomFields,
-        exportedAt: new Date().toISOString(),
-      };
-      
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `kanvas-export-${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      
-      toast.success('Data exported successfully');
-    } catch (error) {
-      toast.error('Failed to export data');
-    }
-  };
-
-  const handleImportData = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = JSON.parse(e.target?.result as string);
-        
-        // Validate data structure
-        if (!data.assets || !data.tags) {
-          throw new Error('Invalid data format');
-        }
-        
-        // Here you would typically dispatch actions to update the stores
-        // For now, just show success message
-        toast.success('Data imported successfully');
-        onClose();
-      } catch (error) {
-        toast.error('Failed to import data: Invalid format');
-      }
-    };
-    reader.readAsText(file);
-  };
-
   const handleClearAllData = () => {
-    if (confirm('Are you sure you want to delete all data? This action cannot be undone.')) {
-      // Here you would typically dispatch actions to clear the stores
-      toast.success('All data cleared');
+    setShowDeleteDialog(true);
+  };
+
+  const handleConfirmDeleteAllData = async () => {
+    // Show browser confirmation dialog
+    const confirmed = window.confirm(
+      '⚠️ FINAL WARNING ⚠️\n\n' +
+      'This action will PERMANENTLY delete ALL data including:\n' +
+      '• All books and their contents\n' +
+      '• All assets and tags\n' +
+      '• All settings and preferences\n' +
+      '• All cloud data (if authenticated)\n' +
+      '• All local storage data\n\n' +
+      'THIS ACTION CANNOT BE UNDONE!\n\n' +
+      'Click "OK" to permanently delete everything, or "Cancel" to abort.'
+    );
+
+    if (!confirmed) {
+      return; // User cancelled the browser confirmation
+    }
+
+    try {
+      // Clear all stores
+      const { clearWorldData: clearAssetWorldData } = useAssetStore.getState();
+      const { clearWorldData: clearTagWorldData } = useTagStore.getState();
+      const { books, currentBookId } = useBookStore.getState();
+      
+      // Clear asset and tag data
+      clearAssetWorldData();
+      clearTagWorldData();
+      
+      // Clear all books
+      Object.keys(books).forEach(bookId => {
+        useBookStore.getState().deleteBook(bookId);
+      });
+      
+      // Reset media store to defaults
+      useMediaStore.getState().setVideosEnabled(true);
+      useMediaStore.getState().setAudioEnabled(true);
+      useMediaStore.getState().setVideoSoundsEnabled(true);
+      useMediaStore.getState().setAudioVolume(0.08);
+      
+      // Reset theme to default
+      useThemeStore.getState().setTheme('dark');
+      
+      // Clear all localStorage items except those that shouldn't be cleared
+      const keysToKeep = []; // Add any keys that should be preserved
+      const allKeys = Object.keys(localStorage);
+      allKeys.forEach(key => {
+        if (!keysToKeep.includes(key)) {
+          localStorage.removeItem(key);
+        }
+      });
+      
+      // Clear all sessionStorage
+      sessionStorage.clear();
+      
+      // Clear Supabase data if authenticated
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          // Sign out the user to clear their session
+          await supabase.auth.signOut();
+        }
+      } catch (supabaseError) {
+        console.warn('Failed to clear Supabase session:', supabaseError);
+      }
+      
+      // Stop audio engine
+      audioEngine.stop();
+      
+      // Show success message
+      toast.success('All data has been permanently deleted');
+      
+      // Close dialogs and reset state
+      setShowDeleteDialog(false);
+      setDeleteUnlocked(false);
       onClose();
+      
+      // Reload the page to ensure clean state
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Failed to clear all data:', error);
+      toast.error('Failed to clear some data. Please refresh the page.');
     }
   };
+
 
   const stats = {
     totalAssets: Object.keys(assets).length,
@@ -207,10 +248,9 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
         
         <div className="flex-1">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col">
-            <TabsList className="grid w-full grid-cols-5 flex-shrink-0 sticky top-16 bg-glass/90 backdrop-blur-sm z-10">
+            <TabsList className="grid w-full grid-cols-4 flex-shrink-0 sticky top-16 bg-glass/90 backdrop-blur-sm z-10">
               <TabsTrigger value="general">General</TabsTrigger>
               <TabsTrigger value="audio">A&V</TabsTrigger>
-              <TabsTrigger value="worlds">Worlds</TabsTrigger>
               <TabsTrigger value="data">Data Management</TabsTrigger>
               <TabsTrigger value="about">About</TabsTrigger>
             </TabsList>
@@ -222,79 +262,6 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                 <CardTitle className="text-lg">Display Settings</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="theme-toggle" className="flex items-center gap-2">
-                      {theme === 'light' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-                      Theme
-                    </Label>
-                    <div className="text-sm text-muted-foreground">
-                      {theme === 'light' ? 'Light mode' : 'Dark mode'}
-                    </div>
-                  </div>
-                  <Switch
-                    id="theme-toggle"
-                    checked={theme === 'light'}
-                    onCheckedChange={toggleTheme}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="auto-save">Auto Save</Label>
-                    <div className="text-sm text-muted-foreground">
-                      Automatically save changes
-                    </div>
-                  </div>
-                  <Switch
-                    id="auto-save"
-                    checked={autoSave}
-                    onCheckedChange={setAutoSave}
-                  />
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="show-grid">Show Grid</Label>
-                    <div className="text-sm text-muted-foreground">
-                      Display grid in viewport
-                    </div>
-                  </div>
-                  <Switch
-                    id="show-grid"
-                    checked={showGrid}
-                    onCheckedChange={setShowGrid}
-                  />
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="snap-to-grid">Snap to Grid</Label>
-                    <div className="text-sm text-muted-foreground">
-                      Align assets to grid
-                    </div>
-                  </div>
-                  <Switch
-                    id="snap-to-grid"
-                    checked={snapToGrid}
-                    onCheckedChange={setSnapToGrid}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="grid-size">Grid Size</Label>
-                  <Input
-                    id="grid-size"
-                    type="number"
-                    value={gridSize}
-                    onChange={(e) => setGridSize(Number(e.target.value))}
-                    min="10"
-                    max="100"
-                    step="10"
-                    className="bg-glass/50 border-glass-border/40"
-                  />
-                </div>
-
                 <div className="pt-4 border-t border-glass-border/30">
                   <div className="text-sm font-medium text-foreground mb-3">Viewport Position & Scale</div>
                   <div className="grid grid-cols-2 gap-3">
@@ -422,122 +389,6 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
             </AudioErrorBoundary>
           </TabsContent>
           
-          <TabsContent value="worlds" className="space-y-4">
-            <Card className="glass cosmic-glow border-glass-border/40">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Globe className="w-5 h-5" />
-                  World Management
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4 text-center">
-                  <div className="p-4 border border-glass-border/30 rounded-lg bg-glass/30">
-                    <div className="text-2xl font-bold text-primary">{allBooks.length}</div>
-                    <div className="text-sm text-muted-foreground">Total Worlds</div>
-                  </div>
-                  <div className="p-4 border border-glass-border/30 rounded-lg bg-glass/30">
-                    <div className="text-2xl font-bold text-accent">
-                      {allBooks.reduce((sum, book) => sum + Object.keys(book.worldData.assets || {}).length, 0)}
-                    </div>
-                    <div className="text-sm text-muted-foreground">Total Assets</div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="auto-save-worlds">Auto Save Worlds</Label>
-                    <div className="text-sm text-muted-foreground">
-                      Automatically save world changes
-                    </div>
-                  </div>
-                  <Switch
-                    id="auto-save-worlds"
-                    checked={autoSave}
-                    onCheckedChange={(checked) => {
-                      setAutoSave(checked);
-                      updateSettings({ autoSave: checked });
-                    }}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>World List</Label>
-                  <div className="max-h-40 overflow-y-auto space-y-2">
-                    {allBooks.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No worlds created yet</p>
-                    ) : (
-                      allBooks.map((book) => (
-                        <div key={book.id} className="flex items-center justify-between p-2 border border-glass-border/30 rounded-lg bg-glass/30">
-                          <div className="flex items-center gap-2">
-                            <BookOpen className="w-4 h-4" />
-                            <div>
-                              <div className="font-medium text-sm">{book.title}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {Object.keys(book.worldData.assets || {}).length} assets
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => {
-                      const data = exportBooks();
-                      const blob = new Blob([data], { type: 'application/json' });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = `worlds-export-${new Date().toISOString().split('T')[0]}.json`;
-                      document.body.appendChild(a);
-                      a.click();
-                      document.body.removeChild(a);
-                      URL.revokeObjectURL(url);
-                      toast.success('Worlds exported successfully');
-                    }}
-                    className="flex-1"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Export Worlds
-                  </Button>
-                  
-                  <div className="flex-1">
-                    <input
-                      type="file"
-                      accept=".json"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onload = (event) => {
-                            const data = event.target?.result as string;
-                            if (importBooks(data)) {
-                              toast.success('Worlds imported successfully');
-                            } else {
-                              toast.error('Failed to import worlds');
-                            }
-                          };
-                          reader.readAsText(file);
-                        }
-                      }}
-                      className="hidden"
-                      id="import-worlds"
-                    />
-                    <Label htmlFor="import-worlds" className="w-full">
-                      <Button variant="outline" className="w-full">
-                        <Upload className="w-4 h-4 mr-2" />
-                        Import Worlds
-                      </Button>
-                    </Label>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
           
           <TabsContent value="data" className="space-y-4">
             <Card className="glass cosmic-glow border-glass-border/40">
@@ -545,49 +396,35 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                 <CardTitle className="text-lg">Data Statistics</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-3 gap-4 text-center">
+                <div className="grid grid-cols-2 gap-4 text-center mb-6">
                   <div className="p-4 border border-glass-border/30 rounded-lg bg-glass/30">
-                    <div className="text-2xl font-bold text-primary">{stats.totalAssets}</div>
+                    <div className="text-2xl font-bold text-primary">{allBooks.length}</div>
+                    <div className="text-sm text-muted-foreground">Books</div>
+                  </div>
+                  <div className="p-4 border border-glass-border/30 rounded-lg bg-glass/30">
+                    <div className="text-2xl font-bold text-accent">{stats.totalAssets}</div>
                     <div className="text-sm text-muted-foreground">Assets</div>
                   </div>
                   <div className="p-4 border border-glass-border/30 rounded-lg bg-glass/30">
-                    <div className="text-2xl font-bold text-accent">{stats.totalTags}</div>
+                    <div className="text-2xl font-bold text-secondary">{stats.totalTags}</div>
                     <div className="text-sm text-muted-foreground">Tags</div>
                   </div>
                   <div className="p-4 border border-glass-border/30 rounded-lg bg-glass/30">
-                    <div className="text-2xl font-bold text-secondary">{stats.totalGlobalFields}</div>
-                    <div className="text-sm text-muted-foreground">Global Fields</div>
+                    <div className="text-2xl font-bold text-primary">{stats.totalGlobalFields}</div>
+                    <div className="text-sm text-muted-foreground">Fields</div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="glass cosmic-glow border-glass-border/40">
-              <CardHeader>
-                <CardTitle className="text-lg">Import/Export</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex gap-2">
-                  <Button onClick={handleExportData} className="flex-1">
-                    <Download className="w-4 h-4 mr-2" />
-                    Export Data
-                  </Button>
-                  
-                  <div className="flex-1">
-                    <input
-                      type="file"
-                      accept=".json"
-                      onChange={handleImportData}
-                      className="hidden"
-                      id="import-data"
-                    />
-                    <Label htmlFor="import-data" className="w-full">
-                      <Button variant="outline" className="w-full">
-                        <Upload className="w-4 h-4 mr-2" />
-                        Import Data
-                      </Button>
-                    </Label>
-                  </div>
+                
+                <div className="pt-4 border-t border-glass-border/30">
+                  <DataManager>
+                    <Button
+                      variant="default"
+                      className="w-full"
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Import / Export Data
+                    </Button>
+                  </DataManager>
                 </div>
                 
                 <div className="pt-4 border-t border-glass-border/30">
@@ -600,7 +437,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                     Clear All Data
                   </Button>
                   <div className="text-xs text-muted-foreground mt-2">
-                    This will permanently delete all assets, tags, and settings.
+                    This will permanently delete all assets, tags, books, and settings.
                   </div>
                 </div>
               </CardContent>
@@ -624,12 +461,209 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                     Invented by KAOS, with inspiration and help from Ghastly.
                   </div>
                 </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="viewport-offset-x">Offset X</Label>
+                    <Input
+                      id="viewport-offset-x"
+                      type="number"
+                      value={viewportOffset.x}
+                      onChange={(e) =>
+                        handleViewportOffsetChange('x', Number(e.target.value))
+                      }
+                      step="1"
+                      className="bg-glass/50 border-glass-border/40"
+                      disabled={!currentBook}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="viewport-offset-y">Offset Y</Label>
+                    <Input
+                      id="viewport-offset-y"
+                      type="number"
+                      value={viewportOffset.y}
+                      onChange={(e) =>
+                        handleViewportOffsetChange('y', Number(e.target.value))
+                      }
+                      step="1"
+                      className="bg-glass/50 border-glass-border/40"
+                      disabled={!currentBook}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="viewport-scale">Viewport Scale</Label>
+                    <Input
+                      id="viewport-scale"
+                      type="number"
+                      value={viewportScale}
+                      onChange={(e) => handleViewportScaleChange(Number(e.target.value))}
+                      min="0.5"
+                      max="2"
+                      step="0.05"
+                      className="bg-glass/50 border-glass-border/40"
+                      disabled={!currentBook}
+                    />
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
+  
+  <TabsContent value="audio" className="space-y-4">
+    <AudioErrorBoundary>
+      <Card className="glass cosmic-glow border-glass-border/40">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Volume2 className="w-5 h-5" />
+            Audio Settings
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label htmlFor="audio-enabled">Music</Label>
+              <div className="text-sm text-muted-foreground">
+                Enable background music and audio effects
+              </div>
+            </div>
+            <Switch
+              id="audio-enabled"
+              checked={audioEnabled}
+              onCheckedChange={handleAudioToggle}
+            />
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label htmlFor="videos-enabled">Videos</Label>
+              <div className="text-sm text-muted-foreground">
+                Enable intro videos and animations
+              </div>
+            </div>
+            <Switch
+              id="videos-enabled"
+              checked={videosEnabled}
+              onCheckedChange={setVideosEnabled}
+            />
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label htmlFor="video-sounds-enabled">Enable Video Sounds</Label>
+              <div className="text-sm text-muted-foreground">
+                Play video audio and sound effects
+              </div>
+            </div>
+            <Switch
+              id="video-sounds-enabled"
+              checked={videoSoundsEnabled}
+              onCheckedChange={setVideoSoundsEnabled}
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="audio-volume">Music Volume: {Math.round(audioVolume * 100)}%</Label>
+            <Slider
+              id="audio-volume"
+              min={0}
+              max={100}
+              step={1}
+              value={[audioVolume * 100]}
+              onValueChange={(value) => {
+                setAudioVolume(value[0] / 100);
+                audioEngine.updateVolume(); // Update real-time volume
+              }}
+              className="w-full"
+              disabled={!audioEnabled}
+            />
+            <div className="text-xs text-muted-foreground">
+              Control background music volume
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </AudioErrorBoundary>
+  </TabsContent>
+  
+    
+  <TabsContent value="about" className="space-y-4">
+    <Card className="glass cosmic-glow border-glass-border/40">
+      <CardHeader>
+        <CardTitle className="text-lg">About KANVAS</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="text-center space-y-2">
+          <div className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+            KANVAS
+          </div>
+          <div className="text-sm text-muted-foreground">
+            Version V0.3.9
+          </div>
+          <div className="text-xs text-muted-foreground max-w-md mx-auto">
+            Invented by KAOS, with inspiration and help from Ghastly.
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  </TabsContent>
             </div>
           </Tabs>
         </div>
+        
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent className="max-w-md">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="w-5 h-5" />
+                Delete All Data
+              </AlertDialogTitle>
+              <AlertDialogDescription className="space-y-4">
+                <div className="text-center py-4">
+                  <div className="text-xl font-bold text-destructive mb-2">
+                    WARNING THIS WILL DELETE ALL DATA
+                  </div>
+                  <div className="text-lg font-bold text-destructive">
+                    THIS ACTION IS NOT REVERSABLE
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-between p-3 border border-destructive/30 rounded-lg bg-destructive/5">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="delete-unlock"
+                      checked={deleteUnlocked}
+                      onCheckedChange={setDeleteUnlocked}
+                    />
+                    <Label htmlFor="delete-unlock" className="text-sm font-medium">
+                      Unlock deletion
+                    </Label>
+                  </div>
+                </div>
+                
+                <div className="text-xs text-muted-foreground text-center">
+                  This will permanently delete all assets, tags, worlds, and settings. There is no way to recover this data.
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => {
+                setShowDeleteDialog(false);
+                setDeleteUnlocked(false);
+              }}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleConfirmDeleteAllData}
+                disabled={!deleteUnlocked}
+                className="bg-destructive hover:bg-destructive/90"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete All Data
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   );

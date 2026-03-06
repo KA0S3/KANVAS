@@ -46,12 +46,12 @@ export function checkLimitsAndTriggerUpgrade(
   
   // Fallback to plan-based limits
   const maxBooksByPlan = {
-    free: 2,
+    free: 1,
     pro: -1, // Unlimited
     lifetime: -1 // Unlimited
   };
   
-  const maxBooks = maxBooksByPlan[plan] || 2;
+  const maxBooks = maxBooksByPlan[plan] || 1;
   
   if (maxBooks === -1) {
     return true; // Unlimited for pro/lifetime

@@ -86,7 +86,7 @@ export async function getEffectiveLimitsWithFallback(): Promise<EffectiveLimits>
   
   const fallbackLimits: EffectiveLimits = {
     quotaBytes: isGuest ? 0 : 100 * 1024 * 1024, // 0 for guest, 100MB for signed in
-    maxBooks: isGuest ? 1 : 2,
+    maxBooks: isGuest ? 1 : 1,
     adsEnabled: true, // Always show ads in fallback mode
     importExportEnabled: false,
     source: {

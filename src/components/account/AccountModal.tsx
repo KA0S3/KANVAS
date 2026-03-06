@@ -332,8 +332,9 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
                               <Input
                                 placeholder="Enter your email"
                                 type="email"
+                                autoComplete="email"
                                 disabled={isSubmitting}
-                                className="bg-glass/50 border-glass-border/40"
+                                className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-black dark:text-white"
                                 {...field}
                               />
                             </FormControl>
@@ -352,8 +353,9 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
                               <Input
                                 placeholder="Enter your password"
                                 type="password"
+                                autoComplete="current-password"
                                 disabled={isSubmitting}
-                                className="bg-glass/50 border-glass-border/40"
+                                className="bg-background border-input"
                                 {...field}
                               />
                             </FormControl>
@@ -392,8 +394,9 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
                               <Input
                                 placeholder="Enter your email"
                                 type="email"
+                                autoComplete="email"
                                 disabled={isSubmitting}
-                                className="bg-glass/50 border-glass-border/40"
+                                className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-black dark:text-white"
                                 {...field}
                               />
                             </FormControl>
@@ -412,8 +415,9 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
                               <Input
                                 placeholder="Create a password"
                                 type="password"
+                                autoComplete="new-password"
                                 disabled={isSubmitting}
-                                className="bg-glass/50 border-glass-border/40"
+                                className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-black dark:text-white"
                                 {...field}
                               />
                             </FormControl>
@@ -432,8 +436,9 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
                               <Input
                                 placeholder="Confirm your password"
                                 type="password"
+                                autoComplete="new-password"
                                 disabled={isSubmitting}
-                                className="bg-glass/50 border-glass-border/40"
+                                className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-black dark:text-white"
                                 {...field}
                               />
                             </FormControl>

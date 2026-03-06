@@ -111,7 +111,7 @@ describe('Owner Key Service - Scope Application', () => {
 
     expect(result.maxStorageBytes).toBe(100 * 1024 * 1024); // Free plan default
     expect(result.quotaBytes).toBe(100 * 1024 * 1024); // Free plan default
-    expect(result.maxBooks).toBe(2); // Free plan default
+    expect(result.maxBooks).toBe(1); // Free plan default
     expect(result.adsEnabled).toBe(true); // From scope
     expect(result.importExportEnabled).toBe(false); // From scope
   });
@@ -182,7 +182,7 @@ describe('Owner Key Service - Scope Application', () => {
     expect(result.effectivePlan).toBe('free'); // Fallback to free
     expect(result.maxStorageBytes).toBe(104857600); // Free plan default (100MB) since scopes don't override unknown plan
     expect(result.quotaBytes).toBe(104857600); // Free plan default
-    expect(result.maxBooks).toBe(2); // Free plan default
+    expect(result.maxBooks).toBe(1); // Free plan default
     expect(result.adsEnabled).toBe(true); // Free plan default
     expect(result.importExportEnabled).toBe(true); // From scope (import_export: true)
     

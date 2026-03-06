@@ -121,7 +121,7 @@ describe('Owner Key System', () => {
       expect(updatedStore.effectiveLimits?.adsEnabled).toBe(false);
       expect(updatedStore.effectiveLimits?.maxStorageBytes).toBe(2147483648);
       expect(updatedStore.effectiveLimits?.quotaBytes).toBe(2147483648);
-      expect(updatedStore.effectiveLimits?.maxBooks).toBe(10); // Default free plan maxBooks
+      expect(updatedStore.effectiveLimits?.maxBooks).toBe(1); // Default free plan maxBooks
     });
 
     it('should clear owner key on sign out', async () => {

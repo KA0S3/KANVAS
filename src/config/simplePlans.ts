@@ -18,7 +18,7 @@ export const PLANS: Record<string, PlanConfig> = {
     id: 'free',
     name: 'Free Plan',
     storageMB: 100,
-    maxBooks: 2,
+    maxBooks: 1,
     canExport: false,
     hasAds: true
   },
@@ -51,7 +51,7 @@ export function getStorageMB(planId: string): number {
 
 export function getMaxBooks(planId: string): number {
   const plan = getPlan(planId);
-  return plan ? plan.maxBooks : 2; // fallback to free plan
+  return plan ? plan.maxBooks : 1; // fallback to free plan
 }
 
 export function canExport(planId: string): boolean {

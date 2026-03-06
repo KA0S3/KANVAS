@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useBookStore } from "@/stores/bookStoreSimple";
 import { useCanCreateBook } from "@/lib/limits";
 import LeatherColorPicker from "./books/LeatherColorPicker";
+import { UpgradePromptModal } from "@/components/UpgradePromptModal";
+import { toast } from "sonner";
 import type { LeatherColorPreset } from "@/types/book";
 
 interface WorldCreationDialogProps {
@@ -23,6 +25,7 @@ const WorldCreationDialog = ({ children, onWorldCreated }: WorldCreationDialogPr
   const [isLeatherMode, setIsLeatherMode] = useState(true);
   const [selectedLeatherColor, setSelectedLeatherColor] = useState<LeatherColorPreset | null>(null);
   const [customCoverImage, setCustomCoverImage] = useState<string | null>(null);
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   const { createBook, leatherPresets } = useBookStore();
   const { canCreate: canCreateNewBook, reason, upgradePrompt } = useCanCreateBook();
 
@@ -39,8 +42,8 @@ const WorldCreationDialog = ({ children, onWorldCreated }: WorldCreationDialogPr
     if (!title.trim()) return;
     
     if (!canCreateNewBook) {
-      // TODO: Show upgrade prompt
-      console.log('Book limit reached, show upgrade prompt');
+      // Show upgrade prompt instead of silently failing
+      setShowUpgradePrompt(true);
       return;
     }
 
@@ -267,6 +270,19 @@ const WorldCreationDialog = ({ children, onWorldCreated }: WorldCreationDialogPr
           </div>
         </div>
       </DialogContent>
+      {/* Upgrade Prompt Modal */}
+      <UpgradePromptModal
+        isOpen={showUpgradePrompt}
+        onClose={() => setShowUpgradePrompt(false)}
+        title={upgradePrompt?.title || 'World Creation Limit Reached'}
+        message={upgradePrompt?.message || reason || 'You have reached the maximum number of worlds for your current plan.'}
+        action={upgradePrompt?.action || 'Upgrade Plan'}
+        type="plan_limit"
+        onAction={() => {
+          setShowUpgradePrompt(false);
+          toast.info('Upgrade feature coming soon!');
+        }}
+      />
     </Dialog>
   );
 };

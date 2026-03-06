@@ -46,12 +46,12 @@ const BookShelf: React.FC<BookShelfProps> = ({
     
     // Fallback to plan-based limits
     const maxBooksByPlan = {
-      free: 2,
+      free: 1,
       pro: -1, // Unlimited
       lifetime: -1 // Unlimited
     };
     
-    const maxBooks = maxBooksByPlan[plan as keyof typeof maxBooksByPlan] || 2;
+    const maxBooks = maxBooksByPlan[plan as keyof typeof maxBooksByPlan] || 1;
     return maxBooks === -1 ? '∞' : maxBooks;
   };
 
@@ -134,13 +134,6 @@ const BookShelf: React.FC<BookShelfProps> = ({
               <h1 className={`text-xl font-bold drop-shadow-lg ${
                 theme === 'dark' ? 'text-white' : 'text-foreground'
               }`}>World Library</h1>
-              <span className={`text-sm px-2 py-1 rounded-md ${
-                theme === 'dark' 
-                  ? 'bg-white/10 text-white/80 border border-white/20' 
-                  : 'bg-muted text-muted-foreground border border-border'
-              }`}>
-                Books: {books.length} / {getMaxBooksDisplay()}
-              </span>
             </div>
             <p className={`text-sm drop-shadow ${
               theme === 'dark' ? 'text-white/80' : 'text-muted-foreground'

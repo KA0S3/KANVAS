@@ -135,7 +135,7 @@ describe('Plan Translation Mapping', () => {
       const lifetimeConfig = getPlanConfig('lifetime');
 
       expect(guestConfig.maxBooks).toBe(1);
-      expect(freeConfig.maxBooks).toBe(2);
+      expect(freeConfig.maxBooks).toBe(1);
       expect(proConfig.maxBooks).toBe(50);
       expect(lifetimeConfig.maxBooks).toBe(-1); // unlimited
     });

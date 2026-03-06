@@ -53,7 +53,7 @@ describe('Effective Limits Calculation', () => {
 
       expect(result.data).toEqual({
         quotaBytes: 100 * 1024 * 1024, // 100MB
-        maxBooks: 2,
+        maxBooks: 1,
         adsEnabled: true,
         importExportEnabled: false,
         source: { plan: 'free' },
@@ -146,7 +146,7 @@ describe('Effective Limits Calculation', () => {
         ok: true,
         json: () => Promise.resolve({
           quotaBytes: 100 * 1024 * 1024,
-          maxBooks: 2,
+          maxBooks: 1,
           adsEnabled: true,
           importExportEnabled: false,
           source: { plan: 'free' }, // No owner key in source
@@ -279,7 +279,7 @@ describe('Effective Limits Calculation', () => {
         ok: true,
         json: () => Promise.resolve({
           quotaBytes: 100 * 1024 * 1024, // Back to base plan
-          maxBooks: 2,
+          maxBooks: 1,
           adsEnabled: true,
           importExportEnabled: false,
           source: { plan: 'free' },
@@ -376,7 +376,7 @@ describe('Effective Limits Calculation', () => {
       const result = await getEffectiveLimitsWithFallback();
 
       expect(result.quotaBytes).toBe(100 * 1024 * 1024); // Free plan fallback
-      expect(result.maxBooks).toBe(2);
+      expect(result.maxBooks).toBe(1);
       expect(result.adsEnabled).toBe(true);
       expect(result.importExportEnabled).toBe(false);
       expect(result.source.plan).toBe('free');

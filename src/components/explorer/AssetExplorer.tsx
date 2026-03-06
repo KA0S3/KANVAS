@@ -133,16 +133,7 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
           >
             <Image className="w-3.5 h-3.5" />
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-6 w-6 p-0"
-            onClick={() => setAccountModalOpen(true)}
-            title="Account"
-          >
-            <User className="w-3.5 h-3.5" />
-          </Button>
-          <Button
+                    <Button
             size="sm"
             variant="ghost"
             className="h-6 w-6 p-0"
