@@ -455,158 +455,54 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                     KANVAS
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    Version V0.3.9
-                  </div>
-                  <div className="text-xs text-muted-foreground max-w-md mx-auto">
-                    Invented by KAOS, with inspiration and help from Ghastly.
+                    Version V3.8.9.2
                   </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="viewport-offset-x">Offset X</Label>
-                    <Input
-                      id="viewport-offset-x"
-                      type="number"
-                      value={viewportOffset.x}
-                      onChange={(e) =>
-                        handleViewportOffsetChange('x', Number(e.target.value))
-                      }
-                      step="1"
-                      className="bg-glass/50 border-glass-border/40"
-                      disabled={!currentBook}
-                    />
+                
+                <div className="border-t border-glass-border/30 pt-4">
+                  <div className="text-sm space-y-2">
+                    <div className="font-semibold text-foreground">Copyright & Ownership</div>
+                    <div className="text-muted-foreground space-y-1">
+                      <p>This application, compendium, and all related features are the exclusive property of its creator.</p>
+                      <p>All inventive functions, coding, operating systems, and intellectual property contained herein are owned by the developer.</p>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="viewport-offset-y">Offset Y</Label>
-                    <Input
-                      id="viewport-offset-y"
-                      type="number"
-                      value={viewportOffset.y}
-                      onChange={(e) =>
-                        handleViewportOffsetChange('y', Number(e.target.value))
-                      }
-                      step="1"
-                      className="bg-glass/50 border-glass-border/40"
-                      disabled={!currentBook}
-                    />
+                </div>
+                
+                <div className="border-t border-glass-border/30 pt-4">
+                  <div className="text-sm space-y-2">
+                    <div className="font-semibold text-foreground">Legal Notice</div>
+                    <div className="text-muted-foreground space-y-1">
+                      <p>© 2026 All Rights Reserved.</p>
+                      <p>Unauthorized reproduction, distribution, or modification of this software or its components is strictly prohibited.</p>
+                      <p>This includes but is not limited to: copying the source code, replicating the design, or implementing similar functionality without explicit permission.</p>
+                      <p>Violators may be subject to legal action under copyright and intellectual property laws.</p>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="viewport-scale">Viewport Scale</Label>
-                    <Input
-                      id="viewport-scale"
-                      type="number"
-                      value={viewportScale}
-                      onChange={(e) => handleViewportScaleChange(Number(e.target.value))}
-                      min="0.5"
-                      max="2"
-                      step="0.05"
-                      className="bg-glass/50 border-glass-border/40"
-                      disabled={!currentBook}
-                    />
+                </div>
+                
+                <div className="border-t border-glass-border/30 pt-4">
+                  <div className="text-sm space-y-2">
+                    <div className="font-semibold text-foreground">Liability Disclaimer</div>
+                    <div className="text-muted-foreground space-y-1">
+                      <p>The creators of this software are not liable for any data loss, corruption, or damage that may occur while using this application.</p>
+                      <p>Users are responsible for maintaining backups of their data and for the security of their information.</p>
+                      <p>This software is provided "as is" without warranties of any kind, either express or implied.</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="border-t border-glass-border/30 pt-4">
+                  <div className="text-xs text-muted-foreground text-center">
+                    <p>This software is provided "as is" without warranty of any kind.</p>
+                    <p>By using this application, you agree to respect the intellectual property rights of the creator.</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
   
-  <TabsContent value="audio" className="space-y-4">
-    <AudioErrorBoundary>
-      <Card className="glass cosmic-glow border-glass-border/40">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Volume2 className="w-5 h-5" />
-            Audio Settings
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor="audio-enabled">Music</Label>
-              <div className="text-sm text-muted-foreground">
-                Enable background music and audio effects
               </div>
-            </div>
-            <Switch
-              id="audio-enabled"
-              checked={audioEnabled}
-              onCheckedChange={handleAudioToggle}
-            />
-          </div>
-          
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor="videos-enabled">Videos</Label>
-              <div className="text-sm text-muted-foreground">
-                Enable intro videos and animations
-              </div>
-            </div>
-            <Switch
-              id="videos-enabled"
-              checked={videosEnabled}
-              onCheckedChange={setVideosEnabled}
-            />
-          </div>
-          
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor="video-sounds-enabled">Enable Video Sounds</Label>
-              <div className="text-sm text-muted-foreground">
-                Play video audio and sound effects
-              </div>
-            </div>
-            <Switch
-              id="video-sounds-enabled"
-              checked={videoSoundsEnabled}
-              onCheckedChange={setVideoSoundsEnabled}
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="audio-volume">Music Volume: {Math.round(audioVolume * 100)}%</Label>
-            <Slider
-              id="audio-volume"
-              min={0}
-              max={100}
-              step={1}
-              value={[audioVolume * 100]}
-              onValueChange={(value) => {
-                setAudioVolume(value[0] / 100);
-                audioEngine.updateVolume(); // Update real-time volume
-              }}
-              className="w-full"
-              disabled={!audioEnabled}
-            />
-            <div className="text-xs text-muted-foreground">
-              Control background music volume
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </AudioErrorBoundary>
-  </TabsContent>
-  
-    
-  <TabsContent value="about" className="space-y-4">
-    <Card className="glass cosmic-glow border-glass-border/40">
-      <CardHeader>
-        <CardTitle className="text-lg">About KANVAS</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="text-center space-y-2">
-          <div className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            KANVAS
-          </div>
-          <div className="text-sm text-muted-foreground">
-            Version V0.3.9
-          </div>
-          <div className="text-xs text-muted-foreground max-w-md mx-auto">
-            Invented by KAOS, with inspiration and help from Ghastly.
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  </TabsContent>
-            </div>
           </Tabs>
         </div>
         
