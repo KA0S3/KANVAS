@@ -86,13 +86,6 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
     }
   }, [authLoading, initializeAuth]);
 
-  // Reset form and error when modal opens/closes or mode changes
-  useEffect(() => {
-    if (isOpen) {
-      setAuthError(null);
-    }
-  }, [isOpen, mode]);
-
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -109,6 +102,15 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
       confirmPassword: '',
     },
   });
+
+  // Reset form and error when modal opens/closes or mode changes
+  useEffect(() => {
+    if (isOpen) {
+      setAuthError(null);
+      loginForm.reset();
+      signUpForm.reset();
+    }
+  }, [isOpen, mode, loginForm, signUpForm]);
 
   const handleLogin = async (data: LoginFormData) => {
     setIsSubmitting(true);
@@ -382,7 +384,7 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
                   </Form>
                 ) : (
                   // Sign Up Form
-                  <Form {...signUpForm}>
+                  <Form {...signUpForm} key="signup-form">
                     <form onSubmit={signUpForm.handleSubmit(handleSignUp)} className="space-y-4">
                       <FormField
                         control={signUpForm.control}
@@ -396,7 +398,7 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
                                 type="email"
                                 autoComplete="email"
                                 disabled={isSubmitting}
-                                className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-black dark:text-white"
+                                className="bg-background border-input"
                                 {...field}
                               />
                             </FormControl>
@@ -417,7 +419,7 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
                                 type="password"
                                 autoComplete="new-password"
                                 disabled={isSubmitting}
-                                className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-black dark:text-white"
+                                className="bg-background border-input"
                                 {...field}
                               />
                             </FormControl>
@@ -438,7 +440,7 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
                                 type="password"
                                 autoComplete="new-password"
                                 disabled={isSubmitting}
-                                className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-black dark:text-white"
+                                className="bg-background border-input"
                                 {...field}
                               />
                             </FormControl>

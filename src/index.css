@@ -157,8 +157,24 @@
 
   /* Enable text selection for specific elements */
   input, textarea, [contenteditable] {
-    -webkit-user-select: text;
-    user-select: text;
+    -webkit-user-select: text !important;
+    user-select: text !important;
+    pointer-events: auto !important;
+  }
+
+  /* Additional fix for form inputs in modals and dialogs */
+  input[type="email"], 
+  input[type="password"], 
+  input[type="text"],
+  .glass input,
+  .cosmic-glow input,
+  dialog input,
+  [role="dialog"] input {
+    -webkit-user-select: text !important;
+    user-select: text !important;
+    pointer-events: auto !important;
+    -webkit-touch-callout: auto !important;
+    touch-action: auto !important;
   }
 
   /* Enable interaction for color pickers */
