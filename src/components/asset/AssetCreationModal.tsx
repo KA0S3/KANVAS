@@ -81,6 +81,8 @@ export function AssetCreationModal({ isOpen, onClose, initialData, parentId, gen
     },
   });
 
+  const [mode, setMode] = useState<'asset' | 'note'>('asset');
+
   // File upload state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'checking' | 'allowed' | 'denied'>('idle');
@@ -241,48 +243,39 @@ export function AssetCreationModal({ isOpen, onClose, initialData, parentId, gen
       <Dialog open={isOpen} onOpenChange={handleClose}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto glass cosmic-glow border-glass-border/40">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold">Create New Asset</DialogTitle>
+            <DialogTitle className="text-xl font-bold">Create New {mode === 'note' ? 'Note' : 'Asset'}</DialogTitle>
           </DialogHeader>
           
-          <div className="space-y-6 py-4">
+          <div className="space-y-6 py-4 relative">
+            {/* Mode Toggle */}
+            <div className="absolute top-0 right-0">
+              <div className="flex items-center gap-2 p-2">
+                <span className={`text-xs font-medium transition-colors ${mode === 'note' ? 'text-gray-500' : 'text-teal-600'}`}>Asset</span>
+                <Switch
+                  checked={mode === 'note'}
+                  onCheckedChange={(checked) => setMode(checked ? 'note' : 'asset')}
+                  className="scale-75"
+                />
+                <span className={`text-xs font-medium transition-colors ${mode === 'asset' ? 'text-gray-500' : 'text-gray-600'}`}>Note</span>
+              </div>
+            </div>
+
             {/* Basic Information */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-foreground">Basic Information</h3>
               
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="asset-name">Name *</Label>
-                  <Input
-                    id="asset-name"
-                    value={formData.name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Enter asset name..."
-                    className="bg-glass/50 border-glass-border/40"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="asset-type">Type</Label>
-                  <Select
-                    value={formData.type}
-                    onValueChange={(value: 'image' | 'document' | 'video' | 'audio' | 'code' | 'other') => setFormData(prev => ({ ...prev, type: value }))}
-                  >
-                    <SelectTrigger className="bg-glass/50 border-glass-border/40">
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="image">Image</SelectItem>
-                      <SelectItem value="document">Document</SelectItem>
-                      <SelectItem value="video">Video</SelectItem>
-                      <SelectItem value="audio">Audio</SelectItem>
-                      <SelectItem value="code">Code</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="asset-name">Name *</Label>
+                <Input
+                  id="asset-name"
+                  value={formData.name}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder={`Enter ${mode === 'note' ? 'note' : 'asset'} name...`}
+                  className="bg-glass/50 border-glass-border/40"
+                />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              {mode === 'asset' && (
                 <div className="space-y-2">
                   <Label htmlFor="asset-tags">Tags</Label>
                   <div className="flex flex-wrap gap-2 p-2 border border-glass-border/40 rounded-md bg-glass/30 min-h-[40px]">
@@ -308,49 +301,7 @@ export function AssetCreationModal({ isOpen, onClose, initialData, parentId, gen
                     })}
                   </div>
                 </div>
-
-                <div className="space-y-2">
-                  <Label>Position</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      type="number"
-                      placeholder="X"
-                      value={formData.x}
-                      onChange={(e) => setFormData(prev => ({ ...prev, x: parseInt(e.target.value) || 0 }))}
-                      className="flex-1 bg-glass/50 border-glass-border/40"
-                    />
-                    <Input
-                      type="number"
-                      placeholder="Y"
-                      value={formData.y}
-                      onChange={(e) => setFormData(prev => ({ ...prev, y: parseInt(e.target.value) || 0 }))}
-                      className="flex-1 bg-glass/50 border-glass-border/40"
-                    />
-                  </div>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Size</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      type="number"
-                      placeholder="Width"
-                      value={formData.width}
-                      onChange={(e) => setFormData(prev => ({ ...prev, width: parseInt(e.target.value) || 200 }))}
-                      className="flex-1 bg-glass/50 border-glass-border/40"
-                    />
-                    <Input
-                      type="number"
-                      placeholder="Height"
-                      value={formData.height}
-                      onChange={(e) => setFormData(prev => ({ ...prev, height: parseInt(e.target.value) || 150 }))}
-                      className="flex-1 bg-glass/50 border-glass-border/40"
-                    />
-                  </div>
-                </div>
-              </div>
+              )}
               
               <div className="space-y-2">
                 <Label htmlFor="asset-description">Description</Label>
@@ -358,95 +309,15 @@ export function AssetCreationModal({ isOpen, onClose, initialData, parentId, gen
                   id="asset-description"
                   value={formData.description}
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Enter asset description..."
+                  placeholder={`Enter ${mode === 'note' ? 'note' : 'asset'} description...`}
                   rows={3}
                   className="bg-glass/50 border-glass-border/40"
                 />
               </div>
             </div>
 
-            {/* File Upload */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-foreground">File Upload</h3>
-              
-              <div className="space-y-2">
-                <Label>Asset File</Label>
-                {selectedFile ? (
-                  <div className="p-4 border border-glass-border/40 rounded-lg bg-glass/30">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center">
-                          <Upload className="w-5 h-5 text-primary" />
-                        </div>
-                        <div>
-                          <p className="font-medium">{selectedFile.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedFile(null);
-                          setUploadStatus('idle');
-                        }}
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    </div>
-                    
-                    {/* Upload Status */}
-                    {syncEnabled && isAuthenticated && (
-                      <div className="mt-3 flex items-center gap-2">
-                        {uploadStatus === 'checking' && (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <div className="animate-spin rounded-full h-3 w-3 border-b border-current"></div>
-                            Checking storage quota...
-                          </div>
-                        )}
-                        {uploadStatus === 'allowed' && (
-                          <div className="flex items-center gap-2 text-sm text-green-600">
-                            <Cloud className="w-3 h-3" />
-                            Cloud upload available
-                          </div>
-                        )}
-                        {uploadStatus === 'denied' && (
-                          <div className="flex items-center gap-2 text-sm text-orange-600">
-                            <AlertCircle className="w-3 h-3" />
-                            Storage quota exceeded - asset will be local only
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="border-2 border-dashed border-glass-border/40 rounded-md p-6 bg-glass/20">
-                    <input
-                      type="file"
-                      accept="image/*,video/*,audio/*,application/pdf,.doc,.docx,.txt,.js,.ts,.jsx,.tsx,.html,.css"
-                      onChange={handleFileSelect}
-                      className="hidden"
-                      id="asset-file-upload"
-                    />
-                    <label
-                      htmlFor="asset-file-upload"
-                      className="flex flex-col items-center justify-center cursor-pointer hover:text-muted-foreground transition-colors"
-                    >
-                      <Upload className="w-8 h-8 mb-2" />
-                      <span className="text-sm font-medium">Click to upload asset file</span>
-                      <span className="text-xs text-muted-foreground">Images, videos, audio, documents, code files</span>
-                      {syncEnabled && isAuthenticated && (
-                        <span className="text-xs text-primary mt-1">Cloud sync enabled</span>
-                      )}
-                    </label>
-                  </div>
-                )}
-              </div>
-            </div>
-
+            {mode === 'asset' && (
+              <>
             {/* Images */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-foreground">Images</h3>
@@ -654,6 +525,8 @@ export function AssetCreationModal({ isOpen, onClose, initialData, parentId, gen
                 </CardContent>
               </Card>
             </div>
+            </>
+            )}
           </div>
 
           <DialogFooter>

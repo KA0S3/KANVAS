@@ -1,10 +1,15 @@
 import { useState } from 'react';
-import { ChevronRight, ChevronDown, File, Folder, FolderOpen } from 'lucide-react';
+import { ChevronRight, ChevronDown, File, Folder, FolderOpen, GripVertical } from 'lucide-react';
 import { useAssetStore } from '@/stores/assetStore';
 import { useTagStore } from '@/stores/tagStore';
 import { AssetContextMenu } from '@/components/AssetContextMenu';
 import type { Asset } from '@/components/AssetItem';
 import { cn } from '@/lib/utils';
+import {
+  useSortable,
+} from '@dnd-kit/sortable';
+import { useDroppable } from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
 
 interface AssetTreeNodeProps {
   asset: Asset;
@@ -13,9 +18,10 @@ interface AssetTreeNodeProps {
   level?: number;
   onEdit?: (asset: Asset) => void;
   onSelectAndFocus?: (asset: Asset) => void;
+  isDragActive?: boolean;
 }
 
-export function AssetTreeNode({ asset, depth, searchQuery = '', level = 0, onEdit, onSelectAndFocus }: AssetTreeNodeProps) {
+export function AssetTreeNode({ asset, depth, searchQuery = '', level = 0, onEdit, onSelectAndFocus, isDragActive = false }: AssetTreeNodeProps) {
   const { assets, setActiveAsset, currentActiveId } = useAssetStore();
   const { getAssetTags } = useTagStore();
   const [isExpanded, setIsExpanded] = useState(asset.isExpanded || false);
@@ -27,7 +33,38 @@ export function AssetTreeNode({ asset, depth, searchQuery = '', level = 0, onEdi
   
   const hasChildren = asset.children && asset.children.length > 0;
   const childAssets = asset.children?.map(childId => assets[childId]).filter(Boolean) || [];
+  
+  // DnD sortable hook
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+    over,
+  } = useSortable({ id: asset.id });
+  
+  // DnD droppable hook for containers
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({
+    id: asset.id,
+    // Allow dropping on all assets, not just folders
+  });
+  
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+  
   const isActive = currentActiveId === asset.id;
+  const isDropTarget = isOver && !isDragging;
+  
+  // Combine refs for drag and drop
+  const combinedRefs = (node: HTMLElement | null) => {
+    setNodeRef(node);
+    setDroppableRef(node);
+  };
   
   // Get tags for this asset with their colors
   const assetTags = getAssetTags(asset.id);
@@ -83,22 +120,37 @@ export function AssetTreeNode({ asset, depth, searchQuery = '', level = 0, onEdi
   return (
     <div>
       <div
-        className={cn(
-          "flex items-center gap-1 py-1 px-2 rounded cursor-pointer hover:bg-accent/50 transition-all duration-300",
-          isActive && "border-l-2 border-cyan-400/60 bg-cyan-500/5 text-cyan-300 font-medium",
-          `pl-${Math.min(depth * 4 + 2, 12)}`
-        )}
-        style={{ 
+        ref={combinedRefs}
+        style={{
+          ...style,
           paddingLeft: `${Math.min(depth * 16 + 8, 48)}px`,
           ...(isActive && {
             marginLeft: '2px',
-            transform: 'translateX(2px)'
+            transform: `translateX(2px) ${style.transform || ''}`
           })
-        }} 
+        }}
+        className={cn(
+          "flex items-center gap-1 py-2 px-2 rounded cursor-pointer hover:bg-accent/50 transition-all duration-300",
+          isActive && "border-l-2 border-cyan-400/60 bg-cyan-500/5 text-cyan-300 font-medium",
+          isDragActive && !isDragging && "opacity-50",
+          isDragging && "opacity-30",
+          isDropTarget && "bg-blue-500/20 border-2 border-blue-500/60 shadow-lg shadow-blue-500/20",
+          `pl-${Math.min(depth * 4 + 2, 12)}`
+        )} 
         onClick={handleSelect}
         onDoubleClick={handleDoubleClick}
         onContextMenu={handleContextMenu}
       >
+        {/* Drag Handle */}
+        <div
+          {...attributes}
+          {...listeners}
+          className="p-1 hover:bg-muted rounded transition-colors cursor-grab active:cursor-grabbing opacity-60 hover:opacity-100 min-w-[24px] flex items-center justify-center"
+          title="Drag to reorder"
+        >
+          <GripVertical className="w-4 h-4 text-muted-foreground" />
+        </div>
+        
         {hasChildren && (
           <button
             onClick={(e) => {
@@ -120,6 +172,11 @@ export function AssetTreeNode({ asset, depth, searchQuery = '', level = 0, onEdi
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {getIcon()}
           <span className="text-sm truncate">{asset.name}</span>
+          {isDropTarget && (
+            <span className="text-xs text-blue-500 font-medium animate-pulse">
+              {hasChildren ? "Drop to nest" : "Drop to make parent"}
+            </span>
+          )}
         </div>
         
         {assetTags.length > 0 && (

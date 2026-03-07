@@ -31,6 +31,7 @@ interface AssetContextMenuProps {
   onSelectAndFocus?: (asset: Asset) => void;
   isViewportAsset?: boolean;
   onCreateAsset?: (options: { name: string; parentId?: string }) => void;
+  onCreateChildAsset?: (parentId: string) => void;
 }
 
 export const AssetContextMenu: React.FC<AssetContextMenuProps> = ({
@@ -41,6 +42,7 @@ export const AssetContextMenu: React.FC<AssetContextMenuProps> = ({
   onSelectAndFocus,
   isViewportAsset = false,
   onCreateAsset,
+  onCreateChildAsset,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -158,15 +160,15 @@ export const AssetContextMenu: React.FC<AssetContextMenuProps> = ({
 
   
   const handleCreateChild = (e: React.MouseEvent) => {
+    console.log('Create Child button clicked for asset:', asset.name);
     e.stopPropagation();
     e.preventDefault();
     e.nativeEvent.stopImmediatePropagation();
     
-    const name = prompt('Enter child asset name:');
-    if (name && onCreateAsset) {
-      onCreateAsset({ name, parentId: asset.id });
-    }
+    // Close context menu and trigger parent to handle modal
     onClose();
+    onCreateChildAsset?.(asset.id);
+    console.log('Called onCreateChildAsset with parentId:', asset.id);
   };
 
   const handleSelect = () => {

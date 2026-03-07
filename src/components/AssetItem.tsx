@@ -1,6 +1,7 @@
 import React from "react";
 import { X, FileText, Image, Film, Music, Code, File, Move, Maximize2, Edit, Trash2 } from "lucide-react";
 import { AssetContextMenu } from '@/components/AssetContextMenu';
+import { AssetCreationModal } from '@/components/asset/AssetCreationModal';
 import { useTagStore } from '@/stores/tagStore';
 import type { CustomField, CustomFieldValue, ViewportDisplaySettings } from "@/types/extendedAsset";
 
@@ -168,6 +169,8 @@ export function AssetItem({ asset, onDelete, onMouseDown, onTouchStart, onDouble
   const [isResizing, setIsResizing] = React.useState(false);
   const [resizeStart, setResizeStart] = React.useState({ x: 0, y: 0, width: 0, height: 0 });
   const [showExternalText, setShowExternalText] = React.useState(false);
+  const [showChildAssetModal, setShowChildAssetModal] = React.useState(false);
+  const [childAssetParentId, setChildAssetParentId] = React.useState<string | null>(null);
 
   const handleContextMenu = React.useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -181,6 +184,12 @@ export function AssetItem({ asset, onDelete, onMouseDown, onTouchStart, onDouble
 
   const closeContextMenu = React.useCallback(() => {
     setContextMenu({ visible: false, x: 0, y: 0 });
+  }, []);
+
+  const handleCreateChildAsset = React.useCallback((parentId: string) => {
+    console.log('handleCreateChildAsset called with parentId:', parentId);
+    setChildAssetParentId(parentId);
+    setShowChildAssetModal(true);
   }, []);
 
   const handleResizeStart = (e: React.MouseEvent) => {
@@ -642,8 +651,19 @@ export function AssetItem({ asset, onDelete, onMouseDown, onTouchStart, onDouble
           onSelectAndFocus={onSelectAndFocus}
           isViewportAsset={true}
           onCreateAsset={onCreateAsset}
+          onCreateChildAsset={handleCreateChildAsset}
         />
       )}
+      
+      {/* Child Asset Creation Modal */}
+      <AssetCreationModal
+        isOpen={showChildAssetModal}
+        onClose={() => {
+          setShowChildAssetModal(false);
+          setChildAssetParentId(null);
+        }}
+        parentId={childAssetParentId || undefined}
+      />
     </div>
   );
 }

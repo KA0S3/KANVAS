@@ -13,6 +13,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useCanCreateBook } from '@/lib/limits';
 import { BookCarousel } from './BookCarousel';
 import { BookEditor } from './BookEditor';
+import { DeleteBookModal } from '@/components/books/DeleteBookModal';
 import { AccountModal } from '@/components/account/AccountModal';
 import { UpgradePromptModal } from '@/components/UpgradePromptModal';
 import { FeatureTeaserCard } from '@/components/upgrade/FeatureTeaserCard';
@@ -41,6 +42,8 @@ export function BookLibrary({ isOpen, onClose, onBookSelect }: BookLibraryProps)
   const [isCreatingBook, setIsCreatingBook] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [bookToDelete, setBookToDelete] = useState<Book | null>(null);
   const [upgradePrompt, setUpgradePrompt] = useState<{
     title: string;
     message: string;
@@ -59,8 +62,15 @@ export function BookLibrary({ isOpen, onClose, onBookSelect }: BookLibraryProps)
   };
 
   const handleBookDelete = (book: Book) => {
-    if (confirm(`Are you sure you want to delete "${book.title}"? This will permanently remove this world and all its assets.`)) {
-      deleteBook(book.id);
+    setBookToDelete(book);
+    setDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (bookToDelete) {
+      deleteBook(bookToDelete.id);
+      setBookToDelete(null);
+      setDeleteModalOpen(false);
     }
   };
 
@@ -275,6 +285,17 @@ export function BookLibrary({ isOpen, onClose, onBookSelect }: BookLibraryProps)
           type={reason === 'guest_limit' ? 'guest' : 'plan_limit'}
         />
       )}
+
+      {/* Delete Book Modal */}
+      <DeleteBookModal
+        isOpen={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false);
+          setBookToDelete(null);
+        }}
+        onConfirm={handleConfirmDelete}
+        book={bookToDelete}
+      />
 
     </>
   );

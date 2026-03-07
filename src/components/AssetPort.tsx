@@ -380,6 +380,18 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
     }
   }, [selectedAsset, setActiveAsset]);
 
+  const handleContainerDoubleClick = useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    
+    // Check if double-click is on empty space (not on an asset or its children)
+    const isAssetClick = target.classList.contains('asset-item') || target.closest('.asset-item');
+    
+    if (!isAssetClick) {
+      // Open asset creation modal
+      openCreateAssetModal();
+    }
+  }, [openCreateAssetModal]);
+
   const handleContainerContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     
@@ -713,6 +725,7 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
       <div
         ref={containerRef}
         onClick={handleContainerClick}
+        onDoubleClick={handleContainerDoubleClick}
         onContextMenu={handleContainerContextMenu}
         onMouseDown={handleBackgroundMouseDown}
         className={`flex-1 relative overflow-hidden ${

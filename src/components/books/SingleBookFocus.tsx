@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Edit } from 'lucide-react';
 import type { Book } from '@/types/book';
 import BookCover from './BookCover';
 import BookEditDialog from '@/components/BookEditDialog';
+import { DeleteBookModal } from './DeleteBookModal';
 import { useBookStore } from '@/stores/bookStoreSimple';
 import { useThemeStore } from '@/stores/themeStore';
 import { BookContextMenu } from './BookContextMenu';
@@ -41,6 +42,8 @@ const SingleBookFocus: React.FC<SingleBookFocusProps> = ({
   });
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [bookToDelete, setBookToDelete] = useState<Book | null>(null);
   const [contextMenu, setContextMenu] = useState<{
     book: Book;
     position: { x: number; y: number };
@@ -127,13 +130,21 @@ const SingleBookFocus: React.FC<SingleBookFocusProps> = ({
   };
 
   const handleContextMenuDelete = (book: Book) => {
-    if (onBookDelete) {
-      onBookDelete(book);
-    }
+    setBookToDelete(book);
+    setDeleteModalOpen(true);
   };
 
   const closeContextMenu = () => {
     setContextMenu(null);
+  };
+
+  // Handle modal confirm delete
+  const handleConfirmDelete = () => {
+    if (bookToDelete && onBookDelete) {
+      onBookDelete(bookToDelete);
+      setBookToDelete(null);
+      setDeleteModalOpen(false);
+    }
   };
 
   if (!currentBook) {
@@ -238,6 +249,17 @@ const SingleBookFocus: React.FC<SingleBookFocusProps> = ({
           onDelete={handleContextMenuDelete}
         />
       )}
+
+      {/* Delete Book Modal */}
+      <DeleteBookModal
+        isOpen={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false);
+          setBookToDelete(null);
+        }}
+        onConfirm={handleConfirmDelete}
+        book={bookToDelete}
+      />
     </div>
   );
 };
