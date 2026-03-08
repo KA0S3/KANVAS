@@ -23,6 +23,7 @@ import { useBackgroundStore } from "@/stores/backgroundStore";
 import { useMediaStore } from "@/stores/mediaStore";
 import { useAuthStore } from "@/stores/authStore";
 import { audioEngine } from "@/services/AudioEngine";
+import { autosaveService } from "@/services/autosaveService";
 import SplashScreen from "@/components/media/SplashScreen";
 import IntroVideo from "@/components/media/IntroVideo";
 import BookEntryAnimation from "@/components/media/BookEntryAnimation";
@@ -42,13 +43,29 @@ const Index = () => {
   const { theme } = useThemeStore();
   const { getBackground } = useBackgroundStore(); // Initialize background store
   const { appPhase, showLibrary, setTransitioning, setAppPhase } = useMediaStore();
-  const { initializeAuth, effectiveLimits } = useAuthStore(); // Initialize auth store
+  const { initializeAuth, effectiveLimits, isAuthenticated } = useAuthStore(); // Initialize auth store
   const showAds = effectiveLimits?.adsEnabled ?? true;
 
   // Initialize auth on app mount
   useEffect(() => {
     initializeAuth();
   }, [initializeAuth]);
+
+  // Initialize autosave service when authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      autosaveService.startAutosave();
+      console.log('[Index] Autosave service started');
+    } else {
+      autosaveService.stopAutosave();
+      console.log('[Index] Autosave service stopped');
+    }
+
+    // Cleanup on unmount
+    return () => {
+      autosaveService.stopAutosave();
+    };
+  }, [isAuthenticated]);
 
   useEffect(() => {
     document.documentElement.className = theme;
@@ -338,7 +355,7 @@ const Index = () => {
           </div>
 
           {/* Fantasy Sidebar - Mobile Overlay */}
-          <aside className={`fantasy-overlay ${sidebarOpen ? "is-open" : ""}`} aria-hidden={!sidebarOpen}>
+          <aside className={`fantasy-overlay ${sidebarOpen ? "is-open" : ""} ${!showAds ? "no-ads" : ""}`} aria-hidden={!sidebarOpen}>
             <div className="fantasy-sidebar">
               <div className="fantasy-sidebar-content">
                 {/* Use the new AssetExplorer component */}

@@ -46,6 +46,26 @@ export function UpgradePromptModal({
   onAction,
   type
 }: UpgradePromptModalProps) {
+  if (!isOpen) return null;
+
+  const { user, plan, fetchUserPlan } = useAuthStore();
+  
+  // Safe owner check with error handling
+  let isOwner = plan === 'owner'; // Default to plan-based check
+  try {
+    const ownerEmail = import.meta.env?.VITE_OWNER_EMAIL;
+    if (ownerEmail && user?.email === ownerEmail) {
+      isOwner = true;
+    }
+  } catch (error) {
+    console.warn('[UpgradePromptModal] Error checking owner status:', error);
+  }
+  
+  // OWNER CHECK: Do not show upgrade modal to owners
+  if (isOwner) {
+    return null;
+  }
+  
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [promoCode, setPromoCode] = useState('');
@@ -58,7 +78,6 @@ export function UpgradePromptModal({
   const [selectedCard, setSelectedCard] = useState<'pro' | 'lifetime' | 'free' | null>(null);
   const [showAccountModal, setShowAccountModal] = useState(false);
   
-  const { user, fetchUserPlan } = useAuthStore();
   const { toast } = useToast();
 
   const product = PAYSTACK_PRODUCTS[selectedProduct];

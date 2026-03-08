@@ -15,6 +15,7 @@ import { BackgroundControls } from "@/components/asset/BackgroundControls";
 import { AccountModal } from "@/components/account/AccountModal";
 import { Button } from "@/components/ui/button";
 import { useSampleData } from "@/hooks/useSampleData";
+import { AutosaveIndicator } from "@/components/autosave/AutosaveIndicator";
 import { 
   globalToLocalCoords, 
   localToGlobalCoords, 
@@ -755,6 +756,10 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
           isEditingBackground && backgroundConfig?.imageUrl ? 'cursor-move' : 'cursor-crosshair'
         }`}
       >
+        {/* Autosave Indicator - Bottom Left */}
+        <div className="absolute bottom-4 left-4 z-10">
+          <AutosaveIndicator compact={true} />
+        </div>
         <div
           className={`absolute inset-0 ${shouldShowGlassEffect(backgroundConfig) ? 'glass cosmic-glow' : ''}`}
           style={{

@@ -1,6 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
+import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Database, Ticket, Bug, Key, LogOut } from "lucide-react";
 import UserManager from "@/components/UserManager";
@@ -11,11 +12,61 @@ import { EffectiveLimitsDebug } from "@/components/debug/EffectiveLimitsDebug";
 const OwnerDashboard = () => {
   const navigate = useNavigate();
   const { user, plan, loading, planLoading, initializeAuth } = useAuthStore();
+  const [systemStats, setSystemStats] = useState({
+    activeSessions: 0,
+    storageUsed: 0,
+    apiCallsToday: 0,
+    totalUsers: 0,
+    totalPromoCodes: 0,
+    totalOwnerKeys: 0
+  });
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  const fetchSystemStats = async () => {
+    try {
+      setStatsLoading(true);
+      
+      // Fetch actual statistics from Supabase
+      const [
+        usersResult,
+        promoCodesResult,
+        ownerKeysResult,
+        storageResult
+      ] = await Promise.all([
+        supabase.from('users').select('id', { count: 'exact', head: true }),
+        supabase.from('promo_codes').select('id', { count: 'exact', head: true }),
+        supabase.from('owner_keys').select('id', { count: 'exact', head: true }),
+        supabase.from('storage_usage').select('total_bytes_used').not('total_bytes_used', 'is', null)
+      ]);
+
+      const totalStorageUsed = storageResult.data?.reduce((sum, usage) => sum + usage.total_bytes_used, 0) || 0;
+
+      setSystemStats({
+        activeSessions: 0, // Would need session tracking implementation
+        storageUsed: totalStorageUsed,
+        apiCallsToday: 0, // Would need API call tracking implementation
+        totalUsers: usersResult.count || 0,
+        totalPromoCodes: promoCodesResult.count || 0,
+        totalOwnerKeys: ownerKeysResult.count || 0
+      });
+    } catch (error) {
+      console.error('Error fetching system stats:', error);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
 
   // Initialize auth store when component mounts
   useEffect(() => {
     initializeAuth();
   }, [initializeAuth]);
+
+  // Fetch system stats when user is authenticated as owner
+  useEffect(() => {
+    if (user && plan === 'owner') {
+      fetchSystemStats();
+    }
+  }, [user, plan]);
 
   const handleExit = () => {
     // Save user info to localStorage before exiting
@@ -243,20 +294,26 @@ const OwnerDashboard = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="backdrop-blur-md bg-white/5 rounded-xl p-6 border border-white/10">
                     <div className="text-center">
-                      <div className="text-3xl font-bold text-blue-300 mb-2">—</div>
-                      <div className="text-white/60 text-sm">Active Sessions</div>
+                      <div className="text-3xl font-bold text-blue-300 mb-2">
+                        {statsLoading ? '...' : systemStats.totalUsers}
+                      </div>
+                      <div className="text-white/60 text-sm">Total Users</div>
                     </div>
                   </div>
                   <div className="backdrop-blur-md bg-white/5 rounded-xl p-6 border border-white/10">
                     <div className="text-center">
-                      <div className="text-3xl font-bold text-green-300 mb-2">—</div>
+                      <div className="text-3xl font-bold text-green-300 mb-2">
+                        {statsLoading ? '...' : `${(systemStats.storageUsed / (1024 * 1024 * 1024)).toFixed(1)}GB`}
+                      </div>
                       <div className="text-white/60 text-sm">Storage Used</div>
                     </div>
                   </div>
                   <div className="backdrop-blur-md bg-white/5 rounded-xl p-6 border border-white/10">
                     <div className="text-center">
-                      <div className="text-3xl font-bold text-purple-300 mb-2">—</div>
-                      <div className="text-white/60 text-sm">API Calls Today</div>
+                      <div className="text-3xl font-bold text-purple-300 mb-2">
+                        {statsLoading ? '...' : systemStats.totalPromoCodes}
+                      </div>
+                      <div className="text-white/60 text-sm">Promo Codes</div>
                     </div>
                   </div>
                 </div>

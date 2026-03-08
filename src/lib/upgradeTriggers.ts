@@ -1,4 +1,5 @@
 import { toast } from 'sonner';
+import { useAuthStore } from '@/stores/authStore';
 
 export type UpgradePromptType = 'max-books' | 'upload-blocked' | 'zip-export' | 'ads-removed';
 
@@ -53,12 +54,27 @@ function getUpgradePromptData(
 }
 
 /**
+ * Check if current user is owner and should not see upgrade prompts
+ */
+function isOwnerUser(): boolean {
+  const user = useAuthStore.getState().user;
+  const ownerEmail = import.meta.env?.VITE_OWNER_EMAIL;
+  return user?.email === ownerEmail || useAuthStore.getState().plan === 'owner';
+}
+
+/**
  * Triggers upgrade prompt when user hits a limit
  */
 export function triggerUpgradePrompt(
   limitType: UpgradePromptType, 
   options: UpgradeTriggerOptions = {}
 ) {
+  // OWNER CHECK: Do not show upgrade prompts to owner
+  if (isOwnerUser()) {
+    console.log('[upgradeTriggers] 🚀 OWNER DETECTED - Skipping upgrade prompt for:', limitType);
+    return;
+  }
+  
   const { onUpgrade, showToast = true, customMessage } = options;
   
   const promptData = getUpgradePromptData(limitType, customMessage);
@@ -80,6 +96,12 @@ export function triggerUpgradePrompt(
  */
 export function useUpgradeTrigger(onUpgrade: (promptData: UpgradePromptData) => void) {
   const checkBookLimit = (currentBooks: number, maxBooks: number, customMessage?: string) => {
+    // OWNER CHECK: Owners have unlimited books
+    if (isOwnerUser()) {
+      console.log('[useUpgradeTrigger] 🚀 OWNER DETECTED - Skipping book limit check');
+      return true;
+    }
+    
     if (currentBooks >= maxBooks) {
       triggerUpgradePrompt('max-books', { onUpgrade, customMessage });
       return false;
@@ -88,6 +110,12 @@ export function useUpgradeTrigger(onUpgrade: (promptData: UpgradePromptData) => 
   };
   
   const checkStorageLimit = (currentUsage: number, quotaLimit: number, requiredBytes: number, customMessage?: string) => {
+    // OWNER CHECK: Owners have unlimited storage
+    if (isOwnerUser()) {
+      console.log('[useUpgradeTrigger] 🚀 OWNER DETECTED - Skipping storage limit check');
+      return true;
+    }
+    
     if (currentUsage + requiredBytes > quotaLimit) {
       triggerUpgradePrompt('upload-blocked', { onUpgrade, customMessage });
       return false;
@@ -96,6 +124,12 @@ export function useUpgradeTrigger(onUpgrade: (promptData: UpgradePromptData) => 
   };
   
   const checkZipExport = (isPremium: boolean, customMessage?: string) => {
+    // OWNER CHECK: Owners always have premium features
+    if (isOwnerUser()) {
+      console.log('[useUpgradeTrigger] 🚀 OWNER DETECTED - Allowing zip export for owner');
+      return true;
+    }
+    
     if (!isPremium) {
       triggerUpgradePrompt('zip-export', { onUpgrade, customMessage });
       return false;
@@ -104,6 +138,12 @@ export function useUpgradeTrigger(onUpgrade: (promptData: UpgradePromptData) => 
   };
   
   const checkAdsRemoved = (isPremium: boolean, customMessage?: string) => {
+    // OWNER CHECK: Owners never see ads
+    if (isOwnerUser()) {
+      console.log('[useUpgradeTrigger] 🚀 OWNER DETECTED - Ads already disabled for owner');
+      return true;
+    }
+    
     if (!isPremium) {
       triggerUpgradePrompt('ads-removed', { onUpgrade, customMessage, showToast: false });
       return false;

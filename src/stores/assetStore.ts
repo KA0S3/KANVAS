@@ -515,7 +515,8 @@ export const useAssetStore = create<AssetStore>()(
   },
 })));
 
-// Auto-save functionality: subscribe to store changes and save to book store
+// Auto-save functionality: Now handled by autosaveService
+// This subscription is kept for compatibility but autosaveService handles cloud saves
 useAssetStore.subscribe(
   (state) => state,
   (state) => {
@@ -525,6 +526,8 @@ useAssetStore.subscribe(
         assets: state.assets,
         globalCustomFields: state.globalCustomFields,
       };
+      // Update local book store immediately for UI consistency
+      // Cloud sync is handled by autosaveService
       bookStore.updateWorldData(bookStore.currentBookId, worldData);
     }
   },

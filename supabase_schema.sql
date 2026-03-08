@@ -7,7 +7,7 @@ CREATE TABLE users (
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     full_name VARCHAR(100),
-    plan_type VARCHAR(20) NOT NULL DEFAULT 'free' CHECK (plan_type IN ('free', 'basic', 'premium', 'enterprise')),
+    plan_type VARCHAR(20) NOT NULL DEFAULT 'guest' CHECK (plan_type IN ('guest', 'free', 'pro', 'lifetime', 'owner')),
     storage_quota_mb INTEGER NOT NULL DEFAULT 100,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP

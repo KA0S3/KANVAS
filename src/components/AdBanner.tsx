@@ -1,6 +1,11 @@
 import React from 'react';
+import { useAuthStore } from '@/stores/authStore';
 
 const AdBanner = () => {
+  const showAds = useAuthStore(state => state.effectiveLimits?.adsEnabled ?? true);
+  
+  if (!showAds) return null;
+
   return (
     <div className="w-full h-[250px] bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center text-gray-500 dark:text-gray-400 text-sm">
       <div className="text-center">

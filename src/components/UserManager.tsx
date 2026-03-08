@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Users, ChevronLeft, ChevronRight, Search, Edit } from "lucide-react";
 import UserAccessEditor from "@/components/UserAccessEditor";
 
-type PlanType = 'free' | 'basic' | 'premium' | 'enterprise';
+type PlanType = 'guest' | 'free' | 'pro' | 'lifetime' | 'owner';
 
 interface UserData {
   id: string;
@@ -125,13 +125,15 @@ const UserManager: React.FC = () => {
 
   const getPlanBadgeVariant = (planType?: PlanType) => {
     switch (planType) {
-      case 'free':
+      case 'guest':
         return 'secondary';
-      case 'basic':
+      case 'free':
         return 'default';
-      case 'premium':
+      case 'pro':
         return 'outline';
-      case 'enterprise':
+      case 'lifetime':
+        return 'default';
+      case 'owner':
         return 'destructive';
       default:
         return 'secondary';

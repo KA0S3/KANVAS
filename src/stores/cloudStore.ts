@@ -11,11 +11,16 @@ interface CloudStore {
   syncEnabled: boolean;
   quota: Quota;
   pendingUploads: number;
+  autosaveStatus: 'idle' | 'saving' | 'saved' | 'error';
+  lastSyncTime: Date | null;
   
   // Methods
   toggleSync: () => void;
   setQuota: (used: number, available: number) => void;
   canUpload: (bytes: number) => boolean;
+  forceUpdateSync: () => void; // Debug method
+  setAutosaveStatus: (status: 'idle' | 'saving' | 'saved' | 'error') => void;
+  setLastSyncTime: (time: Date | null) => void;
 }
 
 // Default quota limits based on plan
@@ -23,6 +28,7 @@ const QUOTA_LIMITS = {
   free: 100 * 1024 * 1024,    // 100MB
   pro: 10 * 1024 * 1024 * 1024,  // 10GB
   lifetime: 15 * 1024 * 1024 * 1024, // 15GB
+  owner: -1, // Unlimited storage
 } as const;
 
 export const useCloudStore = create<CloudStore>()(
@@ -35,6 +41,8 @@ export const useCloudStore = create<CloudStore>()(
         available: QUOTA_LIMITS.free,
       },
       pendingUploads: 0,
+      autosaveStatus: 'idle',
+      lastSyncTime: null,
 
       // Toggle sync functionality
       toggleSync: () => {
@@ -69,6 +77,22 @@ export const useCloudStore = create<CloudStore>()(
         // Check if upload would exceed quota
         return (quota.used + bytes) <= quotaLimit;
       },
+
+      // Debug method to force sync update
+      forceUpdateSync: () => {
+        console.log('[cloudStore] Force updating sync status...');
+        updateQuotaBasedOnPlan();
+      },
+
+      // Set autosave status
+      setAutosaveStatus: (status: 'idle' | 'saving' | 'saved' | 'error') => {
+        set({ autosaveStatus: status });
+      },
+
+      // Set last sync time
+      setLastSyncTime: (time: Date | null) => {
+        set({ lastSyncTime: time });
+      },
     }),
     {
       name: 'kanvas-cloud',
@@ -82,7 +106,7 @@ export const useCloudStore = create<CloudStore>()(
 );
 
 // Helper function to get quota limit based on current plan
-export const getQuotaLimitForPlan = (plan: 'free' | 'pro' | 'lifetime'): number => {
+export const getQuotaLimitForPlan = (plan: 'free' | 'pro' | 'lifetime' | 'owner'): number => {
   return QUOTA_LIMITS[plan];
 };
 
@@ -90,11 +114,21 @@ export const getQuotaLimitForPlan = (plan: 'free' | 'pro' | 'lifetime'): number 
 export const updateQuotaBasedOnPlan = () => {
   const effectiveLimits = useAuthStore.getState().effectiveLimits;
   const currentUsed = useCloudStore.getState().quota.used;
+  const isAuthenticated = useAuthStore.getState().isAuthenticated;
   
   if (effectiveLimits) {
     // Use effectiveLimits.quotaBytes which includes base plan + all overrides
     const limit = effectiveLimits.quotaBytes;
     useCloudStore.getState().setQuota(currentUsed, limit);
+    
+    // Auto-enable sync for all authenticated users
+    if (isAuthenticated) {
+      const currentState = useCloudStore.getState();
+      if (!currentState.syncEnabled) {
+        console.log('[cloudStore] Auto-enabling sync for authenticated user');
+        useCloudStore.setState({ syncEnabled: true });
+      }
+    }
   } else {
     // Fallback to free plan limits if effectiveLimits not available
     const limit = QUOTA_LIMITS.free;

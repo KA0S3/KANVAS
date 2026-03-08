@@ -134,8 +134,32 @@ function migrateLegacyPlanId(legacyPlanId: string): string {
   return legacyMapping[legacyPlanId] || legacyPlanId;
 }
 
-async function computeEffectiveLimits(userId: string, supabase: any): Promise<EffectiveLimits> {
-  console.log(`[computeEffectiveLimits] Computing limits for user: ${userId}`);
+async function computeEffectiveLimits(userId: string, userEmail: string, supabase: any): Promise<EffectiveLimits> {
+  console.log(`[computeEffectiveLimits] Computing limits for user: ${userId}, email: ${userEmail}`);
+  
+  // OWNER CHECK - Highest precedence: Check if user is the owner
+  let ownerEmail: string | undefined;
+  try {
+    ownerEmail = Deno.env.get('VITE_OWNER_EMAIL') || Deno.env.get('OWNER_EMAIL');
+  } catch (error) {
+    console.warn('[computeEffectiveLimits] Error getting owner email from environment:', error);
+  }
+  
+  if (ownerEmail && userEmail === ownerEmail) {
+    console.log(`[computeEffectiveLimits] 🚀 OWNER DETECTED - Applying owner plan for: ${userEmail}`);
+    const ownerPlan = getPlanConfig('owner');
+    if (ownerPlan) {
+      return {
+        quotaBytes: ownerPlan.quotaBytes,
+        maxBooks: ownerPlan.maxBooks,
+        adsEnabled: ownerPlan.adsEnabled,
+        importExportEnabled: ownerPlan.importExportEnabled,
+        source: {
+          plan: 'owner'
+        }
+      };
+    }
+  }
   
   // 1. Get base plan from users table
   const { data: userData, error: userError } = await supabase
@@ -298,8 +322,8 @@ serve(async (req) => {
       )
     }
 
-    // Compute effective limits for the authenticated user
-    const effectiveLimits = await computeEffectiveLimits(user.id, supabase)
+    // Compute effective limits for authenticated user
+    const effectiveLimits = await computeEffectiveLimits(user.id, user.email || '', supabase)
 
     return new Response(
       JSON.stringify(effectiveLimits),

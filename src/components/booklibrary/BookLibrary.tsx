@@ -18,6 +18,7 @@ import { DeleteBookModal } from '@/components/books/DeleteBookModal';
 import { AccountModal } from '@/components/account/AccountModal';
 import { UpgradePromptModal } from '@/components/UpgradePromptModal';
 import { FeatureTeaserCard } from '@/components/upgrade/FeatureTeaserCard';
+import { AutosaveIndicator } from '@/components/autosave/AutosaveIndicator';
 import type { Book } from '@/types/book';
 
 interface BookLibraryProps {
@@ -266,12 +267,15 @@ export function BookLibrary({ isOpen, onClose, onBookSelect }: BookLibraryProps)
               )}
               
               <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>
-                  {currentBookId 
-                    ? `Current: ${allBooks.find(b => b.id === currentBookId)?.title || 'Unknown'}`
-                    : 'No world selected'
-                  }
-                </span>
+                <div className="flex items-center gap-3">
+                  <span>
+                    {currentBookId 
+                      ? `Current: ${allBooks.find(b => b.id === currentBookId)?.title || 'Unknown'}`
+                      : 'No world selected'
+                    }
+                  </span>
+                  <AutosaveIndicator />
+                </div>
                 <Button variant="outline" onClick={onClose}>
                   Close
                 </Button>

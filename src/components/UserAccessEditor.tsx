@@ -15,7 +15,7 @@ import { CalendarIcon, Save, X, AlertTriangle, HardDrive, Crown, Shield, Downloa
 import { format, addDays } from "date-fns";
 import { cn } from "@/lib/utils";
 
-type PlanType = 'free' | 'basic' | 'premium' | 'enterprise';
+type PlanType = 'guest' | 'free' | 'pro' | 'lifetime' | 'owner';
 
 interface UserData {
   id: string;
@@ -47,17 +47,19 @@ interface LicenseData {
 }
 
 const PLAN_STORAGE_LIMITS: Record<PlanType, number> = {
+  guest: 0, // 0 MB - local only
   free: 100, // 100 MB
-  basic: 1024, // 1 GB
-  premium: 10240, // 10 GB
-  enterprise: 102400, // 100 GB
+  pro: 10240, // 10 GB
+  lifetime: 15360, // 15 GB
+  owner: -1, // Unlimited
 };
 
 const PLAN_FEATURES: Record<PlanType, { ads: boolean; importExport: boolean }> = {
+  guest: { ads: true, importExport: false },
   free: { ads: true, importExport: false },
-  basic: { ads: false, importExport: true },
-  premium: { ads: false, importExport: true },
-  enterprise: { ads: false, importExport: true },
+  pro: { ads: false, importExport: true },
+  lifetime: { ads: false, importExport: true },
+  owner: { ads: false, importExport: true },
 };
 
 const UserAccessEditor: React.FC<UserAccessEditorProps> = ({ user, isOpen, onClose, onSave }) => {
@@ -299,10 +301,11 @@ const UserAccessEditor: React.FC<UserAccessEditorProps> = ({ user, isOpen, onClo
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="guest">Guest (0 MB - Local Only)</SelectItem>
                   <SelectItem value="free">Free (100 MB)</SelectItem>
-                  <SelectItem value="basic">Basic (1 GB)</SelectItem>
-                  <SelectItem value="premium">Premium (10 GB)</SelectItem>
-                  <SelectItem value="enterprise">Enterprise (100 GB)</SelectItem>
+                  <SelectItem value="pro">Pro (10 GB)</SelectItem>
+                  <SelectItem value="lifetime">Lifetime (15 GB)</SelectItem>
+                  <SelectItem value="owner">Owner (Unlimited)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

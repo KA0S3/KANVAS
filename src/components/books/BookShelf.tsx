@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { Button } from '@/components/ui/button';
 import { SettingsPanel } from '@/components/settings/SettingsPanel';
 import { AccountModal } from '@/components/account/AccountModal';
+import { AutosaveIndicator } from '@/components/autosave/AutosaveIndicator';
 import type { Book } from '@/types/book';
 import SingleBookFocus from './SingleBookFocus';
 import BookSpineView from './BookSpineView';
@@ -155,6 +156,7 @@ const BookShelf: React.FC<BookShelfProps> = ({
               <h1 className={`text-xl font-bold drop-shadow-lg ${
                 theme === 'dark' ? 'text-white' : 'text-foreground'
               }`}>World Library</h1>
+              <AutosaveIndicator compact={true} />
             </div>
             <p className={`text-sm drop-shadow ${
               theme === 'dark' ? 'text-white/80' : 'text-muted-foreground'

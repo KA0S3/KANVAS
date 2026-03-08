@@ -83,12 +83,31 @@ export async function getEffectiveLimitsWithFallback(): Promise<EffectiveLimits>
   // Graceful degradation fallback
   const { data: { session } } = await supabase.auth.getSession();
   const isGuest = !session?.user;
+  const userEmail = session?.user?.email;
+  const ownerEmail = import.meta.env?.VITE_OWNER_EMAIL;
+  const isOwner = userEmail === ownerEmail;
+  
+  // Enhanced owner fallback - check multiple conditions
+  if (isOwner) {
+    console.log('[effectiveLimitsService] 🚀 OWNER FALLBACK DETECTED - Applying unlimited owner access');
+    const fallbackLimits: EffectiveLimits = {
+      quotaBytes: -1, // Unlimited storage
+      maxBooks: -1, // Unlimited books
+      adsEnabled: false, // No ads for owner
+      importExportEnabled: true, // Full import/export access
+      source: {
+        plan: 'owner',
+      }
+    };
+    console.log('[effectiveLimitsService] Owner fallback limits applied:', fallbackLimits);
+    return fallbackLimits;
+  }
   
   const fallbackLimits: EffectiveLimits = {
     quotaBytes: isGuest ? 0 : 100 * 1024 * 1024, // 0 for guest, 100MB for signed in
-    maxBooks: isGuest ? 1 : 1,
-    adsEnabled: true, // Always show ads in fallback mode
-    importExportEnabled: false,
+    maxBooks: 1,
+    adsEnabled: !isGuest, // Ads for non-guest non-owner users
+    importExportEnabled: false, // Disabled for free tier
     source: {
       plan: isGuest ? 'guest' : 'free',
     }

@@ -61,7 +61,7 @@ export const useAuthStore = create<AuthStore>()(
     (set, get) => ({
       // Initial state
       user: null,
-      plan: 'free',
+      plan: 'guest',
       isAuthenticated: false,
       loading: true,
       planLoading: true,
@@ -117,7 +117,7 @@ export const useAuthStore = create<AuthStore>()(
               // User is signed out
               set({
                 user: null,
-                plan: 'free',
+                plan: 'guest',
                 isAuthenticated: false,
                 loading: false,
                 planLoading: false,
@@ -151,7 +151,7 @@ export const useAuthStore = create<AuthStore>()(
           } else {
             set({
               user: null,
-              plan: 'free',
+              plan: 'guest',
               isAuthenticated: false,
               loading: false,
               planLoading: false,
@@ -230,7 +230,7 @@ export const useAuthStore = create<AuthStore>()(
           // If Supabase sign out fails, manually clear state
           set({
             user: null,
-            plan: 'free',
+            plan: 'guest',
             isAuthenticated: false,
             loading: false,
             planLoading: false,
@@ -263,8 +263,8 @@ export const useAuthStore = create<AuthStore>()(
           console.log(`[authStore] Fetching plan for user: ${userId}`);
           set({ planLoading: true, _lastFetchedUserId: userId });
           
-          // IMMEDIATE OWNER FALLBACK - Check if this is the owner email first
-          const ownerEmail = import.meta.env.VITE_OWNER_EMAIL;
+          // OWNER CHECK: Immediate owner fallback - Check if this is the owner email first
+          const ownerEmail = import.meta.env?.VITE_OWNER_EMAIL;
           const currentUser = get().user;
           if (currentUser?.email === ownerEmail) {
             console.log('[authStore] 🚀 IMMEDIATE OWNER FALLBACK - Setting owner plan');
@@ -332,15 +332,15 @@ export const useAuthStore = create<AuthStore>()(
           }
 
           // Final fallback
-          console.log('[authStore] ⚠️ All methods failed, using default plan: free');
-          set({ plan: 'free', planLoading: false });
+          console.log('[authStore] ⚠️ All methods failed, using default plan: guest');
+          set({ plan: 'guest', planLoading: false });
           await get().updateEffectiveLimits();
           
         } catch (error) {
           console.error('[authStore] Unexpected error fetching user plan:', error);
-          console.log('[authStore] Falling back to default plan: free');
+          console.log('[authStore] Falling back to default plan: guest');
           // Never block the app if auth fails
-          set({ plan: 'free', planLoading: false });
+          set({ plan: 'guest', planLoading: false });
           await get().updateEffectiveLimits();
         }
       },
@@ -467,6 +467,24 @@ export const useAuthStore = create<AuthStore>()(
       return;
     }
 
+    // OWNER CHECK: Immediate owner detection before server call
+    const ownerEmail = import.meta.env?.VITE_OWNER_EMAIL;
+    if (user.email === ownerEmail) {
+      console.log('[authStore] 🚀 IMMEDIATE OWNER DETECTION - Setting owner limits');
+      const ownerLimits: EffectiveLimits = {
+        quotaBytes: -1, // Unlimited
+        maxBooks: -1, // Unlimited
+        adsEnabled: false, // No ads
+        importExportEnabled: true, // Full access
+        source: {
+          plan: 'owner'
+        }
+      };
+      set({ effectiveLimits: ownerLimits, plan: 'owner' });
+      updateQuotaBasedOnPlan();
+      return;
+    }
+
     try {
       // Fetch authoritative effective limits from server
       const limits = await getEffectiveLimitsWithFallback();
@@ -537,7 +555,7 @@ export const useAuthStore = create<AuthStore>()(
     console.log('[authStore] Clearing all auth data (debug method)');
     set({
       user: null,
-      plan: 'free',
+      plan: 'guest',
       isAuthenticated: false,
       loading: false,
       planLoading: false,
