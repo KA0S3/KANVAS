@@ -75,7 +75,8 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
     signIn, 
     signUp, 
     signOut,
-    initializeAuth 
+    initializeAuth,
+    refreshUserData 
   } = useAuthStore();
 
   const { quota } = useCloudStore();
@@ -166,10 +167,13 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
     setAuthError(null);
     
     try {
+      console.log('[AccountModal] Starting logout process');
       await signOut();
+      console.log('[AccountModal] Sign out completed successfully');
       toast.success('Successfully signed out');
       onClose();
     } catch (error) {
+      console.error('[AccountModal] Logout error:', error);
       const errorMessage = 'Failed to sign out';
       setAuthError(errorMessage);
       toast.error(errorMessage);
@@ -703,9 +707,11 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
         isOpen={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
         productKey="PRO_SUBSCRIPTION"
-        onSuccess={() => {
+        onSuccess={async () => {
           toast.success('Successfully upgraded to Pro!');
           setShowPaymentModal(false);
+          // Refresh user data to get updated plan immediately
+          await refreshUserData();
         }}
       />
 

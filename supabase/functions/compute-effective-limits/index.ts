@@ -85,6 +85,26 @@ const PLANS_CONFIG: Record<string, PlanConfig> = {
       prioritySupport: true,
       lifetimeAccess: true
     }
+  },
+  
+  owner: {
+    id: 'owner',
+    label: 'Owner',
+    description: 'Unrestricted owner access with full control',
+    quotaBytes: -1, // Unlimited storage
+    maxBooks: -1, // Unlimited books
+    adsEnabled: false,
+    importExportEnabled: true,
+    maxAssetSize: -1, // Unlimited file size
+    features: {
+      cloudSync: true,
+      collaboration: true,
+      advancedFeatures: true,
+      prioritySupport: true,
+      adminAccess: true,
+      unrestricted: true,
+      ownerDashboard: true
+    }
   }
 };
 

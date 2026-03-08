@@ -142,10 +142,10 @@ class OwnerKeyService {
    * and take precedence over owner key overrides.
    */
   applyOwnerKeyOverrides(
-    basePlan: 'guest' | 'free' | 'pro' | 'lifetime',
+    basePlan: 'guest' | 'free' | 'pro' | 'lifetime' | 'owner',
     scopes?: OwnerKeyScopes
   ): {
-    effectivePlan: 'guest' | 'free' | 'pro' | 'lifetime';
+    effectivePlan: 'guest' | 'free' | 'pro' | 'lifetime' | 'owner';
     maxStorageBytes: number;
     quotaBytes: number; // Total storage quota including base plan + extras
     maxBooks: number;

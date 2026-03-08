@@ -10,7 +10,7 @@ import { EffectiveLimitsDebug } from "@/components/debug/EffectiveLimitsDebug";
 
 const OwnerDashboard = () => {
   const navigate = useNavigate();
-  const { user, ownerKeyInfo, loading } = useAuthStore();
+  const { user, plan, loading } = useAuthStore();
 
   useEffect(() => {
     // Redirect to home if not authenticated
@@ -19,18 +19,27 @@ const OwnerDashboard = () => {
       return;
     }
 
-    // Check access permissions
+    // Check access permissions - only owner email and owner plan
     if (!loading && user) {
       const ownerEmail = import.meta.env.VITE_OWNER_EMAIL;
       const hasOwnerEmail = user.email === ownerEmail;
-      const hasOwnerScope = ownerKeyInfo?.isValid && ownerKeyInfo?.scopes;
+      const hasOwnerPlan = plan === 'owner';
 
-      if (!hasOwnerEmail && !hasOwnerScope) {
+      console.log('[OwnerDashboard] Access check:', {
+        userEmail: user.email,
+        ownerEmail,
+        hasOwnerEmail,
+        currentPlan: plan,
+        hasOwnerPlan
+      });
+
+      if (!hasOwnerEmail || !hasOwnerPlan) {
+        console.log('[OwnerDashboard] Access denied - redirecting to home');
         navigate("/");
         return;
       }
     }
-  }, [user, ownerKeyInfo, loading, navigate]);
+  }, [user, plan, loading, navigate]);
 
   // Show loading state while checking authentication
   if (loading) {
@@ -42,7 +51,7 @@ const OwnerDashboard = () => {
   }
 
   // Don't render content if user doesn't have access (redirect will happen)
-  if (!user || (!(user.email === import.meta.env.VITE_OWNER_EMAIL) && !ownerKeyInfo?.isValid)) {
+  if (!user || !(user.email === import.meta.env.VITE_OWNER_EMAIL && plan === 'owner')) {
     return null;
   }
 

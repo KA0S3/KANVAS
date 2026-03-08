@@ -75,6 +75,19 @@ export const PLANS_CONFIG: Record<string, PlanConfig> = {
       currency: 'USD',
       oneTimeCents: 8000 // $80 one-time
     }
+  },
+  
+  owner: {
+    id: 'owner',
+    label: 'Owner',
+    quotaBytes: -1, // Unlimited
+    maxBooks: -1, // Unlimited
+    adsEnabled: false,
+    importExportEnabled: true,
+    canCreateMultipleGuestBooks: true,
+    pricing: {
+      currency: 'USD'
+    }
   }
 };
 

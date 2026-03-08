@@ -7,7 +7,7 @@ import { getPlanConfig, migrateLegacyPlanId } from '@/lib/plans';
 import { getEffectiveLimitsWithFallback, type EffectiveLimits } from '@/services/effectiveLimitsService';
 import type { User } from '@supabase/supabase-js';
 
-type Plan = 'guest' | 'free' | 'pro' | 'lifetime';
+type Plan = 'guest' | 'free' | 'pro' | 'lifetime' | 'owner';
 
 interface OwnerKeyInfo {
   isValid: boolean;
@@ -49,6 +49,8 @@ interface AuthStore {
   validateOwnerKey: (token: string) => Promise<{ error?: string; success?: boolean }>;
   clearOwnerKey: () => Promise<void>;
   updateEffectiveLimits: () => Promise<void>;
+  refreshUserData: () => Promise<void>; // New method for real-time updates
+  clearAllAuthData: () => void; // Debug method to clear all auth data
 }
 
 export const useAuthStore = create<AuthStore>()(
@@ -85,7 +87,8 @@ export const useAuthStore = create<AuthStore>()(
               // Fetch owner keys
               await get().fetchOwnerKeys(session.user.id);
             } else {
-              // User is signed out
+              // User is signed out - this should handle sign out properly
+              console.log('[authStore] User signed out, clearing state');
               set({
                 user: null,
                 plan: 'free',
@@ -95,9 +98,21 @@ export const useAuthStore = create<AuthStore>()(
                 licenseInfo: null,
                 effectiveLimits: null,
               });
+              
+              // Update cloud store quota based on free plan
+              updateQuotaBasedOnPlan();
             }
           }
         );
+
+        // Set up periodic refresh for authenticated users
+        const refreshInterval = setInterval(async () => {
+          const { user, isAuthenticated } = get();
+          if (isAuthenticated && user) {
+            console.log('[authStore] Periodic plan refresh');
+            await get().refreshUserData();
+          }
+        }, 30000); // Refresh every 30 seconds
 
         // Initial session check
         supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -125,7 +140,10 @@ export const useAuthStore = create<AuthStore>()(
         });
 
         // Return cleanup function
-        return () => subscription.unsubscribe();
+        return () => {
+          subscription.unsubscribe();
+          clearInterval(refreshInterval);
+        };
       },
 
       // Sign in method
@@ -173,15 +191,32 @@ export const useAuthStore = create<AuthStore>()(
       // Sign out method
       signOut: async () => {
         try {
+          console.log('[authStore] Starting sign out process');
+          
+          // Just sign out from Supabase - the auth state change listener will handle the rest
           const { error } = await supabase.auth.signOut();
           
           if (error) {
             console.error('Sign out error:', error);
+            throw error;
           }
           
-          // The onAuthStateChange listener will handle updating the state
+          console.log('[authStore] Sign out initiated successfully');
         } catch (error) {
           console.error('Unexpected sign out error:', error);
+          // If Supabase sign out fails, manually clear state
+          set({
+            user: null,
+            plan: 'free',
+            isAuthenticated: false,
+            loading: false,
+            ownerKeyInfo: null,
+            licenseInfo: null,
+            effectiveLimits: null,
+          });
+          localStorage.removeItem('kanvas-auth');
+          updateQuotaBasedOnPlan();
+          throw error;
         }
       },
 
@@ -381,15 +416,58 @@ export const useAuthStore = create<AuthStore>()(
       updateQuotaBasedOnPlan();
     }
   },
+
+  // Refresh user data for real-time updates
+  refreshUserData: async () => {
+    const { user } = get();
+    
+    if (!user) {
+      console.warn('[authStore] Cannot refresh user data: no authenticated user');
+      return;
+    }
+
+    console.log('[authStore] Refreshing user data for real-time updates');
+    
+    try {
+      // Refresh all user data in parallel
+      await Promise.all([
+        get().fetchUserPlan(user.id),
+        get().fetchUserLicense(user.id),
+        get().fetchOwnerKeys(user.id),
+        get().updateEffectiveLimits()
+      ]);
+      
+      console.log('[authStore] Successfully refreshed user data');
+    } catch (error) {
+      console.error('[authStore] Failed to refresh user data:', error);
+    }
+  },
+
+  // Debug method to clear all auth data
+  clearAllAuthData: () => {
+    console.log('[authStore] Clearing all auth data (debug method)');
+    set({
+      user: null,
+      plan: 'free',
+      isAuthenticated: false,
+      loading: false,
+      ownerKeyInfo: null,
+      licenseInfo: null,
+      effectiveLimits: null,
+    });
+    localStorage.removeItem('kanvas-auth');
+    updateQuotaBasedOnPlan();
+  },
     }),
     {
       name: 'kanvas-auth',
-      // Only persist essential auth state, not the user object (it will be refreshed)
+      // Only persist minimal state - authentication should be fresh each time
       partialize: (state) => ({
         plan: state.plan,
-        isAuthenticated: state.isAuthenticated,
         licenseInfo: state.licenseInfo,
       }),
+      // Don't persist authentication state to avoid sign out issues
+      skipHydration: false,
     }
   )
 );
