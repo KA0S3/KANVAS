@@ -50,13 +50,8 @@ interface AuthStore {
   clearOwnerKey: () => Promise<void>;
   updateEffectiveLimits: () => Promise<void>;
   refreshUserData: () => Promise<void>; // New method for real-time updates
-  cleanup: () => void; // Method to reset initialization
   clearAllAuthData: () => void; // Debug method to clear all auth data
 }
-
-// Track initialization to prevent multiple setups
-let isInitialized = false;
-let cleanupFunction: (() => void) | null = null;
 
 export const useAuthStore = create<AuthStore>()(
   persist(
@@ -72,13 +67,13 @@ export const useAuthStore = create<AuthStore>()(
 
       // Initialize auth listener
       initializeAuth: () => {
-        if (isInitialized) {
-          console.log('[authStore] Already initialized, skipping');
+        // Prevent multiple initializations
+        if (get().loading === false) {
+          console.log('[authStore] Auth store already initialized, skipping');
           return;
         }
-
+        
         console.log('[authStore] Initializing auth store');
-        isInitialized = true;
         
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (event, session) => {
@@ -130,21 +125,41 @@ export const useAuthStore = create<AuthStore>()(
         }, 30000); // Refresh every 30 seconds
 
         console.log('[authStore] Checking initial session');
-        // Initial session check
-        supabase.auth.getSession().then(async ({ data: { session } }) => {
-          console.log('[authStore] Initial session check:', session?.user?.email);
-          if (session?.user) {
-            set({
-              user: session.user,
-              isAuthenticated: true,
-              loading: false,
-              ownerKeyInfo: null, // Clear owner key on session restore
-            });
-            await get().fetchUserPlan(session.user.id);
-            await get().fetchUserLicense(session.user.id);
-            await get().fetchOwnerKeys(session.user.id);
-          } else {
-            console.log('[authStore] No initial session, setting user to null');
+        // Initial session check with timeout
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Session check timeout')), 5000);
+        });
+
+        Promise.race([sessionPromise, timeoutPromise])
+          .then(async ({ data: { session } }) => {
+            console.log('[authStore] Initial session check:', session?.user?.email);
+            if (session?.user) {
+              set({
+                user: session.user,
+                isAuthenticated: true,
+                loading: false,
+                ownerKeyInfo: null, // Clear owner key on session restore
+              });
+              await get().fetchUserPlan(session.user.id);
+              await get().fetchUserLicense(session.user.id);
+              await get().fetchOwnerKeys(session.user.id);
+            } else {
+              console.log('[authStore] No initial session, setting user to null');
+              set({
+                user: null,
+                plan: 'free',
+                isAuthenticated: false,
+                loading: false,
+                ownerKeyInfo: null,
+                licenseInfo: null,
+                effectiveLimits: null,
+              });
+            }
+          })
+          .catch((error) => {
+            console.error('[authStore] Session check failed:', error);
+            // Fallback to no session
             set({
               user: null,
               plan: 'free',
@@ -154,15 +169,13 @@ export const useAuthStore = create<AuthStore>()(
               licenseInfo: null,
               effectiveLimits: null,
             });
-          }
-        });
+          });
 
         console.log('[authStore] Auth store initialization complete');
-        // Store cleanup function
-        cleanupFunction = () => {
+        // Return cleanup function
+        return () => {
           subscription.unsubscribe();
           clearInterval(refreshInterval);
-          isInitialized = false;
         };
       },
 
@@ -460,15 +473,6 @@ export const useAuthStore = create<AuthStore>()(
       console.log('[authStore] Successfully refreshed user data');
     } catch (error) {
       console.error('[authStore] Failed to refresh user data:', error);
-    }
-  },
-
-  // Cleanup method to reset initialization
-  cleanup: () => {
-    console.log('[authStore] Cleaning up auth store');
-    if (cleanupFunction) {
-      cleanupFunction();
-      cleanupFunction = null;
     }
   },
 
