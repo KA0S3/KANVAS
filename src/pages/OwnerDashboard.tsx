@@ -33,6 +33,16 @@ const OwnerDashboard = () => {
         hasOwnerPlan
       });
 
+      // Show debug info in UI for development
+      if (import.meta.env.DEV) {
+        console.log('[OwnerDashboard] Debug Info:');
+        console.log('- Your email:', user.email);
+        console.log('- Expected owner email:', ownerEmail);
+        console.log('- Your current plan:', plan);
+        console.log('- Has owner email?', hasOwnerEmail);
+        console.log('- Has owner plan?', hasOwnerPlan);
+      }
+
       if (!hasOwnerEmail || !hasOwnerPlan) {
         console.log('[OwnerDashboard] Access denied - redirecting to home');
         navigate("/");
@@ -53,6 +63,38 @@ const OwnerDashboard = () => {
   // Don't render content if user doesn't have access (redirect will happen)
   if (!user || !(user.email === import.meta.env.VITE_OWNER_EMAIL && plan === 'owner')) {
     return null;
+  }
+
+  // Debug info for development
+  if (import.meta.env.DEV) {
+    return (
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-foreground">Debug Info</h1>
+            <div className="bg-red-100 border border-red-300 text-red-700 p-4 rounded-lg">
+              <h2 className="font-bold mb-2">Owner Dashboard Debug</h2>
+              <div className="space-y-2 font-mono text-sm">
+                <div>Your Email: {user.email}</div>
+                <div>Expected Owner Email: {import.meta.env.VITE_OWNER_EMAIL}</div>
+                <div>Your Plan: {plan}</div>
+                <div>Email Match: {user.email === import.meta.env.VITE_OWNER_EMAIL ? '✅ YES' : '❌ NO'}</div>
+                <div>Plan Match: {plan === 'owner' ? '✅ YES' : '❌ NO'}</div>
+                <div>Can Access: {(user.email === import.meta.env.VITE_OWNER_EMAIL && plan === 'owner') ? '✅ YES' : '❌ NO'}</div>
+              </div>
+              <div className="mt-4 text-sm text-gray-600">
+                <strong>To fix owner access:</strong>
+                <ul className="list-disc list-inside mt-2 space-y-1">
+                  <li>Update your email in Supabase users table to match VITE_OWNER_EMAIL</li>
+                  <li>Or update VITE_OWNER_EMAIL in .env to match your email</li>
+                  <li>Update your plan_type to 'owner' in Supabase users table</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
