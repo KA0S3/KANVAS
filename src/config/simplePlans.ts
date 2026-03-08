@@ -37,6 +37,14 @@ export const PLANS: Record<string, PlanConfig> = {
     maxBooks: -1, // unlimited
     canExport: true,
     hasAds: false
+  },
+  owner: {
+    id: 'owner',
+    name: 'Owner',
+    storageMB: -1, // unlimited
+    maxBooks: -1, // unlimited
+    canExport: true,
+    hasAds: false
   }
 };
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, LogOut, Loader2, Crown, HardDrive } from 'lucide-react';
+import { User, Mail, LogOut, Loader2, Crown, HardDrive, Shield, Lock } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import {
   Form,
   FormControl,
@@ -254,7 +255,7 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
   if (authLoading) {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-md glass cosmic-glow border-glass-border/40">
+        <DialogContent className="max-w-6xl w-[95vw] glass cosmic-glow border-glass-border/40 max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <User className="w-5 h-5" />
@@ -271,7 +272,7 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md glass cosmic-glow border-glass-border/40">
+      <DialogContent className="max-w-6xl w-[95vw] glass cosmic-glow border-glass-border/40 max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <User className="w-5 h-5" />
@@ -279,7 +280,7 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="flex-1 overflow-y-auto pb-4">
           {!isAuthenticated ? (
             // Logged out state - show forms
             <Card className="glass cosmic-glow border-glass-border/40">
@@ -469,86 +470,231 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
               </CardContent>
             </Card>
           ) : (
-            // Logged in state
-            <Card className="glass cosmic-glow border-glass-border/40">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Mail className="w-4 h-4" />
-                  Account Info
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <PlanAndStorageDisplay />
+            // Logged in state - Dashboard Layout
+            <div className="p-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 
-                <div className="flex items-center gap-3 p-3 bg-glass/30 rounded-lg border border-glass-border/30">
-                  <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center">
-                    <User className="w-5 h-5 text-primary" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-sm font-medium">Logged in as</div>
-                    <div className="text-xs text-muted-foreground">{user?.email}</div>
+                {/* Account Info Card */}
+                <div className="relative group transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1">
+                  <div className="relative bg-white/5 dark:bg-gray-800/5 backdrop-blur-sm border rounded-xl p-6 hover:bg-white/10 dark:hover:bg-gray-700/10 hover:shadow-xl transition-all duration-300 border-white/10 dark:border-gray-700/20">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl flex items-center justify-center">
+                        <User className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold">Account Info</h3>
+                        <p className="text-sm text-muted-foreground">Profile details</p>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3 p-3 bg-glass/30 rounded-lg border border-glass-border/30">
+                        <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center">
+                          <User className="w-5 h-5 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-sm font-medium">Logged in as</div>
+                          <div className="text-xs text-muted-foreground truncate">{user?.email}</div>
+                        </div>
+                      </div>
+                      
+                      <Button
+                        variant="destructive"
+                        onClick={handleLogout}
+                        disabled={isSubmitting}
+                        className="w-full gap-2"
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Signing out...
+                          </>
+                        ) : (
+                          <>
+                            <LogOut className="w-4 h-4" />
+                            Sign Out
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 </div>
 
-                <Button
-                  variant="destructive"
-                  onClick={handleLogout}
-                  disabled={isSubmitting}
-                  className="w-full gap-2"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Signing out...
-                    </>
-                  ) : (
-                    <>
-                      <LogOut className="w-4 h-4" />
-                      Sign Out
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-          )}
+                {/* Storage Usage Card */}
+                <div className="relative group transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1">
+                  <div className="relative bg-white/5 dark:bg-gray-800/5 backdrop-blur-sm border rounded-xl p-6 hover:bg-white/10 dark:hover:bg-gray-700/10 hover:shadow-xl transition-all duration-300 border-white/10 dark:border-gray-700/20">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
+                        <HardDrive className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold">Storage Usage</h3>
+                        <p className="text-sm text-muted-foreground">Cloud storage</p>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div className="p-3 bg-glass/30 rounded-lg border border-glass-border/30">
+                        <div className="flex items-center gap-2 mb-3">
+                          <HardDrive className="w-4 h-4 text-muted-foreground" />
+                          <div className="text-sm font-medium">Usage Overview</div>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>{formatBytes(quota.used)} used</span>
+                            <span>{formatBytes(quota.available)} total</span>
+                          </div>
+                          
+                          <Progress 
+                            value={quota.available > 0 ? (quota.used / quota.available) * 100 : 0} 
+                            className="h-2"
+                          />
+                          
+                          <div className="text-xs text-center text-muted-foreground">
+                            {quota.available > 0 ? ((quota.used / quota.available) * 100).toFixed(1) : 0}% used
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
-          {/* Feature Teaser Cards for Free Users */}
-          {isAuthenticated && effectiveLimits?.source.plan === 'free' && (
-            <div className="space-y-3">
-              <div className="text-sm font-medium text-muted-foreground">Upgrade Benefits</div>
-              <div className="grid grid-cols-1 gap-3">
-                <FeatureTeaserCard 
-                  feature="no-ads" 
-                  compact={true}
-                  onUpgrade={() => {
-                    setUpgradePrompt({
-                      title: 'Remove Ads',
-                      message: 'Enjoy an uninterrupted creative experience with no ads. Upgrade to Premium for an ad-free experience.',
-                      action: 'Upgrade Now'
-                    });
-                    setShowUpgradePrompt(true);
-                  }}
-                />
-                <FeatureTeaserCard 
-                  feature="backup" 
-                  compact={true}
-                  onUpgrade={() => {
-                    setUpgradePrompt({
-                      title: 'Cloud Backup',
-                      message: 'Cloud backup and sync are available for Pro users. Upgrade your plan to automatically backup your work and access it from any device.',
-                      action: 'Upgrade to Pro'
-                    });
-                    setShowUpgradePrompt(true);
-                  }}
-                />
+                {/* Current Plan Card */}
+                <div className="relative group transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1">
+                  <div className="relative bg-white/5 dark:bg-gray-800/5 backdrop-blur-sm border rounded-xl p-6 hover:bg-white/10 dark:hover:bg-gray-700/10 hover:shadow-xl transition-all duration-300 border-white/10 dark:border-gray-700/20">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl flex items-center justify-center">
+                        <Crown className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold">Current Plan</h3>
+                        <p className="text-sm text-muted-foreground">Subscription status</p>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <div className="p-3 bg-glass/30 rounded-lg border border-glass-border/30">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                              (effectiveLimits?.source.plan === 'pro' || plan === 'pro') ? 'text-blue-600' : 
+                              (effectiveLimits?.source.plan === 'lifetime' || plan === 'lifetime') ? 'text-purple-600' : 
+                              'text-gray-600'
+                            } bg-current/10`}>
+                              {(effectiveLimits?.source.plan === 'pro' || plan === 'pro') || 
+                               (effectiveLimits?.source.plan === 'lifetime' || plan === 'lifetime') ? 
+                                <Crown className="w-4 h-4" /> : 
+                                <User className="w-4 h-4" />
+                            }
+                            </div>
+                            <div>
+                              <div className="text-sm font-medium">
+                                {(effectiveLimits?.source.plan === 'pro' || plan === 'pro') ? 'Pro' : 
+                                 (effectiveLimits?.source.plan === 'lifetime' || plan === 'lifetime') ? 'Lifetime' : 
+                                 'Free'}
+                              </div>
+                              <div className={`text-xs font-semibold ${
+                                (effectiveLimits?.source.plan === 'pro' || plan === 'pro') ? 'text-blue-600' : 
+                                (effectiveLimits?.source.plan === 'lifetime' || plan === 'lifetime') ? 'text-purple-600' : 
+                                'text-gray-600'
+                              }`}>
+                                {(effectiveLimits?.source.plan === 'pro' || plan === 'pro') ? 'Monthly' : 
+                                 (effectiveLimits?.source.plan === 'lifetime' || plan === 'lifetime') ? 'Forever' : 
+                                 'Basic'}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {(effectiveLimits?.source.plan === 'free' || plan === 'free') && (
+                        <Button
+                          variant="outline"
+                          onClick={() => setShowPaymentModal(true)}
+                          className="w-full bg-gradient-to-r from-teal-500/10 to-cyan-500/10 border-teal-500/30 hover:bg-gradient-to-r hover:from-teal-500/20 hover:to-cyan-500/20 transition-all duration-300"
+                        >
+                          <Crown className="w-4 h-4 mr-2" />
+                          Upgrade Plan
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
+              
+              {/* Feature Benefits Section */}
+              {(effectiveLimits?.source.plan === 'free' || plan === 'free') && (
+                <div className="mt-6">
+                  <div className="text-sm font-medium text-muted-foreground mb-4">Upgrade Benefits</div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="relative group transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1 cursor-pointer"
+                         onClick={() => {
+                           setUpgradePrompt({
+                             title: 'Remove Ads',
+                             message: 'Enjoy an uninterrupted creative experience with no ads. Upgrade to Premium for an ad-free experience.',
+                             action: 'Upgrade Now'
+                           });
+                           setShowUpgradePrompt(true);
+                         }}>
+                      <div className="relative bg-gradient-to-br from-green-500/5 to-emerald-500/5 backdrop-blur-sm border border-green-200/30 dark:border-green-800/30 rounded-xl p-6 hover:bg-gradient-to-br hover:from-green-500/10 hover:to-emerald-500/10 hover:shadow-xl hover:border-green-500/50 transition-all duration-300">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Shield className="w-6 h-6 text-white" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <h3 className="font-semibold text-green-700 dark:text-green-300">No Ads</h3>
+                              <Badge variant="secondary" className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-700">
+                                <Lock className="w-3 h-3 mr-1" />
+                                Premium
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground">Enjoy an uninterrupted creative experience</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="relative group transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1 cursor-pointer"
+                         onClick={() => {
+                           setUpgradePrompt({
+                             title: 'Cloud Backup',
+                             message: 'Cloud backup and sync are available for Pro users. Upgrade your plan to automatically backup your work and access it from any device.',
+                             action: 'Upgrade to Pro'
+                           });
+                           setShowUpgradePrompt(true);
+                         }}>
+                      <div className="relative bg-gradient-to-br from-blue-500/5 to-cyan-500/5 backdrop-blur-sm border border-blue-200/30 dark:border-blue-800/30 rounded-xl p-6 hover:bg-gradient-to-br hover:from-blue-500/10 hover:to-cyan-500/10 hover:shadow-xl hover:border-blue-500/50 transition-all duration-300">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <HardDrive className="w-6 h-6 text-white" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <h3 className="font-semibold text-blue-700 dark:text-blue-300">10GB Cloud Backup</h3>
+                              <Badge variant="secondary" className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700">
+                                <Lock className="w-3 h-3 mr-1" />
+                                Pro
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground">Automatic backups with secure cloud storage</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Footer note */}
-          <div className="text-xs text-muted-foreground text-center">
-            ⚠️ Authentication is optional - app works fully offline
-          </div>
+
+        </div>
+        
+        {/* Footer note */}
+        <div className="text-xs text-muted-foreground text-center p-4 border-t border-border/20">
+          ⚠️ Authentication is optional - app works fully offline
         </div>
       </DialogContent>
       
