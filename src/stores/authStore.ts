@@ -67,12 +67,15 @@ export const useAuthStore = create<AuthStore>()(
 
       // Initialize auth listener
       initializeAuth: () => {
+        console.log('[authStore] Initializing auth store');
+        
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (event, session) => {
-            console.log('Auth state changed:', event, session?.user?.id);
+            console.log('[authStore] Auth state changed:', event, session?.user?.id);
             
             if (session?.user) {
               // User is signed in
+              console.log('[authStore] User signed in:', session.user.email);
               set({
                 user: session.user,
                 isAuthenticated: true,
@@ -105,6 +108,7 @@ export const useAuthStore = create<AuthStore>()(
           }
         );
 
+        console.log('[authStore] Setting up periodic refresh');
         // Set up periodic refresh for authenticated users
         const refreshInterval = setInterval(async () => {
           const { user, isAuthenticated } = get();
@@ -114,8 +118,10 @@ export const useAuthStore = create<AuthStore>()(
           }
         }, 30000); // Refresh every 30 seconds
 
+        console.log('[authStore] Checking initial session');
         // Initial session check
         supabase.auth.getSession().then(async ({ data: { session } }) => {
+          console.log('[authStore] Initial session check:', session?.user?.email);
           if (session?.user) {
             set({
               user: session.user,
@@ -127,6 +133,7 @@ export const useAuthStore = create<AuthStore>()(
             await get().fetchUserLicense(session.user.id);
             await get().fetchOwnerKeys(session.user.id);
           } else {
+            console.log('[authStore] No initial session, setting user to null');
             set({
               user: null,
               plan: 'free',
@@ -139,6 +146,7 @@ export const useAuthStore = create<AuthStore>()(
           }
         });
 
+        console.log('[authStore] Auth store initialization complete');
         // Return cleanup function
         return () => {
           subscription.unsubscribe();
