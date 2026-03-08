@@ -69,7 +69,7 @@ export const useAuthStore = create<AuthStore>()(
       initializeAuth: () => {
         // Prevent multiple initializations
         if (get().loading === false) {
-          console.log('[authStore] Auth store already initialized, skipping');
+          console.log('[authStore] Auth store already initialized');
           return;
         }
         
@@ -77,27 +77,25 @@ export const useAuthStore = create<AuthStore>()(
         
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (event, session) => {
-            console.log('[authStore] Auth state changed:', event, session?.user?.id);
+            console.log('[authStore] Auth state changed:', event, session?.user?.email);
             
             if (session?.user) {
               // User is signed in
-              console.log('[authStore] User signed in:', session.user.email);
               set({
                 user: session.user,
                 isAuthenticated: true,
                 loading: false,
-                ownerKeyInfo: null, // Clear owner key on sign in
+                ownerKeyInfo: null,
               });
               
-              // Fetch user plan from Supabase
-              await get().fetchUserPlan(session.user.id);
-              // Fetch license information
-              await get().fetchUserLicense(session.user.id);
-              // Fetch owner keys
-              await get().fetchOwnerKeys(session.user.id);
+              // Fetch user data
+              await Promise.all([
+                get().fetchUserPlan(session.user.id),
+                get().fetchUserLicense(session.user.id),
+                get().fetchOwnerKeys(session.user.id),
+              ]);
             } else {
-              // User is signed out - this should handle sign out properly
-              console.log('[authStore] User signed out, clearing state');
+              // User is signed out
               set({
                 user: null,
                 plan: 'free',
@@ -107,59 +105,27 @@ export const useAuthStore = create<AuthStore>()(
                 licenseInfo: null,
                 effectiveLimits: null,
               });
-              
-              // Update cloud store quota based on free plan
               updateQuotaBasedOnPlan();
             }
           }
         );
 
-        console.log('[authStore] Setting up periodic refresh');
-        // Set up periodic refresh for authenticated users
-        const refreshInterval = setInterval(async () => {
-          const { user, isAuthenticated } = get();
-          if (isAuthenticated && user) {
-            console.log('[authStore] Periodic plan refresh');
-            await get().refreshUserData();
-          }
-        }, 30000); // Refresh every 30 seconds
-
-        console.log('[authStore] Checking initial session');
-        // Initial session check with timeout
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Session check timeout')), 5000);
-        });
-
-        Promise.race([sessionPromise, timeoutPromise])
-          .then(async ({ data: { session } }) => {
-            console.log('[authStore] Initial session check:', session?.user?.email);
-            if (session?.user) {
-              set({
-                user: session.user,
-                isAuthenticated: true,
-                loading: false,
-                ownerKeyInfo: null, // Clear owner key on session restore
-              });
-              await get().fetchUserPlan(session.user.id);
-              await get().fetchUserLicense(session.user.id);
-              await get().fetchOwnerKeys(session.user.id);
-            } else {
-              console.log('[authStore] No initial session, setting user to null');
-              set({
-                user: null,
-                plan: 'free',
-                isAuthenticated: false,
-                loading: false,
-                ownerKeyInfo: null,
-                licenseInfo: null,
-                effectiveLimits: null,
-              });
-            }
-          })
-          .catch((error) => {
-            console.error('[authStore] Session check failed:', error);
-            // Fallback to no session
+        // Simple session check without timeout
+        supabase.auth.getSession().then(async ({ data: { session } }) => {
+          console.log('[authStore] Initial session:', session?.user?.email);
+          if (session?.user) {
+            set({
+              user: session.user,
+              isAuthenticated: true,
+              loading: false,
+              ownerKeyInfo: null,
+            });
+            await Promise.all([
+              get().fetchUserPlan(session.user.id),
+              get().fetchUserLicense(session.user.id),
+              get().fetchOwnerKeys(session.user.id),
+            ]);
+          } else {
             set({
               user: null,
               plan: 'free',
@@ -169,13 +135,12 @@ export const useAuthStore = create<AuthStore>()(
               licenseInfo: null,
               effectiveLimits: null,
             });
-          });
+          }
+        });
 
-        console.log('[authStore] Auth store initialization complete');
         // Return cleanup function
         return () => {
           subscription.unsubscribe();
-          clearInterval(refreshInterval);
         };
       },
 

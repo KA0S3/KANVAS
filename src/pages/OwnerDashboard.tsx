@@ -33,16 +33,6 @@ const OwnerDashboard = () => {
         hasOwnerPlan
       });
 
-      // Show debug info in UI for development
-      if (import.meta.env.DEV) {
-        console.log('[OwnerDashboard] Debug Info:');
-        console.log('- Your email:', user.email);
-        console.log('- Expected owner email:', ownerEmail);
-        console.log('- Your current plan:', plan);
-        console.log('- Has owner email?', hasOwnerEmail);
-        console.log('- Has owner plan?', hasOwnerPlan);
-      }
-
       if (!hasOwnerEmail || !hasOwnerPlan) {
         console.log('[OwnerDashboard] Access denied - redirecting to home');
         navigate("/");
@@ -75,8 +65,8 @@ const OwnerDashboard = () => {
           </p>
         </div>
 
-        {/* Debug info for development - only show if DEV and not interfering */}
-        {import.meta.env.DEV && user.email !== import.meta.env.VITE_OWNER_EMAIL && (
+        {/* Debug info for development - only show if access denied */}
+        {import.meta.env.DEV && (user.email !== import.meta.env.VITE_OWNER_EMAIL || plan !== 'owner') && (
           <div className="mb-8 bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
             <h2 className="font-bold mb-2">⚠️ Owner Access Debug</h2>
             <div className="space-y-2 font-mono text-sm">
@@ -90,8 +80,7 @@ const OwnerDashboard = () => {
             <div className="mt-4 text-sm text-gray-600">
               <strong>To fix owner access:</strong>
               <ul className="list-disc list-inside mt-2 space-y-1">
-                <li>Update your email in Supabase users table to match VITE_OWNER_EMAIL</li>
-                <li>Or update VITE_OWNER_EMAIL in .env to match your email</li>
+                <li>Update your email in Supabase users table to match {import.meta.env.VITE_OWNER_EMAIL}</li>
                 <li>Update your plan_type to 'owner' in Supabase users table</li>
               </ul>
             </div>
