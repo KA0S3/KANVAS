@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Settings, User } from 'lucide-react';
 import { useBookStore } from '@/stores/bookStoreSimple';
 import { useThemeStore } from '@/stores/themeStore';
@@ -31,7 +32,8 @@ const BookShelf: React.FC<BookShelfProps> = ({
 }) => {
   const { viewMode, setViewMode, getAllBooks, currentBookId, setCurrentBook, getCurrentBook } = useBookStore();
   const { theme } = useThemeStore();
-  const { isAuthenticated, plan, effectiveLimits } = useAuthStore();
+  const { user, plan, isAuthenticated, effectiveLimits } = useAuthStore();
+  const navigate = useNavigate();
   const books = getAllBooks();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -67,6 +69,25 @@ const BookShelf: React.FC<BookShelfProps> = ({
 
   const handleViewModeChange = (newMode: 'single' | 'spine') => {
     setViewMode(newMode);
+  };
+
+  const handleAccountClick = () => {
+    // Check if user is authenticated and is an owner
+    if (isAuthenticated && user && plan) {
+      const ownerEmail = import.meta.env.VITE_OWNER_EMAIL;
+      const isOwner = user.email === ownerEmail && plan === 'owner';
+      
+      if (isOwner) {
+        // Redirect to owner dashboard
+        navigate('/owner');
+      } else {
+        // Open regular account modal for non-owners
+        setIsAccountModalOpen(true);
+      }
+    } else {
+      // Open account modal for non-authenticated users
+      setIsAccountModalOpen(true);
+    }
   };
 
   const handleEditBook = () => {
@@ -146,7 +167,7 @@ const BookShelf: React.FC<BookShelfProps> = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setIsAccountModalOpen(true)}
+              onClick={handleAccountClick}
               className={`${
                 theme === 'dark' 
                   ? 'border-white/20 text-white hover:bg-white/10' 

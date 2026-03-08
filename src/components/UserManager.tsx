@@ -33,6 +33,7 @@ const UserManager: React.FC = () => {
   const usersPerPage = 25;
 
   const fetchUsers = async (page: number = 1, search: string = "") => {
+    console.log('[UserManager] Starting fetchUsers...', { page, search, loading });
     setLoading(true);
     try {
       const offset = (page - 1) * usersPerPage;
@@ -48,11 +49,16 @@ const UserManager: React.FC = () => {
 
       const { data, error, count } = await query;
 
+      console.log('[UserManager] Supabase query result:', { data, error, count });
+
       if (error) {
-        console.error('Error fetching users:', error);
+        console.error('[UserManager] Error fetching users:', error);
+        console.error('[UserManager] Full error details:', JSON.stringify(error, null, 2));
         return;
       }
 
+      console.log('[UserManager] Successfully fetched users:', { data: data?.length, count });
+      
       // Transform data to match our interface, adding default values for missing fields
       const transformedData = (data || []).map(user => ({
         ...user,
@@ -63,16 +69,20 @@ const UserManager: React.FC = () => {
         import_export_enabled: user.plan_type !== 'free', // Default logic
       }));
 
+      console.log('[UserManager] Transformed data:', transformedData);
       setUsers(transformedData);
       setTotalUsers(count || 0);
     } catch (error) {
-      console.error('Unexpected error fetching users:', error);
+      console.error('[UserManager] Unexpected error fetching users:', error);
+      console.error('[UserManager] Full unexpected error:', JSON.stringify(error, null, 2));
     } finally {
+      console.log('[UserManager] fetchUsers completed, setting loading to false');
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    console.log('[UserManager] useEffect triggered - fetching users...', { currentPage, searchTerm });
     fetchUsers(currentPage, searchTerm);
   }, [currentPage, searchTerm]);
 

@@ -33,9 +33,12 @@ interface AuthStore {
   plan: Plan;
   isAuthenticated: boolean;
   loading: boolean;
+  planLoading: boolean;
   ownerKeyInfo: OwnerKeyInfo | null;
   licenseInfo: LicenseInfo | null;
   effectiveLimits: EffectiveLimits | null;
+  _lastFetchedUserId?: string; // Prevent duplicate fetches
+  _authStateInitialized?: boolean; // Prevent multiple initializations
   
   // Methods
   initializeAuth: () => void;
@@ -61,6 +64,7 @@ export const useAuthStore = create<AuthStore>()(
       plan: 'free',
       isAuthenticated: false,
       loading: true,
+      planLoading: true,
       ownerKeyInfo: null,
       licenseInfo: null,
       effectiveLimits: null,
@@ -68,12 +72,13 @@ export const useAuthStore = create<AuthStore>()(
       // Initialize auth listener
       initializeAuth: () => {
         // Prevent multiple initializations
-        if (get().loading === false) {
+        if (get().loading === false || get()._authStateInitialized) {
           console.log('[authStore] Auth store already initialized');
           return;
         }
         
         console.log('[authStore] Initializing auth store');
+        set({ _authStateInitialized: true });
         
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (event, session) => {
@@ -81,19 +86,33 @@ export const useAuthStore = create<AuthStore>()(
             
             if (session?.user) {
               // User is signed in
-              set({
-                user: session.user,
-                isAuthenticated: true,
-                loading: false,
-                ownerKeyInfo: null,
-              });
+              const currentUserId = session.user.id;
+              const lastUserId = get()._lastFetchedUserId;
               
-              // Fetch user data
-              await Promise.all([
-                get().fetchUserPlan(session.user.id),
-                get().fetchUserLicense(session.user.id),
-                get().fetchOwnerKeys(session.user.id),
-              ]);
+              // Only fetch plan data if user actually changed
+              if (currentUserId !== lastUserId) {
+                set({
+                  user: session.user,
+                  isAuthenticated: true,
+                  loading: false,
+                  planLoading: true,
+                  ownerKeyInfo: null,
+                });
+                
+                // Fetch user data
+                await Promise.all([
+                  get().fetchUserPlan(session.user.id),
+                  get().fetchUserLicense(session.user.id),
+                  get().fetchOwnerKeys(session.user.id),
+                ]);
+              } else {
+                // Just update user object, don't re-fetch plan
+                set({
+                  user: session.user,
+                  isAuthenticated: true,
+                  loading: false,
+                });
+              }
             } else {
               // User is signed out
               set({
@@ -101,9 +120,12 @@ export const useAuthStore = create<AuthStore>()(
                 plan: 'free',
                 isAuthenticated: false,
                 loading: false,
+                planLoading: false,
                 ownerKeyInfo: null,
                 licenseInfo: null,
                 effectiveLimits: null,
+                _lastFetchedUserId: undefined,
+                _authStateInitialized: false,
               });
               updateQuotaBasedOnPlan();
             }
@@ -118,6 +140,7 @@ export const useAuthStore = create<AuthStore>()(
               user: session.user,
               isAuthenticated: true,
               loading: false,
+              planLoading: true,
               ownerKeyInfo: null,
             });
             await Promise.all([
@@ -131,9 +154,11 @@ export const useAuthStore = create<AuthStore>()(
               plan: 'free',
               isAuthenticated: false,
               loading: false,
+              planLoading: false,
               ownerKeyInfo: null,
               licenseInfo: null,
               effectiveLimits: null,
+              _lastFetchedUserId: undefined,
             });
           }
         });
@@ -208,9 +233,11 @@ export const useAuthStore = create<AuthStore>()(
             plan: 'free',
             isAuthenticated: false,
             loading: false,
+            planLoading: false,
             ownerKeyInfo: null,
             licenseInfo: null,
             effectiveLimits: null,
+            _lastFetchedUserId: undefined,
           });
           localStorage.removeItem('kanvas-auth');
           updateQuotaBasedOnPlan();
@@ -225,31 +252,95 @@ export const useAuthStore = create<AuthStore>()(
 
       // Fetch user plan from Supabase
       fetchUserPlan: async (userId: string) => {
-        try {
-          const { data, error } = await supabase
-            .from('users')
-            .select('plan_type')
-            .eq('id', userId)
-            .single();
+        // Prevent duplicate fetches for same user
+        const lastFetched = get()._lastFetchedUserId;
+        if (lastFetched === userId && get().planLoading) {
+          console.log(`[authStore] ⏭️ Skipping duplicate fetch for user: ${userId}`);
+          return;
+        }
 
-          if (error) {
-            console.warn('Failed to fetch user plan, using default:', error);
-            // Don't fail the app if we can't fetch the plan
-            set({ plan: 'free' });
+        try {
+          console.log(`[authStore] Fetching plan for user: ${userId}`);
+          set({ planLoading: true, _lastFetchedUserId: userId });
+          
+          // IMMEDIATE OWNER FALLBACK - Check if this is the owner email first
+          const ownerEmail = import.meta.env.VITE_OWNER_EMAIL;
+          const currentUser = get().user;
+          if (currentUser?.email === ownerEmail) {
+            console.log('[authStore] 🚀 IMMEDIATE OWNER FALLBACK - Setting owner plan');
+            set({ plan: 'owner', planLoading: false });
             await get().updateEffectiveLimits();
             return;
           }
-
-          // Migrate legacy plan names if needed
-          let userPlan = data?.plan_type as Plan || 'free';
-          userPlan = migrateLegacyPlanId(userPlan) as Plan;
           
-          set({ plan: userPlan });
+          // Try multiple approaches with shorter timeouts
+          const fetchWithTimeout = async (query: any, timeoutMs: number) => {
+            const timeoutPromise = new Promise((_, reject) => {
+              setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms`)), timeoutMs);
+            });
+            return Promise.race([query, timeoutPromise]);
+          };
+
+          // Method 1: Direct query to users table
+          try {
+            console.log('[authStore] Trying direct users table query...');
+            const { data, error } = await fetchWithTimeout(
+              supabase
+                .from('users')
+                .select('plan_type')
+                .eq('id', userId)
+                .single(),
+              3000 // 3 second timeout
+            ) as any;
+
+            if (!error && data) {
+              let userPlan = data?.plan_type as Plan || 'free';
+              console.log(`[authStore] Raw plan from DB: ${data?.plan_type}, after migration: ${userPlan}`);
+              userPlan = migrateLegacyPlanId(userPlan) as Plan;
+              
+              console.log(`[authStore] ✅ Successfully fetched plan: ${userPlan} for user: ${userId}`);
+              set({ plan: userPlan, planLoading: false });
+              await get().updateEffectiveLimits();
+              return;
+            } else {
+              console.log('[authStore] Direct query failed, trying auth.user()...');
+            }
+          } catch (err) {
+            console.log('[authStore] Direct query error:', err);
+          }
+
+          // Method 2: Try using auth metadata (fallback)
+          try {
+            console.log('[authStore] Trying auth metadata fallback...');
+            const { data: { user } } = await supabase.auth.getUser();
+            
+            // Check if plan is in user metadata
+            const metadataPlan = user?.user_metadata?.plan_type || user?.app_metadata?.plan_type;
+            if (metadataPlan) {
+              let userPlan = metadataPlan as Plan;
+              userPlan = migrateLegacyPlanId(userPlan) as Plan;
+              
+              console.log(`[authStore] ✅ Found plan in metadata: ${userPlan} for user: ${userId}`);
+              set({ plan: userPlan, planLoading: false });
+              await get().updateEffectiveLimits();
+              return;
+            } else {
+              console.log('[authStore] No plan in metadata, trying owner fallback...');
+            }
+          } catch (err) {
+            console.log('[authStore] Metadata fallback failed:', err);
+          }
+
+          // Final fallback
+          console.log('[authStore] ⚠️ All methods failed, using default plan: free');
+          set({ plan: 'free', planLoading: false });
           await get().updateEffectiveLimits();
+          
         } catch (error) {
-          console.warn('Unexpected error fetching user plan, using default:', error);
+          console.error('[authStore] Unexpected error fetching user plan:', error);
+          console.log('[authStore] Falling back to default plan: free');
           // Never block the app if auth fails
-          set({ plan: 'free' });
+          set({ plan: 'free', planLoading: false });
           await get().updateEffectiveLimits();
         }
       },
@@ -449,9 +540,11 @@ export const useAuthStore = create<AuthStore>()(
       plan: 'free',
       isAuthenticated: false,
       loading: false,
+      planLoading: false,
       ownerKeyInfo: null,
       licenseInfo: null,
       effectiveLimits: null,
+      _lastFetchedUserId: undefined,
     });
     localStorage.removeItem('kanvas-auth');
     updateQuotaBasedOnPlan();

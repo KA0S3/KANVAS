@@ -1,4 +1,5 @@
  import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { Sparkles, ArrowLeft, Plus, PanelRight, BookOpen, User } from "lucide-react";
 import { AssetItem, type Asset } from "./AssetItem";
 import { AssetCreationModal } from "./asset/AssetCreationModal";
@@ -8,6 +9,7 @@ import { useAssetTree } from "@/hooks/useAssetTree";
 import { useAssetStore } from "@/stores/assetStore";
 import { useBookStore } from "@/stores/bookStoreSimple";
 import { useBackgroundStore } from "@/stores/backgroundStore";
+import { useAuthStore } from "@/stores/authStore";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
 import { BackgroundControls } from "@/components/asset/BackgroundControls";
 import { AccountModal } from "@/components/account/AccountModal";
@@ -110,6 +112,8 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
   const { currentActiveId, setCurrentViewportId, currentViewportId, isEditingBackground, updateAsset } = useAssetStore();
   const { getCurrentBook, getWorldData, updateWorldData } = useBookStore();
   const { getBackground, setBackground } = useBackgroundStore();
+  const { user, plan, isAuthenticated } = useAuthStore();
+  const navigate = useNavigate();
   
   // Get book-specific viewport settings, falling back to defaults if no book is selected
   const currentBook = getCurrentBook();
@@ -183,6 +187,25 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
     e.nativeEvent.stopImmediatePropagation(); // Prevent other listeners
     console.log('🔵 AssetPort: All event propagation stopped, calling openCreateAssetModal');
     openCreateAssetModal();
+  };
+
+  const handleAccountClick = () => {
+    // Check if user is authenticated and is an owner
+    if (isAuthenticated && user && plan) {
+      const ownerEmail = import.meta.env.VITE_OWNER_EMAIL;
+      const isOwner = user.email === ownerEmail && plan === 'owner';
+      
+      if (isOwner) {
+        // Redirect to owner dashboard
+        navigate('/owner');
+      } else {
+        // Open regular account modal for non-owners
+        setShowAccountModal(true);
+      }
+    } else {
+      // Open account modal for non-authenticated users
+      setShowAccountModal(true);
+    }
   };
 
   const handleDeleteAsset = useCallback((id: string) => {
@@ -701,7 +724,7 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setShowAccountModal(true)}
+            onClick={handleAccountClick}
             className="gap-2"
             title="Account"
           >

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { X, Plus, BookOpen, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -36,7 +37,8 @@ export function BookLibrary({ isOpen, onClose, onBookSelect }: BookLibraryProps)
   } = useBookStore();
   const { theme } = useThemeStore();
   const { canCreate: canCreateBook, reason, upgradePrompt: limitUpgradePrompt } = useCanCreateBook();
-  const { isAuthenticated, effectiveLimits } = useAuthStore();
+  const { user, plan, isAuthenticated, effectiveLimits } = useAuthStore();
+  const navigate = useNavigate();
 
   const [editingBook, setEditingBook] = useState<Book | null>(null);
   const [isCreatingBook, setIsCreatingBook] = useState(false);
@@ -94,11 +96,30 @@ export function BookLibrary({ isOpen, onClose, onBookSelect }: BookLibraryProps)
     } else if (reason === 'plan_limit') {
       // Open upgrade prompt
       setUpgradePrompt({
-        title: 'World Limit Reached',
-        message: `You've reached your limit of books. Upgrade to create unlimited worlds and access premium features.`,
+        title: 'Upgrade Required',
+        message: limitUpgradePrompt?.message || 'You need to upgrade your plan to create more books.',
         action: 'Upgrade Now'
       });
       setShowUpgradePrompt(true);
+    }
+  };
+
+  const handleAccountClick = () => {
+    // Check if user is authenticated and is an owner
+    if (isAuthenticated && user && plan) {
+      const ownerEmail = import.meta.env.VITE_OWNER_EMAIL;
+      const isOwner = user.email === ownerEmail && plan === 'owner';
+      
+      if (isOwner) {
+        // Redirect to owner dashboard
+        navigate('/owner');
+      } else {
+        // Open regular account modal for non-owners
+        setShowAccountModal(true);
+      }
+    } else {
+      // Open account modal for non-authenticated users
+      setShowAccountModal(true);
     }
   };
 
@@ -183,7 +204,7 @@ export function BookLibrary({ isOpen, onClose, onBookSelect }: BookLibraryProps)
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setShowAccountModal(true)}
+                  onClick={handleAccountClick}
                   className="gap-2"
                   title="Account"
                 >

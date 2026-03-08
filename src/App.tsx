@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import OwnerDashboard from "./pages/OwnerDashboard";
 import NotFound from "./pages/NotFound";
+import "@/utils/debugAuth"; // Import debug utilities
 
 const queryClient = new QueryClient();
 
