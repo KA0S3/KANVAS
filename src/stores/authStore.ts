@@ -50,8 +50,13 @@ interface AuthStore {
   clearOwnerKey: () => Promise<void>;
   updateEffectiveLimits: () => Promise<void>;
   refreshUserData: () => Promise<void>; // New method for real-time updates
+  cleanup: () => void; // Method to reset initialization
   clearAllAuthData: () => void; // Debug method to clear all auth data
 }
+
+// Track initialization to prevent multiple setups
+let isInitialized = false;
+let cleanupFunction: (() => void) | null = null;
 
 export const useAuthStore = create<AuthStore>()(
   persist(
@@ -67,7 +72,13 @@ export const useAuthStore = create<AuthStore>()(
 
       // Initialize auth listener
       initializeAuth: () => {
+        if (isInitialized) {
+          console.log('[authStore] Already initialized, skipping');
+          return;
+        }
+
         console.log('[authStore] Initializing auth store');
+        isInitialized = true;
         
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (event, session) => {
@@ -147,10 +158,11 @@ export const useAuthStore = create<AuthStore>()(
         });
 
         console.log('[authStore] Auth store initialization complete');
-        // Return cleanup function
-        return () => {
+        // Store cleanup function
+        cleanupFunction = () => {
           subscription.unsubscribe();
           clearInterval(refreshInterval);
+          isInitialized = false;
         };
       },
 
@@ -448,6 +460,15 @@ export const useAuthStore = create<AuthStore>()(
       console.log('[authStore] Successfully refreshed user data');
     } catch (error) {
       console.error('[authStore] Failed to refresh user data:', error);
+    }
+  },
+
+  // Cleanup method to reset initialization
+  cleanup: () => {
+    console.log('[authStore] Cleaning up auth store');
+    if (cleanupFunction) {
+      cleanupFunction();
+      cleanupFunction = null;
     }
   },
 
