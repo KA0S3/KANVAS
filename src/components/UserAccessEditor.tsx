@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { CalendarIcon, Save, X, AlertTriangle, HardDrive, Crown, Shield, Download } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { cn } from "@/lib/utils";
+import { formatBytes } from "@/lib/utils";
 
 type PlanType = 'guest' | 'free' | 'pro' | 'lifetime' | 'owner';
 
@@ -109,13 +110,6 @@ const UserAccessEditor: React.FC<UserAccessEditorProps> = ({ user, isOpen, onClo
     }
   };
 
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
 
   const calculateEffectiveQuota = () => {
     const baseQuota = PLAN_STORAGE_LIMITS[formData.plan_type as PlanType] * 1024 * 1024; // Convert to bytes

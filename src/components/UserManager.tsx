@@ -7,8 +7,17 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Users, ChevronLeft, ChevronRight, Search, Edit } from "lucide-react";
 import UserAccessEditor from "@/components/UserAccessEditor";
+import { formatBytes } from "@/lib/utils";
 
 type PlanType = 'guest' | 'free' | 'pro' | 'lifetime' | 'owner';
+
+const PLAN_FEATURES: Record<PlanType, { ads: boolean; importExport: boolean }> = {
+  guest: { ads: true, importExport: false },
+  free: { ads: true, importExport: false },
+  pro: { ads: false, importExport: true },
+  lifetime: { ads: false, importExport: true },
+  owner: { ads: false, importExport: true },
+};
 
 interface UserData {
   id: string;
@@ -65,8 +74,8 @@ const UserManager: React.FC = () => {
         plan_type: user.plan_type as PlanType || 'free',
         storage_used: 0, // Default value - would need to be calculated from storage_usage table
         extra_quota: 0, // Default value
-        ads_enabled: user.plan_type !== 'free', // Default logic
-        import_export_enabled: user.plan_type !== 'free', // Default logic
+        ads_enabled: PLAN_FEATURES[user.plan_type as PlanType || 'free'].ads,
+        import_export_enabled: PLAN_FEATURES[user.plan_type as PlanType || 'free'].importExport,
       }));
 
       console.log('[UserManager] Transformed data:', transformedData);
@@ -115,13 +124,6 @@ const UserManager: React.FC = () => {
     setIsEditorOpen(true);
   };
 
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
 
   const getPlanBadgeVariant = (planType?: PlanType) => {
     switch (planType) {

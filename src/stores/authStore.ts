@@ -37,6 +37,8 @@ interface AuthStore {
   ownerKeyInfo: OwnerKeyInfo | null;
   licenseInfo: LicenseInfo | null;
   effectiveLimits: EffectiveLimits | null;
+  isVerificationPending: boolean;
+  verificationEmail: string | null;
   _lastFetchedUserId?: string; // Prevent duplicate fetches
   _authStateInitialized?: boolean; // Prevent multiple initializations
   
@@ -54,6 +56,7 @@ interface AuthStore {
   updateEffectiveLimits: () => Promise<void>;
   refreshUserData: () => Promise<void>; // New method for real-time updates
   clearAllAuthData: () => void; // Debug method to clear all auth data
+  setVerificationPending: (pending: boolean, email?: string) => void; // New method for verification state
 }
 
 export const useAuthStore = create<AuthStore>()(
@@ -68,6 +71,8 @@ export const useAuthStore = create<AuthStore>()(
       ownerKeyInfo: null,
       licenseInfo: null,
       effectiveLimits: null,
+      isVerificationPending: false,
+      verificationEmail: null,
 
       // Initialize auth listener
       initializeAuth: () => {
@@ -88,6 +93,11 @@ export const useAuthStore = create<AuthStore>()(
               // User is signed in
               const currentUserId = session.user.id;
               const lastUserId = get()._lastFetchedUserId;
+              
+              // Clear verification pending state when user successfully signs in
+              if (get().isVerificationPending) {
+                set({ isVerificationPending: false, verificationEmail: null });
+              }
               
               // Only fetch plan data if user actually changed
               if (currentUserId !== lastUserId) {
@@ -111,6 +121,8 @@ export const useAuthStore = create<AuthStore>()(
                   user: session.user,
                   isAuthenticated: true,
                   loading: false,
+                  isVerificationPending: false,
+                  verificationEmail: null,
                 });
               }
             } else {
@@ -124,6 +136,8 @@ export const useAuthStore = create<AuthStore>()(
                 ownerKeyInfo: null,
                 licenseInfo: null,
                 effectiveLimits: null,
+                isVerificationPending: false,
+                verificationEmail: null,
                 _lastFetchedUserId: undefined,
                 _authStateInitialized: false,
               });
@@ -196,6 +210,9 @@ export const useAuthStore = create<AuthStore>()(
           const { data, error } = await supabase.auth.signUp({
             email,
             password,
+            options: {
+              emailRedirectTo: `${import.meta.env.VITE_APP_URL || window.location.origin}/auth/confirm`,
+            }
           });
 
           if (error) {
@@ -203,8 +220,18 @@ export const useAuthStore = create<AuthStore>()(
             return { error: error.message };
           }
 
-          // Note: User might need to confirm email depending on Supabase settings
-          return { success: true };
+          // Check if user needs email confirmation
+          if (data.user && !data.user.email_confirmed_at) {
+            set({ isVerificationPending: true, verificationEmail: email });
+            return { success: true };
+          } else if (data.user && data.user.email_confirmed_at) {
+            // User is already confirmed (rare case)
+            return { success: true };
+          } else {
+            // No user returned, likely email confirmation required
+            set({ isVerificationPending: true, verificationEmail: email });
+            return { success: true };
+          }
         } catch (error) {
           console.error('Unexpected sign up error:', error);
           return { error: 'An unexpected error occurred during sign up' };
@@ -550,6 +577,14 @@ export const useAuthStore = create<AuthStore>()(
     }
   },
 
+  // Set verification pending state
+  setVerificationPending: (pending: boolean, email?: string) => {
+    set({
+      isVerificationPending: pending,
+      verificationEmail: email || null,
+    });
+  },
+
   // Debug method to clear all auth data
   clearAllAuthData: () => {
     console.log('[authStore] Clearing all auth data (debug method)');
@@ -562,6 +597,8 @@ export const useAuthStore = create<AuthStore>()(
       ownerKeyInfo: null,
       licenseInfo: null,
       effectiveLimits: null,
+      isVerificationPending: false,
+      verificationEmail: null,
       _lastFetchedUserId: undefined,
     });
     localStorage.removeItem('kanvas-auth');

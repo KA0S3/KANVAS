@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
 import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Users, Database, Ticket, Bug, Key, LogOut } from "lucide-react";
 import UserManager from "@/components/UserManager";
 import PromoCodeManager from "@/components/PromoCodeManager";
@@ -202,121 +203,138 @@ const OwnerDashboard = () => {
               </div>
             )}
 
-            {/* Dashboard Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* User Manager Section */}
-              <div className="backdrop-blur-md bg-white/10 rounded-2xl border border-white/20 shadow-2xl overflow-hidden">
-                <div className="p-6 border-b border-white/10">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
-                      <Users className="w-5 h-5 text-blue-300" />
-                    </div>
-                    <div>
-                      <h2 className="text-xl font-semibold text-white">User Manager</h2>
-                      <p className="text-white/60 text-sm">Manage user accounts and permissions</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="p-6">
-                  <UserManager />
-                </div>
-              </div>
-
-              {/* Promo Code Manager Section */}
-              <div className="backdrop-blur-md bg-white/10 rounded-2xl border border-white/20 shadow-2xl overflow-hidden">
-                <div className="p-6 border-b border-white/10">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-purple-500/20 rounded-xl flex items-center justify-center">
-                      <Ticket className="w-5 h-5 text-purple-300" />
-                    </div>
-                    <div>
-                      <h2 className="text-xl font-semibold text-white">Promo Codes</h2>
-                      <p className="text-white/60 text-sm">Create and manage promotional codes</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="p-6">
-                  <PromoCodeManager />
-                </div>
-              </div>
-
-              {/* Owner Key Manager Section */}
-              <div className="backdrop-blur-md bg-white/10 rounded-2xl border border-white/20 shadow-2xl overflow-hidden">
-                <div className="p-6 border-b border-white/10">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-cyan-500/20 rounded-xl flex items-center justify-center">
-                      <Key className="w-5 h-5 text-cyan-300" />
-                    </div>
-                    <div>
-                      <h2 className="text-xl font-semibold text-white">Owner Keys</h2>
-                      <p className="text-white/60 text-sm">Manage owner access keys</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="p-6">
-                  <OwnerKeyManager />
-                </div>
-              </div>
-
-              {/* Effective Limits Debug Section */}
-              <div className="backdrop-blur-md bg-white/10 rounded-2xl border border-white/20 shadow-2xl overflow-hidden">
-                <div className="p-6 border-b border-white/10">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-orange-500/20 rounded-xl flex items-center justify-center">
-                      <Bug className="w-5 h-5 text-orange-300" />
-                    </div>
-                    <div>
-                      <h2 className="text-xl font-semibold text-white">Limits Debug</h2>
-                      <p className="text-white/60 text-sm">Debug effective limits and overrides</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="p-6">
-                  <EffectiveLimitsDebug />
-                </div>
-              </div>
-            </div>
-
-            {/* System Overview Section */}
-            <div className="mt-8 backdrop-blur-md bg-white/10 rounded-2xl border border-white/20 shadow-2xl overflow-hidden">
+            {/* Tabbed Dashboard */}
+            <div className="backdrop-blur-md bg-white/10 rounded-2xl border border-white/20 shadow-2xl overflow-hidden">
               <div className="p-6 border-b border-white/10">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center">
-                    <Database className="w-5 h-5 text-emerald-300" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-semibold text-white">System Overview</h2>
-                    <p className="text-white/60 text-sm">System statistics and monitoring</p>
-                  </div>
-                </div>
-              </div>
-              <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="backdrop-blur-md bg-white/5 rounded-xl p-6 border border-white/10">
-                    <div className="text-center">
-                      <div className="text-3xl font-bold text-blue-300 mb-2">
-                        {statsLoading ? '...' : systemStats.totalUsers}
+                <Tabs defaultValue="users" className="w-full">
+                  <TabsList className="grid w-full grid-cols-5 bg-white/5 border border-white/10">
+                    <TabsTrigger value="users" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/70 hover:text-white hover:bg-white/5">
+                      <Users className="w-4 h-4 mr-2" />
+                      Users
+                    </TabsTrigger>
+                    <TabsTrigger value="promo" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/70 hover:text-white hover:bg-white/5">
+                      <Ticket className="w-4 h-4 mr-2" />
+                      Promo Codes
+                    </TabsTrigger>
+                    <TabsTrigger value="keys" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/70 hover:text-white hover:bg-white/5">
+                      <Key className="w-4 h-4 mr-2" />
+                      Owner Keys
+                    </TabsTrigger>
+                    <TabsTrigger value="debug" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/70 hover:text-white hover:bg-white/5">
+                      <Bug className="w-4 h-4 mr-2" />
+                      Limits Debug
+                    </TabsTrigger>
+                    <TabsTrigger value="system" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/70 hover:text-white hover:bg-white/5">
+                      <Database className="w-4 h-4 mr-2" />
+                      System
+                    </TabsTrigger>
+                  </TabsList>
+
+                  {/* User Manager Tab */}
+                  <TabsContent value="users" className="mt-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
+                          <Users className="w-5 h-5 text-blue-300" />
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-semibold text-white">User Manager</h3>
+                          <p className="text-white/60 text-sm">Manage user accounts and permissions</p>
+                        </div>
                       </div>
-                      <div className="text-white/60 text-sm">Total Users</div>
+                      <UserManager />
                     </div>
-                  </div>
-                  <div className="backdrop-blur-md bg-white/5 rounded-xl p-6 border border-white/10">
-                    <div className="text-center">
-                      <div className="text-3xl font-bold text-green-300 mb-2">
-                        {statsLoading ? '...' : `${(systemStats.storageUsed / (1024 * 1024 * 1024)).toFixed(1)}GB`}
+                  </TabsContent>
+
+                  {/* Promo Code Manager Tab */}
+                  <TabsContent value="promo" className="mt-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-10 h-10 bg-purple-500/20 rounded-xl flex items-center justify-center">
+                          <Ticket className="w-5 h-5 text-purple-300" />
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-semibold text-white">Promo Codes</h3>
+                          <p className="text-white/60 text-sm">Create and manage promotional codes</p>
+                        </div>
                       </div>
-                      <div className="text-white/60 text-sm">Storage Used</div>
+                      <PromoCodeManager />
                     </div>
-                  </div>
-                  <div className="backdrop-blur-md bg-white/5 rounded-xl p-6 border border-white/10">
-                    <div className="text-center">
-                      <div className="text-3xl font-bold text-purple-300 mb-2">
-                        {statsLoading ? '...' : systemStats.totalPromoCodes}
+                  </TabsContent>
+
+                  {/* Owner Key Manager Tab */}
+                  <TabsContent value="keys" className="mt-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-10 h-10 bg-cyan-500/20 rounded-xl flex items-center justify-center">
+                          <Key className="w-5 h-5 text-cyan-300" />
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-semibold text-white">Owner Keys</h3>
+                          <p className="text-white/60 text-sm">Manage owner access keys</p>
+                        </div>
                       </div>
-                      <div className="text-white/60 text-sm">Promo Codes</div>
+                      <OwnerKeyManager />
                     </div>
-                  </div>
-                </div>
+                  </TabsContent>
+
+                  {/* Effective Limits Debug Tab */}
+                  <TabsContent value="debug" className="mt-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-10 h-10 bg-orange-500/20 rounded-xl flex items-center justify-center">
+                          <Bug className="w-5 h-5 text-orange-300" />
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-semibold text-white">Limits Debug</h3>
+                          <p className="text-white/60 text-sm">Debug effective limits and overrides</p>
+                        </div>
+                      </div>
+                      <EffectiveLimitsDebug />
+                    </div>
+                  </TabsContent>
+
+                  {/* System Overview Tab */}
+                  <TabsContent value="system" className="mt-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center">
+                          <Database className="w-5 h-5 text-emerald-300" />
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-semibold text-white">System Overview</h3>
+                          <p className="text-white/60 text-sm">System statistics and monitoring</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="backdrop-blur-md bg-white/5 rounded-xl p-6 border border-white/10">
+                          <div className="text-center">
+                            <div className="text-3xl font-bold text-blue-300 mb-2">
+                              {statsLoading ? '...' : systemStats.totalUsers}
+                            </div>
+                            <div className="text-white/60 text-sm">Total Users</div>
+                          </div>
+                        </div>
+                        <div className="backdrop-blur-md bg-white/5 rounded-xl p-6 border border-white/10">
+                          <div className="text-center">
+                            <div className="text-3xl font-bold text-green-300 mb-2">
+                              {statsLoading ? '...' : `${(systemStats.storageUsed / (1024 * 1024 * 1024)).toFixed(1)}GB`}
+                            </div>
+                            <div className="text-white/60 text-sm">Storage Used</div>
+                          </div>
+                        </div>
+                        <div className="backdrop-blur-md bg-white/5 rounded-xl p-6 border border-white/10">
+                          <div className="text-center">
+                            <div className="text-3xl font-bold text-purple-300 mb-2">
+                              {statsLoading ? '...' : systemStats.totalPromoCodes}
+                            </div>
+                            <div className="text-white/60 text-sm">Promo Codes</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </div>
             </div>
           </div>

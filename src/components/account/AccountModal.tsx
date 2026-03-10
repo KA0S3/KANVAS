@@ -26,10 +26,12 @@ import { Progress } from '@/components/ui/progress';
 import { PaymentModal } from '@/components/subscription/PaymentModal';
 import { FeatureTeaserCard } from '@/components/upgrade/FeatureTeaserCard';
 import { UpgradePromptModal } from '@/components/UpgradePromptModal';
+import { CheckEmailView } from '@/components/auth/CheckEmailView';
 import { useAuthStore } from '@/stores/authStore';
 import { useCloudStore } from '@/stores/cloudStore';
 import { formatBytes } from '@/lib/utils';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabaseClient';
 
 interface AccountModalProps {
   isOpen: boolean;
@@ -76,7 +78,10 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
     signUp, 
     signOut,
     initializeAuth,
-    refreshUserData 
+    refreshUserData,
+    isVerificationPending,
+    verificationEmail,
+    setVerificationPending
   } = useAuthStore();
 
   const { quota } = useCloudStore();
@@ -160,6 +165,41 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleResendVerification = async () => {
+    if (!verificationEmail) return;
+    
+    setIsSubmitting(true);
+    setAuthError(null);
+    
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: verificationEmail,
+        options: {
+          emailRedirectTo: `${import.meta.env.VITE_APP_URL || window.location.origin}/auth/confirm`,
+        }
+      });
+
+      if (error) {
+        setAuthError(error.message);
+        toast.error(error.message);
+      } else {
+        toast.success('Verification email resent! Please check your inbox.');
+      }
+    } catch (error) {
+      const errorMessage = 'Failed to resend verification email';
+      setAuthError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleBackToLogin = () => {
+    setVerificationPending(false, undefined);
+    setMode('login');
   };
 
   const handleLogout = async () => {
@@ -325,7 +365,20 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
                   </div>
                 )}
 
-                {mode === 'login' ? (
+                {isVerificationPending ? (
+                  // Show verification pending view
+                  <CardContent className="p-6">
+                    <CheckEmailView
+                      email={verificationEmail}
+                      onResend={handleResendVerification}
+                      isResending={isSubmitting}
+                      onBackToLogin={handleBackToLogin}
+                    />
+                  </CardContent>
+                ) : (
+                  // Show login/signup forms
+                  <>
+                    {mode === 'login' ? (
                   // Login Form
                   <Form {...loginForm}>
                     <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
@@ -471,6 +524,8 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
                     </form>
                   </Form>
                 )}
+                </>
+              )}
               </CardContent>
             </Card>
           ) : (

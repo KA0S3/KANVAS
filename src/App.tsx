@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import OwnerDashboard from "./pages/OwnerDashboard";
+import AuthConfirm from "./pages/AuthConfirm";
 import NotFound from "./pages/NotFound";
 import "@/utils/debugAuth"; // Import debug utilities
 
@@ -18,6 +19,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/auth/confirm" element={<AuthConfirm />} />
           <Route path="/owner" element={<OwnerDashboard />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

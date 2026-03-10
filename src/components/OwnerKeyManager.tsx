@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -15,7 +16,8 @@ import {
   AlertTriangle,
   CheckCircle,
   XCircle,
-  Trash2
+  Trash2,
+  Plus
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -52,6 +54,22 @@ const OwnerKeyManager = () => {
   const [revokeReason, setRevokeReason] = useState('');
   const [selectedKeyId, setSelectedKeyId] = useState<string | null>(null);
   const [showRevokeDialog, setShowRevokeDialog] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [createdToken, setCreatedToken] = useState<string | null>(null);
+  const [createLoading, setCreateLoading] = useState(false);
+  
+  // Form state for creating new key
+  const [newKey, setNewKey] = useState({
+    keyName: '',
+    userEmail: '',
+    scopes: {
+      ads: false,
+      max_storage_bytes: 1073741824, // 1GB default
+      max_books: 10,
+      import_export: true
+    },
+    expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // 1 year from now
+  });
 
   const fetchOwnerKeys = async () => {
     try {
@@ -129,6 +147,63 @@ const OwnerKeyManager = () => {
     }
   };
 
+  const handleCreateKey = async () => {
+    try {
+      setCreateLoading(true);
+      setError(null);
+      setSuccess(null);
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        setError('Authentication required');
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-owner-key`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify(newKey),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
+
+      const result = await response.json();
+      setCreatedToken(result.token);
+      setSuccess('Owner key created successfully! Save the token below - it will only be shown once.');
+      setShowCreateDialog(false);
+      
+      // Reset form
+      setNewKey({
+        keyName: '',
+        userEmail: '',
+        scopes: {
+          ads: false,
+          max_storage_bytes: 1073741824,
+          max_books: 10,
+          import_export: true
+        },
+        expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      });
+      
+      await fetchOwnerKeys();
+    } catch (err) {
+      console.error('Error creating owner key:', err);
+      setError(err instanceof Error ? err.message : 'Failed to create owner key');
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchOwnerKeys();
   }, []);
@@ -183,10 +258,22 @@ const OwnerKeyManager = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
+            {/* Create New Key Button */}
+            <div className="flex justify-end">
+              <Button
+                onClick={() => setShowCreateDialog(true)}
+                className="flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Create Owner Key
+              </Button>
+            </div>
+            
             {ownerKeys.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Key className="h-12 w-12 mx-auto mb-4 opacity-50" />
                 <p>No owner keys found</p>
+                <p className="text-sm mt-2">Create your first owner key to get started</p>
               </div>
             ) : (
               ownerKeys.map((key) => (
@@ -324,6 +411,182 @@ const OwnerKeyManager = () => {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Create Owner Key Dialog */}
+      {showCreateDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Plus className="h-5 w-5" />
+                Create Owner Key
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="keyName">Key Name</Label>
+                  <Input
+                    id="keyName"
+                    placeholder="e.g., Admin Key, Test Key"
+                    value={newKey.keyName}
+                    onChange={(e) => setNewKey({ ...newKey, keyName: e.target.value })}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="userEmail">User Email</Label>
+                  <Input
+                    id="userEmail"
+                    type="email"
+                    placeholder="user@example.com"
+                    value={newKey.userEmail}
+                    onChange={(e) => setNewKey({ ...newKey, userEmail: e.target.value })}
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="expiresAt">Expiration Date</Label>
+                <Input
+                  id="expiresAt"
+                  type="date"
+                  value={newKey.expiresAt}
+                  onChange={(e) => setNewKey({ ...newKey, expiresAt: e.target.value })}
+                  min={new Date().toISOString().split('T')[0]}
+                />
+              </div>
+              
+              <div className="space-y-3">
+                <Label>Scopes & Permissions</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={newKey.scopes.ads}
+                        onChange={(e) => setNewKey({ 
+                          ...newKey, 
+                          scopes: { ...newKey.scopes, ads: e.target.checked } 
+                        })}
+                      />
+                      Show Ads
+                    </Label>
+                    
+                    <Label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={newKey.scopes.import_export}
+                        onChange={(e) => setNewKey({ 
+                          ...newKey, 
+                          scopes: { ...newKey.scopes, import_export: e.target.checked } 
+                        })}
+                      />
+                      Import/Export Access
+                    </Label>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div>
+                      <Label htmlFor="maxStorage">Max Storage (MB)</Label>
+                      <Input
+                        id="maxStorage"
+                        type="number"
+                        value={Math.round(newKey.scopes.max_storage_bytes! / (1024 * 1024))}
+                        onChange={(e) => setNewKey({ 
+                          ...newKey, 
+                          scopes: { 
+                            ...newKey.scopes, 
+                            max_storage_bytes: parseInt(e.target.value) * 1024 * 1024 
+                          } 
+                        })}
+                        min="0"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="maxBooks">Max Books</Label>
+                      <Input
+                        id="maxBooks"
+                        type="number"
+                        value={newKey.scopes.max_books}
+                        onChange={(e) => setNewKey({ 
+                          ...newKey, 
+                          scopes: { ...newKey.scopes, max_books: parseInt(e.target.value) } 
+                        })}
+                        min="0"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowCreateDialog(false);
+                    setNewKey({
+                      keyName: '',
+                      userEmail: '',
+                      scopes: {
+                        ads: false,
+                        max_storage_bytes: 1073741824,
+                        max_books: 10,
+                        import_export: true
+                      },
+                      expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+                    });
+                  }}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreateKey}
+                  disabled={createLoading || !newKey.keyName || !newKey.userEmail}
+                  className="flex-1"
+                >
+                  {createLoading ? 'Creating...' : 'Create Key'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Created Token Display */}
+      {createdToken && (
+        <Alert>
+          <CheckCircle className="h-4 w-4" />
+          <AlertDescription>
+            <div className="space-y-2">
+              <p className="font-medium">Owner key created! Save this token - it will only be shown once:</p>
+              <div className="bg-muted p-3 rounded-md">
+                <code className="text-xs break-all">{createdToken}</code>
+              </div>
+              <div className="flex gap-2 mt-2">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(createdToken);
+                    setSuccess('Token copied to clipboard!');
+                  }}
+                >
+                  Copy Token
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setCreatedToken(null)}
+                >
+                  Hide Token
+                </Button>
+              </div>
+            </div>
+          </AlertDescription>
+        </Alert>
       )}
     </div>
   );
