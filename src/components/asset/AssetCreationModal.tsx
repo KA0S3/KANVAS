@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X, Save, Upload, Settings, Droplets, Eye, EyeOff, Globe, Lock, Plus, Trash2, Cloud, AlertCircle } from 'lucide-react';
 import { useAssetCreation } from '@/hooks/useAssetCreation';
 import { useTagStore } from '@/stores/tagStore';
 import { useCloudStore } from '@/stores/cloudStore';
 import { useAuthStore } from '@/stores/authStore';
+import { useAssetStore } from '@/stores/assetStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -29,6 +30,7 @@ import { Slider } from '@/components/ui/slider';
 import { CustomFieldsManager } from './CustomFieldsManager';
 import { ViewportDisplaySettingsManager } from './ViewportDisplaySettingsManager';
 import { UpgradePromptModal } from '@/components/UpgradePromptModal';
+import { calculateViewportCenterPosition, calculateChildAssetCenterPosition } from '@/utils/coordinateUtils';
 import type { Asset } from '@/components/AssetItem';
 import type { CustomField, CustomFieldValue, ViewportDisplaySettings } from '@/types/extendedAsset';
 import { GeneratorParser, EXAMPLE_GENERATOR_DATA } from '@/services/generatorParser';
@@ -52,33 +54,53 @@ interface AssetCreationModalProps {
   parentId?: string;
   generatorImportData?: any;
   projectId?: string;
+  viewportSize?: { width: number; height: number };
 }
 
-export function AssetCreationModal({ isOpen, onClose, initialData, parentId, generatorImportData, projectId }: AssetCreationModalProps) {
+export function AssetCreationModal({ isOpen, onClose, initialData, parentId, generatorImportData, projectId, viewportSize }: AssetCreationModalProps) {
   const { createNewAsset, upgradeModal, closeUpgradeModal, canUploadToCloud, isOverQuota } = useAssetCreation();
   const { tags } = useTagStore();
   const { syncEnabled } = useCloudStore();
   const { isAuthenticated, plan } = useAuthStore();
+  const { assets } = useAssetStore();
+  
+  // Calculate the correct position based on whether this is a child asset or root asset
+  const getCalculatedPosition = useCallback(() => {
+    if (initialData?.x !== undefined && initialData?.y !== undefined) {
+      return { x: initialData.x, y: initialData.y };
+    }
+    
+    // Always center assets in the middle of the visible screen, regardless of nesting level
+    const viewportWidth = viewportSize?.width || 800;
+    const viewportHeight = viewportSize?.height || 600;
+    console.log('🎯 AssetCreationModal: Using screen dimensions:', { viewportWidth, viewportHeight });
+    const centerPosition = calculateViewportCenterPosition(viewportWidth, viewportHeight, 200, 150);
+    console.log('🎯 AssetCreationModal: Calculated screen center position:', centerPosition);
+    return centerPosition;
+  }, [initialData, viewportSize]);
   
   // Local form state
-  const [formData, setFormData] = useState({
-    name: initialData?.name || 'New Asset',
-    type: initialData?.type || 'other' as 'image' | 'document' | 'video' | 'audio' | 'code' | 'other',
-    x: initialData?.x || 100,
-    y: initialData?.y || 100,
-    width: initialData?.width || 200,
-    height: initialData?.height || 150,
-    description: initialData?.description || '',
-    tags: initialData?.tags || [],
-    thumbnail: '',
-    customFields: initialData?.customFields || [],
-    customFieldValues: initialData?.customFieldValues || [],
-    viewportDisplaySettings: initialData?.viewportDisplaySettings || {
-      name: true,
-      description: false,
-      thumbnail: true,
-      portraitBlur: 0,
-    },
+  const [formData, setFormData] = useState(() => {
+    const calculatedPosition = getCalculatedPosition();
+    return {
+      name: initialData?.name || 'New Asset',
+      type: initialData?.type || 'other' as 'image' | 'document' | 'video' | 'audio' | 'code' | 'other',
+      x: calculatedPosition.x,
+      y: calculatedPosition.y,
+      width: initialData?.width || 200,
+      height: initialData?.height || 150,
+      description: initialData?.description || '',
+      tags: initialData?.tags || [],
+      thumbnail: '',
+      customFields: initialData?.customFields || [],
+      customFieldValues: initialData?.customFieldValues || [],
+      viewportDisplaySettings: initialData?.viewportDisplaySettings || {
+        name: true,
+        description: false,
+        thumbnail: true,
+        portraitBlur: 0,
+      },
+    };
   });
 
   const [mode, setMode] = useState<'asset' | 'note'>('asset');
@@ -104,6 +126,16 @@ export function AssetCreationModal({ isOpen, onClose, initialData, parentId, gen
       }
     }
   }, [generatorImportData]);
+
+  // Update position when parentId or assets change (but not on every render)
+  useEffect(() => {
+    const calculatedPosition = getCalculatedPosition();
+    setFormData(prev => ({
+      ...prev,
+      x: calculatedPosition.x,
+      y: calculatedPosition.y,
+    }));
+  }, [parentId, assets]); // Only depend on parentId and assets, not on getCalculatedPosition itself
 
   const [isCreating, setIsCreating] = useState(false);
   const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] = useState(false);
@@ -185,11 +217,15 @@ export function AssetCreationModal({ isOpen, onClose, initialData, parentId, gen
   const handleClose = () => {
     setSelectedFile(null);
     setUploadStatus('idle');
+    
+    // Recalculate position for the next time the modal opens
+    const resetPosition = getCalculatedPosition();
+    
     setFormData({
       name: initialData?.name || 'New Asset',
       type: initialData?.type || 'other' as 'image' | 'document' | 'video' | 'audio' | 'code' | 'other',
-      x: initialData?.x || 100,
-      y: initialData?.y || 100,
+      x: resetPosition.x,
+      y: resetPosition.y,
       width: initialData?.width || 200,
       height: initialData?.height || 150,
       description: initialData?.description || '',

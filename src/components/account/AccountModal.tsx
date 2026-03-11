@@ -202,6 +202,20 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
     setMode('login');
   };
 
+  const handleSignUpFromError = () => {
+    // Get the current email from login form
+    const currentEmail = loginForm.getValues('email');
+    
+    // Set the email in sign up form
+    signUpForm.setValue('email', currentEmail);
+    
+    // Switch to signup mode
+    setMode('signup');
+    
+    // Clear the auth error
+    setAuthError(null);
+  };
+
   const handleLogout = async () => {
     setIsSubmitting(true);
     setAuthError(null);
@@ -360,8 +374,26 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
               <CardContent className="space-y-4">
                 {/* Display auth error */}
                 {authError && (
-                  <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-sm text-destructive">
-                    {authError}
+                  <div className="space-y-3">
+                    <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-sm text-destructive">
+                      {authError}
+                    </div>
+                    
+                    {/* Show Sign Up button for invalid credentials error */}
+                    {authError.includes('Invalid login credentials') && (
+                      <div className="flex flex-col items-center space-y-2">
+                        <p className="text-sm text-muted-foreground text-center">
+                          Don't have an account yet?
+                        </p>
+                        <Button
+                          onClick={handleSignUpFromError}
+                          variant="outline"
+                          className="w-full"
+                        >
+                          Sign Up with this email
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
 

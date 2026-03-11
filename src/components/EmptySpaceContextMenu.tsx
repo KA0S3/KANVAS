@@ -10,6 +10,7 @@ import { useAssetStore } from '@/stores/assetStore';
 import { useBackgroundStore } from '@/stores/backgroundStore';
 import { useBookStore } from '@/stores/bookStoreSimple';
 import { getAssetKeyWithBook } from '@/stores/backgroundStore';
+import { calculateViewportCenterPosition } from '@/utils/coordinateUtils';
 import type { BackgroundConfig } from '@/types/background';
 
 interface EmptySpaceContextMenuProps {
@@ -19,6 +20,7 @@ interface EmptySpaceContextMenuProps {
   onOpenSettings: () => void;
   onOpenBackgroundSettings: () => void;
   onOpenAssetModal: (initialData?: any) => void;
+  viewportSize?: { width: number; height: number };
 }
 
 export const EmptySpaceContextMenu: React.FC<EmptySpaceContextMenuProps> = ({
@@ -28,6 +30,7 @@ export const EmptySpaceContextMenu: React.FC<EmptySpaceContextMenuProps> = ({
   onOpenSettings,
   onOpenBackgroundSettings,
   onOpenAssetModal,
+  viewportSize,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const { setIsEditingBackground } = useAssetStore();
@@ -92,18 +95,25 @@ export const EmptySpaceContextMenu: React.FC<EmptySpaceContextMenuProps> = ({
   }, [onClose]);
 
   const openCreateAssetModal = useCallback(() => {
-    console.log('🎯 Opening create modal');
+    console.log('🎯 EmptySpaceContextMenu: Opening create modal');
+    
+    // Always center assets in the middle of the visible screen
+    const viewportWidth = viewportSize?.width || 800;
+    const viewportHeight = viewportSize?.height || 600;
+    console.log('🎯 EmptySpaceContextMenu: Using screen dimensions:', { viewportWidth, viewportHeight });
+    const centerPosition = calculateViewportCenterPosition(viewportWidth, viewportHeight, 200, 150);
+    console.log('🎯 EmptySpaceContextMenu: Calculated screen center position:', centerPosition);
     
     // ONLY open the modal - do NOT create any assets
     onOpenAssetModal({
       name: 'New Asset',
       type: 'other',
-      x: position.x,
-      y: position.y,
+      x: centerPosition.x,
+      y: centerPosition.y,
       width: 200,
       height: 150,
     });
-  }, [onOpenAssetModal, enteredAssetId]);
+  }, [onOpenAssetModal, viewportSize]);
 
   const handleCreateAsset = (e: React.MouseEvent) => {
     console.log('🟢 EmptySpaceContextMenu handleCreateAsset called');

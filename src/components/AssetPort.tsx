@@ -22,6 +22,7 @@ import {
   screenToViewportCoords,
   getDefaultViewportConfig,
   calculateCenterTransform,
+  calculateViewportCenterPosition,
   type ViewportConfig 
 } from "@/utils/coordinateUtils";
 import { getBackgroundColor, shouldShowParchmentOverlay, shouldShowGlassEffect } from "@/utils/backgroundUtils";
@@ -43,7 +44,6 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
   const [isTouchDragging, setIsTouchDragging] = useState(false);
   const [touchStartDistance, setTouchStartDistance] = useState(0);
   const [lastTouchDistance, setLastTouchDistance] = useState(0);
-  const [currentViewport, setCurrentViewport] = useState<ViewportConfig>(getDefaultViewportConfig());
   const [enteredAssetId, setEnteredAssetId] = useState<string | null>(null);
   const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
   const [viewportSize, setViewportSize] = useState({ width: 800, height: 600 });
@@ -116,6 +116,28 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
   const { user, plan, isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
   
+  // Calculate effective viewport size based on current context
+  const getEffectiveViewportSize = useCallback(() => {
+    if (enteredAssetId && assets && assets[enteredAssetId]) {
+      // When inside a nested asset, use the parent asset's dimensions as the viewport
+      const parentAsset = assets[enteredAssetId];
+      return {
+        width: parentAsset.width || 800,
+        height: parentAsset.height || 600
+      };
+    }
+    // When at root level, use the actual container dimensions
+    return viewportSize;
+  }, [enteredAssetId, assets, viewportSize]);
+
+  const effectiveViewportSize = getEffectiveViewportSize();
+  
+  // Log effective viewport size changes for debugging
+  useEffect(() => {
+    console.log('🎯 AssetPort: Effective viewport size changed:', effectiveViewportSize);
+    console.log('🎯 AssetPort: Currently in asset:', enteredAssetId || 'root');
+  }, [effectiveViewportSize, enteredAssetId]);
+  
   // Get book-specific viewport settings, falling back to defaults if no book is selected
   const currentBook = getCurrentBook();
   const bookWorldData = currentBook ? getWorldData(currentBook.id) : null;
@@ -162,24 +184,28 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
   const openCreateAssetModal = useCallback(() => {
     console.log('🎯 Opening create modal');
     
-    // Calculate random position within the container
-    const containerRect = containerRef.current?.getBoundingClientRect();
-    const randomX = 50 + Math.random() * ((containerRect?.width || 400) - 250);
-    const randomY = 80 + Math.random() * ((containerRect?.height || 300) - 150);
+    // Always center assets in the middle of the visible screen
+    const centerPosition = calculateViewportCenterPosition(
+      viewportSize.width,
+      viewportSize.height,
+      200, // default asset width
+      150  // default asset height
+    );
     
-    console.log('AssetPort: Opening asset modal at position:', randomX, randomY);
+    console.log('AssetPort: Opening asset modal at screen center:', centerPosition.x, centerPosition.y);
+    console.log('AssetPort: Using screen viewport size:', viewportSize);
     
     // ONLY open the modal - do NOT create any assets
     setModalInitialData({
       name: 'New Asset',
       type: 'other',
-      x: randomX,
-      y: randomY,
+      x: centerPosition.x,
+      y: centerPosition.y,
       width: 200,
       height: 150,
     });
     setIsModalOpen(true);
-  }, [currentActiveId]);
+  }, [viewportSize]);
 
   const handleCreateAssetClick = (e: React.MouseEvent) => {
     console.log('🔵 AssetPort handleCreateAssetClick called');
@@ -219,20 +245,10 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
   }, []);
 
   const handleAssetDoubleClick = useCallback((asset: Asset) => {
-    // Enter the asset by setting it as the active asset and updating viewport
+    // Enter the asset by setting it as the active asset
     setActiveAsset(asset.id);
     setEnteredAssetId(asset.id);
     setCurrentViewportId(asset.id); // Update current viewport context in store
-    
-    // Calculate viewport to center the asset
-    if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const centerTransform = calculateCenterTransform(asset, rect.width, rect.height);
-      
-      // Use asset's custom viewport config if available, otherwise use calculated center
-      const newViewport = asset.viewportConfig || centerTransform;
-      setCurrentViewport(newViewport);
-    }
   }, [setActiveAsset, setCurrentViewportId]);
 
   // Listen for navigation events from sidebar
@@ -270,7 +286,6 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
     setEnteredAssetId(null);
     setActiveAsset(null);
     setCurrentViewportId(null); // Clear current viewport context in store
-    setCurrentViewport(getDefaultViewportConfig());
   }, [setActiveAsset, setCurrentViewportId]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent, asset: Asset) => {
@@ -314,35 +329,13 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
     const screenX = touch.clientX - containerRect.left - dragOffset.x;
     const screenY = touch.clientY - containerRect.top - dragOffset.y;
     
-    // Convert screen coordinates to viewport coordinates
-    const viewportCoords = screenToViewportCoords(
-      { x: screenX, y: screenY },
-      currentViewport
-    );
+    // Keep within bounds of container
+    const boundedX = Math.max(0, Math.min(screenX, containerRect.width - 200));
+    const boundedY = Math.max(0, Math.min(screenY, containerRect.height - 50));
     
-    // Keep within bounds (in viewport space)
-    const boundedX = Math.max(0, Math.min(viewportCoords.x, containerRect.width - 200));
-    const boundedY = Math.max(0, Math.min(viewportCoords.y, containerRect.height - 50));
-    
-    // Convert to global coordinates if we're inside an asset
-    let finalX = boundedX;
-    let finalY = boundedY;
-    
-    if (enteredAssetId && assets && assets[enteredAssetId]) {
-      const parentAsset = assets[enteredAssetId];
-      // Convert from local (viewport) to global coordinates
-      const globalCoords = localToGlobalCoords(
-        { x: boundedX, y: boundedY },
-        parentAsset,
-        currentViewport
-      );
-      finalX = globalCoords.x;
-      finalY = globalCoords.y;
-    }
-    
-    // Update asset position in store
-    updateAssetPosition(selectedAsset, finalX, finalY);
-  }, [isTouchDragging, selectedAsset, dragOffset, updateAssetPosition, enteredAssetId, assets, currentViewport]);
+    // Update asset position directly
+    updateAssetPosition(selectedAsset, boundedX, boundedY);
+  }, [isTouchDragging, selectedAsset, dragOffset, updateAssetPosition]);
 
   const handleTouchEnd = useCallback(() => {
     setIsTouchDragging(false);
@@ -355,35 +348,13 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
     const screenX = e.clientX - containerRect.left - dragOffset.x;
     const screenY = e.clientY - containerRect.top - dragOffset.y;
     
-    // Convert screen coordinates to viewport coordinates
-    const viewportCoords = screenToViewportCoords(
-      { x: screenX, y: screenY },
-      currentViewport
-    );
+    // Keep within bounds of container
+    const boundedX = Math.max(0, Math.min(screenX, containerRect.width - 200));
+    const boundedY = Math.max(0, Math.min(screenY, containerRect.height - 50));
     
-    // Keep within bounds (in viewport space)
-    const boundedX = Math.max(0, Math.min(viewportCoords.x, containerRect.width - 200));
-    const boundedY = Math.max(0, Math.min(viewportCoords.y, containerRect.height - 50));
-    
-    // Convert to global coordinates if we're inside an asset
-    let finalX = boundedX;
-    let finalY = boundedY;
-    
-    if (enteredAssetId && assets && assets[enteredAssetId]) {
-      const parentAsset = assets[enteredAssetId];
-      // Convert from local (viewport) to global coordinates
-      const globalCoords = localToGlobalCoords(
-        { x: boundedX, y: boundedY },
-        parentAsset,
-        currentViewport
-      );
-      finalX = globalCoords.x;
-      finalY = globalCoords.y;
-    }
-    
-    // Update asset position in store
-    updateAssetPosition(selectedAsset, finalX, finalY);
-  }, [isDragging, selectedAsset, dragOffset, updateAssetPosition, enteredAssetId, assets, currentViewport]);
+    // Update asset position directly
+    updateAssetPosition(selectedAsset, boundedX, boundedY);
+  }, [isDragging, selectedAsset, dragOffset, updateAssetPosition]);
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
@@ -862,18 +833,10 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
           </div>
         )}
 
-        {/* Viewport transform container */}
-        <div
-          className="viewport-container"
-          style={{
-            transform: `scale(${currentViewport.zoom * bookViewportScale}) translate(${currentViewport.panX + bookViewportOffset.x}px, ${currentViewport.panY + bookViewportOffset.y}px)`,
-            transformOrigin: '0 0',
-            width: '100%',
-            height: '100%',
-          }}
-        >
+        {/* Simple container without transforms */}
+        <div className="viewport-container" style={{ width: '100%', height: '100%', position: 'relative' }}>
          {displayAssets.length === 0 ? (
-          <div className="viewport-container flex flex-col items-center justify-center text-muted-foreground" style={{ height: '100%' }}>
+          <div className="flex flex-col items-center justify-center text-muted-foreground" style={{ height: '100%' }}>
              <Sparkles className="w-8 h-8 mb-2 opacity-50" />
              <p className="text-sm">
                {enteredAssetId ? 'No child assets' : 'No assets yet'}
@@ -887,22 +850,13 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
            </div>
          ) : (
           displayAssets.map((asset) => {
-            // Convert asset position to local coordinates if we're inside a parent
+            // When inside a parent asset, position relative to parent's bounds
             let displayAsset = { ...asset };
             
             if (enteredAssetId && assets && assets[enteredAssetId]) {
               const parentAsset = assets[enteredAssetId];
-              // Convert from global to local coordinates
-              const localCoords = globalToLocalCoords(
-                { x: asset.x, y: asset.y },
-                parentAsset,
-                currentViewport
-              );
-              displayAsset = {
-                ...asset,
-                x: localCoords.x,
-                y: localCoords.y,
-              };
+              // For nested assets, just use the stored coordinates as-is since we're not using transforms
+              displayAsset = asset;
             }
             
             return (
@@ -938,6 +892,7 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
             setModalInitialData(initialData);
             setIsModalOpen(true);
           }}
+          viewportSize={viewportSize}
         />
       )}
 
@@ -963,8 +918,9 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
           setGeneratorImportData(null);
         }}
         initialData={modalInitialData}
-        parentId={currentActiveId || undefined}
+        parentId={enteredAssetId || undefined}
         generatorImportData={generatorImportData}
+        viewportSize={viewportSize}
       />
 
       {/* Asset Edit Modal */}

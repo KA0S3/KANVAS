@@ -12,6 +12,37 @@ export interface Point {
 }
 
 /**
+ * Calculate the perfect center position for an asset in the viewport
+ * This ensures assets are always placed at the center regardless of viewport size
+ */
+export function calculateViewportCenterPosition(
+  viewportWidth: number = 800,
+  viewportHeight: number = 600,
+  assetWidth: number = 200,
+  assetHeight: number = 150
+): Point {
+  const centerX = viewportWidth / 2 - assetWidth / 2;
+  const centerY = viewportHeight / 2 - assetHeight / 2;
+  
+  return { x: centerX, y: centerY };
+}
+
+/**
+ * Calculate the center position for a child asset within its parent asset
+ * This ensures child assets are centered within their parent's bounds
+ */
+export function calculateChildAssetCenterPosition(
+  parentAsset: Asset,
+  childAssetWidth: number = 200,
+  childAssetHeight: number = 150
+): Point {
+  const centerX = (parentAsset.width || 200) / 2 - childAssetWidth / 2;
+  const centerY = (parentAsset.height || 150) / 2 - childAssetHeight / 2;
+  
+  return { x: centerX, y: centerY };
+}
+
+/**
  * Convert global canvas coordinates to local asset coordinates
  * This ensures child assets are positioned relative to their parent's (0,0) point
  */

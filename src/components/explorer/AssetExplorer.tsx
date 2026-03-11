@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { AssetCreationModal } from '@/components/asset/AssetCreationModal';
 import { SettingsPanel } from '@/components/settings/SettingsPanel';
 import { AccountModal } from '@/components/account/AccountModal';
+import { calculateViewportCenterPosition } from '@/utils/coordinateUtils';
 import type { Asset } from '@/components/AssetItem';
 import {
   DndContext,
@@ -226,12 +227,15 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
   const openCreateAssetModal = useCallback(() => {
     console.log('🎯 Opening create modal');
     
+    // Calculate viewport center position
+    const centerPosition = calculateViewportCenterPosition(800, 600, 200, 150);
+    
     // ONLY open the modal - do NOT create any assets
     setModalInitialData({
       name: 'New Asset',
       type: 'other',
-      x: 100,
-      y: 100,
+      x: centerPosition.x,
+      y: centerPosition.y,
       width: 200,
       height: 150,
     });
@@ -246,12 +250,15 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
   };
 
   const handleCreateAssetForTree = useCallback((options: { name: string; parentId?: string }) => {
+    // Calculate viewport center position
+    const centerPosition = calculateViewportCenterPosition(800, 600, 200, 150);
+    
     // Open modal with pre-filled data
     setModalInitialData({
       name: options.name,
       type: 'other',
-      x: 0,
-      y: 0,
+      x: centerPosition.x,
+      y: centerPosition.y,
       width: 200,
       height: 150,
       customFields: [],

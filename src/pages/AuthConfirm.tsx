@@ -23,6 +23,9 @@ export default function AuthConfirm() {
     message: 'Verifying your account...',
   })
   const [redirectCountdown, setRedirectCountdown] = useState(5)
+  
+  // Get redirectTo parameter from URL, fallback to '/'
+  const redirectTo = searchParams.get('redirectTo') || '/'
 
   const { setVerificationPending } = useAuthStore()
 
@@ -107,7 +110,7 @@ export default function AuthConfirm() {
         setRedirectCountdown((prev) => {
           if (prev <= 1) {
             clearInterval(timer)
-            navigate('/')
+            navigate(redirectTo)
             return 0
           }
           return prev - 1
@@ -119,7 +122,7 @@ export default function AuthConfirm() {
   }, [confirmationData.status, confirmationData.shouldRedirect, navigate])
 
   const handleManualRedirect = () => {
-    navigate('/')
+    navigate(redirectTo)
   }
 
   const handleRetrySignup = () => {

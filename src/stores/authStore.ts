@@ -211,7 +211,7 @@ export const useAuthStore = create<AuthStore>()(
             email,
             password,
             options: {
-              emailRedirectTo: `${import.meta.env.VITE_APP_URL || window.location.origin}/auth/confirm`,
+              emailRedirectTo: `${import.meta.env.VITE_APP_URL || window.location.origin}/auth/confirm?redirectTo=${import.meta.env.VITE_APP_URL || window.location.origin}`,
             }
           });
 
