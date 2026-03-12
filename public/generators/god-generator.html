@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Forge of Gods v0.9. - Pantheon & Deity Manager</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
         /* --- Font Import --- */
@@ -155,6 +156,30 @@
         .saved-festival-item .button-group .btn { padding: 4px 8px; font-size: 0.8em; }
 
 
+        /* --- Notification Banner --- */
+        .notification-banner {
+            background: linear-gradient(135deg, rgba(255, 193, 7, 0.15) 0%, rgba(255, 193, 7, 0.08) 100%);
+            border: 1px solid rgba(255, 193, 7, 0.3);
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 0.85rem;
+            color: #ffc107;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 10px rgba(255, 193, 7, 0.1);
+            margin-bottom: 15px;
+        }
+        .notification-banner i {
+            font-size: 1rem;
+            opacity: 0.8;
+        }
+        .notification-banner strong {
+            color: #fff;
+            font-weight: 600;
+        }
+
         /* --- Print / PDF Export Styles --- */
         .print-only { display: none; }
         @media print {
@@ -180,6 +205,9 @@
 <body>
     <div class="header no-print">
         <h1>THE FORGE OF GODS</h1>
+        <div class="notification-banner">
+            <i class="fas fa-info-circle"></i> <strong>Note:</strong> Save/Load buttons use browser localStorage only. To save deities to the cloud, use the "Import to Canvas" button to add them as assets in your KANVAS project.
+        </div>
         <div class="tabs">
             <button class="tab-button active deity" data-tab="deity-anvil">DEITY ANVIL</button>
             <button class="tab-button pantheon" data-tab="pantheon-forge">PANTHEON FORGE</button>
@@ -192,7 +220,7 @@
     <div id="deity-anvil" class="tab-content active">
         <div class="card">
             <h2 style="color:var(--accent-color-deity); border-bottom: 1px solid var(--accent-color-deity); text-shadow: var(--accent-glow-deity);">
-                <span>Deity Details</span>
+                <span id="deity-details-title" style="cursor: pointer; transition: all 0.2s ease;" onclick="generateRandomDeity()" title="Generate a new random deity's details">New God</span>
                 <span class="random-all-btn" id="randomize-all-btn" title="Generate a new random deity's details">🎲</span>
             </h2>
             <form id="deity-form" style="display: flex; flex-direction: column; flex-grow: 1;">

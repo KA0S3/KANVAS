@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, User, Users, Building, Sparkles, Swords } from 'lucide-react';
+import { Settings, User, Users, Building, Sparkles, Swords, Wand2 } from 'lucide-react';
 import { useBookStore } from '@/stores/bookStoreSimple';
 import { useThemeStore } from '@/stores/themeStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -42,7 +42,7 @@ const BookShelf: React.FC<BookShelfProps> = ({
   const [generatorsOpen, setGeneratorsOpen] = useState(false);
 
   const openGenerator = (generator: string) => {
-    window.open(`/generators/${generator}.html`, '_blank', 'width=1200,height=800');
+    window.open(`/generators/${generator}.html`, '_blank', 'noopener,noreferrer');
   };
 
   // Close dropdown when clicking outside
@@ -234,18 +234,18 @@ const BookShelf: React.FC<BookShelfProps> = ({
                 `}
                 title="Generators"
               >
-                <Sparkles className="w-4 h-4" />
+                <Wand2 className="w-4 h-4" />
               </button>
               
               {generatorsOpen && (
                 <div className="absolute top-full mt-1 right-0 z-50 min-w-[160px] bg-sidebar border border-sidebar-border rounded-md shadow-lg overflow-hidden">
-                  <div className="py-1">
+                  <div>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         openGenerator('character-generator');
                       }}
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-sidebar-accent/40 flex items-center gap-2 transition-colors"
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-sidebar-accent/40 flex items-center gap-2 transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
                     >
                       <Users className="w-4 h-4" />
                       <span>Characters</span>
@@ -255,7 +255,7 @@ const BookShelf: React.FC<BookShelfProps> = ({
                         e.stopPropagation();
                         openGenerator('city-generator');
                       }}
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-sidebar-accent/40 flex items-center gap-2 transition-colors"
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-sidebar-accent/40 flex items-center gap-2 transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
                     >
                       <Building className="w-4 h-4" />
                       <span>Cities</span>
@@ -265,7 +265,7 @@ const BookShelf: React.FC<BookShelfProps> = ({
                         e.stopPropagation();
                         openGenerator('god-generator');
                       }}
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-sidebar-accent/40 flex items-center gap-2 transition-colors"
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-sidebar-accent/40 flex items-center gap-2 transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
                     >
                       <Sparkles className="w-4 h-4" />
                       <span>Gods</span>
@@ -275,7 +275,7 @@ const BookShelf: React.FC<BookShelfProps> = ({
                         e.stopPropagation();
                         openGenerator('battle-manager');
                       }}
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-sidebar-accent/40 flex items-center gap-2 transition-colors"
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-sidebar-accent/40 flex items-center gap-2 transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
                     >
                       <Swords className="w-4 h-4" />
                       <span>Battles</span>

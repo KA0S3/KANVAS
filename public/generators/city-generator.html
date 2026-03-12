@@ -7,6 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&family=EB+Garamond:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         /* --- Core Styles & Theming --- */
         :root {
@@ -267,6 +268,30 @@
         /* --- END NEW STYLES --- */
 
 
+        /* --- Notification Banner --- */
+        .notification-banner {
+            background: linear-gradient(135deg, rgba(255, 193, 7, 0.15) 0%, rgba(255, 193, 7, 0.08) 100%);
+            border: 1px solid rgba(255, 193, 7, 0.3);
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 0.85rem;
+            color: #ffc107;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 10px rgba(255, 193, 7, 0.1);
+            margin-bottom: 15px;
+        }
+        .notification-banner i {
+            font-size: 1rem;
+            opacity: 0.8;
+        }
+        .notification-banner strong {
+            color: #fff;
+            font-weight: 600;
+        }
+
         /* --- The rest of the CSS (Proficiencies, Modal, Print) remains unchanged --- */
         .proficiencies-container {
             display: flex;
@@ -387,77 +412,150 @@
                 background: white !important;
                 color: black !important;
                 padding: 0;
+                margin: 0;
+                font-size: 0.85em !important;
+                line-height: 1.2 !important;
             }
             .main-container {
-                display: block;
-                max-width: 100%;
-                margin: 0;
+                display: block !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding: 15px !important;
+                width: 100% !important;
             }
-            .header-controls, #load-modal, #roll-stats-btn, .small-randomizer-btn, #randomize-fields-btn, hr {
-                display: none !important; /* Hide all buttons and UI controls */
+            /* Completely restructure columns for print */
+            .left-column, .center-column, .right-column {
+                display: block !important;
+                width: 100% !important;
+                float: none !important;
+                clear: both !important;
+                page-break-inside: auto !important;
+                margin-bottom: 0 !important;
+            }
+            /* Hide all UI controls */
+            .header-controls, #load-modal, #roll-stats-btn, .small-randomizer-btn, #randomize-fields-btn, hr, .input-group-with-btn button, .stat-header-wrapper button {
+                display: none !important;
             }
             h1, h2 {
                 color: #000 !important;
                 text-shadow: none !important;
-                border-bottom: 2px solid #aaa;
-                padding-bottom: 5px;
+                border-bottom: 2px solid #aaa !important;
+                padding-bottom: 3px !important;
+                margin-bottom: 8px !important;
+                font-size: 1.2em !important;
+            }
+            h1 {
+                font-size: 1.5em !important;
+                text-align: center !important;
+                margin-bottom: 15px !important;
             }
             .card {
                 background: #f8f8f8 !important;
                 border: 1px solid #ccc !important;
                 box-shadow: none !important;
-                margin-bottom: 15px;
-                break-inside: avoid; /* Prevent card breaking across pages */
+                margin-bottom: 12px !important;
+                padding: 8px !important;
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+                border-radius: 0 !important;
             }
+            /* Form fields styling */
             input[type="text"], input[type="number"], textarea, select {
                 border: none !important;
                 background: none !important;
-                border-bottom: 1px dashed #000 !important;
+                border-bottom: 1px solid #000 !important;
                 color: black !important;
-                padding: 0 0 2px 0;
+                padding: 2px 0 !important;
+                font-size: 0.9em !important;
+                width: 100% !important;
             }
-            /* Hide the actual dropdown arrow in print for select (and datalist input) */
             select, input[list] {
                 background-image: none !important;
             }
-            /* Ensure text areas expand to show content */
+            /* Compact text areas */
             textarea {
-                min-height: 50px !important;
+                min-height: 25px !important;
+                max-height: 60px !important;
                 height: auto !important;
+                overflow: hidden !important;
+                resize: none !important;
             }
-            /* Ensure headers are visible */
+            /* Header styling */
             .header {
                 background: white !important;
                 border: none !important;
-                padding-bottom: 0;
+                padding-bottom: 10px !important;
+                margin-bottom: 10px !important;
             }
-            /* Style for Proficiencies in print */
+            /* Proficiencies compact styling */
             .proficiency-stat-group {
-                border: 1px solid #ddd;
-                padding: 5px;
-                margin-bottom: 10px;
+                border: 1px solid #ddd !important;
+                padding: 4px !important;
+                margin-bottom: 8px !important;
+                page-break-inside: avoid !important;
             }
             .stat-header {
                 border: none !important;
                 background: #e9e9e9 !important;
-                padding: 5px 10px !important;
-                margin-bottom: 5px;
+                padding: 3px 6px !important;
+                margin-bottom: 3px !important;
             }
-            .stat-info h3, .stat-modifier, .proficiency-bonus-value, .proficiency-item label {
+            .stat-info h3 {
                 color: black !important;
+                font-size: 0.9em !important;
+                margin: 0 !important;
+            }
+            .stat-modifier, .proficiency-bonus-value, .proficiency-item label {
+                color: black !important;
+                font-size: 0.85em !important;
             }
             .proficiency-details input[type="checkbox"] {
-                border: 1px solid #000;
-                background: white;
+                border: 1px solid #000 !important;
+                background: white !important;
+                width: 12px !important;
+                height: 12px !important;
             }
-            /* Show a checkmark in print for checked boxes */
             .proficiency-details input[type="checkbox"]:checked:after {
-                content: 'X';
-                position: absolute;
-                top: 0;
-                left: 3px;
-                font-size: 12px;
-                color: black;
+                content: 'X' !important;
+                position: absolute !important;
+                top: -2px !important;
+                left: 2px !important;
+                font-size: 10px !important;
+                color: black !important;
+            }
+            /* Skills list compact */
+            .skills-list {
+                grid-template-columns: 1fr !important;
+                gap: 2px !important;
+                padding-left: 10px !important;
+            }
+            /* Form groups compact */
+            .form-group {
+                margin-bottom: 6px !important;
+            }
+            .form-group label {
+                font-size: 0.85em !important;
+                margin-bottom: 2px !important;
+                color: #000 !important;
+                font-weight: bold !important;
+            }
+            /* Grid layouts become single column */
+            [style*="grid-template-columns"] {
+                display: block !important;
+            }
+            [style*="grid-template-columns"] > .form-group {
+                display: block !important;
+                width: 100% !important;
+                margin-bottom: 6px !important;
+            }
+            /* Footer card */
+            .footer-card {
+                margin-top: 10px !important;
+            }
+            /* Ensure no empty spaces */
+            * {
+                orphan: 0 !important;
+                widow: 0 !important;
             }
         }
     </style>
@@ -467,11 +565,13 @@
     <div class="main-container">
         <header class="header card">
             <h1>Dominion Generator & World Manager</h1>
+            <div class="notification-banner">
+                <i class="fas fa-info-circle"></i> <strong>Note:</strong> Save/Load buttons use browser localStorage only. To save dominions to the cloud, use the "Import to Canvas" button to add them as assets in your KANVAS project.
+            </div>
             <div class="header-controls">
-                <button id="new-btn">New</button>
+                <button id="new-btn" style="min-height: 50px; display: flex; flex-direction: column; align-items: center; justify-content: center;"><span>New</span><small style="font-size: 0.7rem; opacity: 0.8;">CLEARS ALL FIELDS</small></button>
                 <button id="save-btn">Save</button>
                 <button id="load-btn">Load</button>
-                <button id="export-btn">Export to PDF</button>
                 <button id="import-btn" onclick="importToCanvas()" style="background: linear-gradient(135deg, #4caf50 0%, #45a049 100%); color: white;">Import to Canvas</button>
             </div>
         </header>
@@ -670,7 +770,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'con-stat', 'int-stat', 'wis-stat', 'cha-stat', 'dominion-size', 'prof-bonus', 
             'population', 'wealth', 'influence', 'districts', 'key-buildings', 'notable-features',
             'aesthetics', 'ideals', 'bonds', 'flaws', 'main-factions', 'key-npcs', 
-            'proficiencies-list', 'new-btn', 'save-btn', 'load-btn', 'export-btn', 'import-btn',
+            'proficiencies-list', 'new-btn', 'save-btn', 'load-btn', 'import-btn',
             'roll-stats-btn', 'randomize-fields-btn', 'load-modal',
             'saved-dominion-list', 'str-mod', 'dex-mod', 'con-mod', 'int-mod', 'wis-mod', 'cha-mod',
             // Individual randomizer buttons
@@ -759,7 +859,6 @@ document.addEventListener('DOMContentLoaded', () => {
         DOMElements.newBtn.addEventListener('click', clearSheet);
         DOMElements.saveBtn.addEventListener('click', saveDominion);
         DOMElements.loadBtn.addEventListener('click', showLoadModal);
-        DOMElements.exportBtn.addEventListener('click', () => window.print());
         DOMElements.importBtn.addEventListener('click', importToCanvas);
         DOMElements.closeModalBtn.addEventListener('click', () => DOMElements.loadModal.style.display = 'none');
         window.addEventListener('click', (event) => {
@@ -959,16 +1058,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function clearSheet() {
-        if (confirm("Are you sure you want to clear all fields? Any unsaved data will be lost.")) {
-            DOMElements.allInputs.forEach(input => {
-                if (input.type === 'checkbox') input.checked = false;
-                else if (input.tagName === 'SELECT') input.selectedIndex = 0;
-                else input.value = '';
-            });
-            ['strStat', 'dexStat', 'conStat', 'intStat', 'wisStat', 'chaStat'].forEach(s => DOMElements[s].value = 10);
-            DOMElements.profBonus.value = "+0";
-            updateAllCalculatedValues();
-        }
+        // Activate all randomization functions
+        rollStats();
+        randomizeAllFields();
+        randomizeSize();
     }
 
     const DB_KEY = 'dominionGeneratorDB';
