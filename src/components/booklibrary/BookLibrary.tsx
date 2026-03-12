@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Plus, BookOpen, User } from 'lucide-react';
+import { X, Plus, BookOpen, User, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -52,6 +52,7 @@ export function BookLibrary({ isOpen, onClose, onBookSelect }: BookLibraryProps)
     message: string;
     action: string;
   } | null>(null);
+  const [generatorsOpen, setGeneratorsOpen] = useState(false);
 
   const allBooks = getAllBooks();
 
@@ -178,10 +179,14 @@ export function BookLibrary({ isOpen, onClose, onBookSelect }: BookLibraryProps)
     return maxBooks === -1 ? '∞' : maxBooks;
   };
 
+  const openGenerator = (generator: string) => {
+    window.open(`/generators/${generator}.html`, '_blank', 'width=1200,height=800');
+  };
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-6xl w-full h-[80vh] glass cosmic-glow border-glass-border/40">
+        <DialogContent className="max-w-6xl w-full h-[80vh] glass cosmic-glow border-glass-border/40 flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <BookOpen className="w-5 h-5" />
@@ -189,7 +194,7 @@ export function BookLibrary({ isOpen, onClose, onBookSelect }: BookLibraryProps)
             </DialogTitle>
           </DialogHeader>
 
-          <div className="flex flex-col h-full gap-4">
+          <div className="flex flex-col flex-1 gap-4 min-h-0">
             {/* Header Controls */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
@@ -201,6 +206,52 @@ export function BookLibrary({ isOpen, onClose, onBookSelect }: BookLibraryProps)
 
               {/* Action Buttons */}
               <div className="flex items-center gap-2 flex-wrap">
+                {/* Generators Dropdown */}
+                <div className="relative">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setGeneratorsOpen(!generatorsOpen)}
+                    className="gap-2"
+                    title="Generators"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span className="hidden sm:inline">Generators</span>
+                    {generatorsOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </Button>
+                  
+                  {generatorsOpen && (
+                    <div className="absolute top-full mt-1 right-0 z-50 bg-background border border-border rounded-md shadow-lg min-w-[200px]">
+                      <div className="py-1">
+                        <button
+                          onClick={() => openGenerator('character-generator')}
+                          className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground flex items-center gap-2"
+                        >
+                          <span>👤</span> Character Generator
+                        </button>
+                        <button
+                          onClick={() => openGenerator('battle-manager')}
+                          className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground flex items-center gap-2"
+                        >
+                          <span>⚔️</span> Battle Manager
+                        </button>
+                        <button
+                          onClick={() => openGenerator('city-generator')}
+                          className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground flex items-center gap-2"
+                        >
+                          <span>🏰</span> City Generator
+                        </button>
+                        <button
+                          onClick={() => openGenerator('god-generator')}
+                          className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground flex items-center gap-2"
+                        >
+                          <span>✨</span> God Generator
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
                 {/* Account Button */}
                 <Button
                   variant="outline"
@@ -281,6 +332,32 @@ export function BookLibrary({ isOpen, onClose, onBookSelect }: BookLibraryProps)
                 </Button>
               </div>
             </div>
+          </div>
+
+          {/* Terms and Conditions Notice */}
+          <div className="text-center pt-2 border-t border-glass-border/20">
+            <p className="text-xs text-muted-foreground opacity-60">
+              By interacting with this app you confirm you have read and understood the{' '}
+              <a 
+                href="/terms-of-service" 
+                className="underline hover:opacity-100"
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
+              >
+                Terms & Conditions
+              </a>
+              {' '}and{' '}
+              <a 
+                href="/privacy-policy" 
+                className="underline hover:opacity-100"
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
+              >
+                Privacy Policy
+              </a>
+            </p>
           </div>
         </DialogContent>
       </Dialog>

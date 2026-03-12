@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, User } from 'lucide-react';
+import { Settings, User, Users, Building, Sparkles, Swords } from 'lucide-react';
 import { useBookStore } from '@/stores/bookStoreSimple';
 import { useThemeStore } from '@/stores/themeStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -39,6 +39,27 @@ const BookShelf: React.FC<BookShelfProps> = ({
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+  const [generatorsOpen, setGeneratorsOpen] = useState(false);
+
+  const openGenerator = (generator: string) => {
+    window.open(`/generators/${generator}.html`, '_blank', 'width=1200,height=800');
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (generatorsOpen) {
+        setGeneratorsOpen(false);
+      }
+    };
+
+    if (generatorsOpen) {
+      document.addEventListener('click', handleClickOutside);
+      return () => {
+        document.removeEventListener('click', handleClickOutside);
+      };
+    }
+  }, [generatorsOpen]);
 
   // Helper function to get max books display
   const getMaxBooksDisplay = () => {
@@ -161,7 +182,7 @@ const BookShelf: React.FC<BookShelfProps> = ({
             <p className={`text-sm drop-shadow ${
               theme === 'dark' ? 'text-white/80' : 'text-muted-foreground'
             }`}>
-              {books.length} book{books.length !== 1 ? 's' : ''} available
+              {getMaxBooksDisplay()} book{getMaxBooksDisplay() !== '∞' && getMaxBooksDisplay() !== 1 ? 's' : ''} available
             </p>
           </div>
           
@@ -194,6 +215,75 @@ const BookShelf: React.FC<BookShelfProps> = ({
               <Settings className="w-4 h-4 mr-2" />
               Settings
             </Button>
+            
+            {/* Generators Button */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setGeneratorsOpen(!generatorsOpen);
+                }}
+                className={`
+                  whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border hover:text-accent-foreground py-2 px-3 h-10 flex items-center justify-center gap-2 bg-sidebar-accent/20 border-sidebar-border hover:bg-sidebar-accent/40
+                  ${
+                    theme === 'dark' 
+                      ? 'border-white/20 text-white hover:bg-white/10' 
+                      : 'border-border text-foreground hover:bg-accent'
+                  }
+                `}
+                title="Generators"
+              >
+                <Sparkles className="w-4 h-4" />
+              </button>
+              
+              {generatorsOpen && (
+                <div className="absolute top-full mt-1 right-0 z-50 min-w-[160px] bg-sidebar border border-sidebar-border rounded-md shadow-lg overflow-hidden">
+                  <div className="py-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openGenerator('character-generator');
+                      }}
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-sidebar-accent/40 flex items-center gap-2 transition-colors"
+                    >
+                      <Users className="w-4 h-4" />
+                      <span>Characters</span>
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openGenerator('city-generator');
+                      }}
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-sidebar-accent/40 flex items-center gap-2 transition-colors"
+                    >
+                      <Building className="w-4 h-4" />
+                      <span>Cities</span>
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openGenerator('god-generator');
+                      }}
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-sidebar-accent/40 flex items-center gap-2 transition-colors"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      <span>Gods</span>
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openGenerator('battle-manager');
+                      }}
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-sidebar-accent/40 flex items-center gap-2 transition-colors"
+                    >
+                      <Swords className="w-4 h-4" />
+                      <span>Battles</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -252,6 +342,32 @@ const BookShelf: React.FC<BookShelfProps> = ({
         isOpen={isAccountModalOpen}
         onClose={() => setIsAccountModalOpen(false)}
       />
+
+      {/* Terms and Conditions Notice */}
+      <div className="absolute bottom-2 left-0 right-0 text-center z-10">
+        <p className={`text-xs ${
+          theme === 'dark' ? 'text-white/40' : 'text-muted-foreground/60'
+        }`}>
+          By using this app you confirm you have read and understood the{' '}
+          <a 
+            href="/terms-of-service" 
+            className={`underline hover:opacity-100 ${
+              theme === 'dark' ? 'text-white/60' : 'text-muted-foreground'
+            }`}
+          >
+            Terms & Conditions
+          </a>
+          {' '}and{' '}
+          <a 
+            href="/privacy-policy" 
+            className={`underline hover:opacity-100 ${
+              theme === 'dark' ? 'text-white/60' : 'text-muted-foreground'
+            }`}
+          >
+            Privacy Policy
+          </a>
+        </p>
+      </div>
     </div>
   );
 };

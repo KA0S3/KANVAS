@@ -13,6 +13,7 @@ interface AssetTreeNodeProps {
   onAssetSelect?: (assetId: string) => void;
   onAssetMove?: (assetId: string, newParentId?: string) => void;
   onEdit?: (asset: Asset) => void;
+  onCreateChildAsset?: (parentId: string) => void;
   searchTerm?: string;
   showOnlyFiltered?: boolean;
 }
@@ -33,6 +34,7 @@ export const AssetTreeNode: React.FC<AssetTreeNodeProps> = ({
   onAssetSelect,
   onAssetMove,
   onEdit,
+  onCreateChildAsset,
   searchTerm = '',
   showOnlyFiltered = false,
 }) => {
@@ -301,6 +303,7 @@ export const AssetTreeNode: React.FC<AssetTreeNodeProps> = ({
               onAssetSelect={onAssetSelect}
               onAssetMove={onAssetMove}
               onEdit={onEdit}
+              onCreateChildAsset={onCreateChildAsset}
               searchTerm={searchTerm}
               showOnlyFiltered={showOnlyFiltered}
             />
@@ -315,6 +318,7 @@ export const AssetTreeNode: React.FC<AssetTreeNodeProps> = ({
           position={{ x: contextMenu.x, y: contextMenu.y }}
           onClose={closeContextMenu}
           onEdit={onEdit}
+          onCreateChildAsset={onCreateChildAsset}
         />
       )}
     </div>

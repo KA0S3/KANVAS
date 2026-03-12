@@ -103,7 +103,6 @@ export function AssetCreationModal({ isOpen, onClose, initialData, parentId, gen
     };
   });
 
-  const [mode, setMode] = useState<'asset' | 'note'>('asset');
 
   // File upload state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -279,20 +278,15 @@ export function AssetCreationModal({ isOpen, onClose, initialData, parentId, gen
       <Dialog open={isOpen} onOpenChange={handleClose}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto glass cosmic-glow border-glass-border/40">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold">Create New {mode === 'note' ? 'Note' : 'Asset'}</DialogTitle>
+            <DialogTitle className="text-xl font-bold">Create New Asset</DialogTitle>
           </DialogHeader>
           
           <div className="space-y-6 py-4 relative">
-            {/* Mode Toggle */}
+            {/* Notes Coming Soon - Locked Feature */}
             <div className="absolute top-0 right-0">
-              <div className="flex items-center gap-2 p-2">
-                <span className={`text-xs font-medium transition-colors ${mode === 'note' ? 'text-gray-500' : 'text-teal-600'}`}>Asset</span>
-                <Switch
-                  checked={mode === 'note'}
-                  onCheckedChange={(checked) => setMode(checked ? 'note' : 'asset')}
-                  className="scale-75"
-                />
-                <span className={`text-xs font-medium transition-colors ${mode === 'asset' ? 'text-gray-500' : 'text-gray-600'}`}>Note</span>
+              <div className="flex items-center gap-2 p-2 opacity-60">
+                <Lock className="w-4 h-4 text-muted-foreground" />
+                <span className="text-xs font-medium text-muted-foreground">Notes coming soon!</span>
               </div>
             </div>
 
@@ -306,38 +300,36 @@ export function AssetCreationModal({ isOpen, onClose, initialData, parentId, gen
                   id="asset-name"
                   value={formData.name}
                   onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder={`Enter ${mode === 'note' ? 'note' : 'asset'} name...`}
+                  placeholder="Enter asset name..."
                   className="bg-glass/50 border-glass-border/40"
                 />
               </div>
 
-              {mode === 'asset' && (
-                <div className="space-y-2">
-                  <Label htmlFor="asset-tags">Tags</Label>
-                  <div className="flex flex-wrap gap-2 p-2 border border-glass-border/40 rounded-md bg-glass/30 min-h-[40px]">
-                    {availableTags.map((tag) => {
-                      const tagColor = tag.color && tag.color.trim() !== '' ? tag.color : '#6b7280';
-                      
-                      return (
-                        <Badge
-                          key={tag.id}
-                          variant={formData.tags.includes(tag.id) ? "default" : "outline"}
-                          className="cursor-pointer"
-                          style={{ 
-                            backgroundColor: formData.tags.includes(tag.id) ? tagColor : 'transparent',
-                            borderColor: tagColor,
-                            color: formData.tags.includes(tag.id) ? 'white' : tagColor,
-                            borderWidth: '2px'
-                          }}
-                          onClick={() => handleTagToggle(tag.id)}
-                        >
-                          {tag.name}
-                        </Badge>
-                      );
-                    })}
-                  </div>
+              <div className="space-y-2">
+                <Label htmlFor="asset-tags">Tags</Label>
+                <div className="flex flex-wrap gap-2 p-2 border border-glass-border/40 rounded-md bg-glass/30 min-h-[40px]">
+                  {availableTags.map((tag) => {
+                    const tagColor = tag.color && tag.color.trim() !== '' ? tag.color : '#6b7280';
+                    
+                    return (
+                      <Badge
+                        key={tag.id}
+                        variant={formData.tags.includes(tag.id) ? "default" : "outline"}
+                        className="cursor-pointer"
+                        style={{ 
+                          backgroundColor: formData.tags.includes(tag.id) ? tagColor : 'transparent',
+                          borderColor: tagColor,
+                          color: formData.tags.includes(tag.id) ? 'white' : tagColor,
+                          borderWidth: '2px'
+                        }}
+                        onClick={() => handleTagToggle(tag.id)}
+                      >
+                        {tag.name}
+                      </Badge>
+                    );
+                  })}
                 </div>
-              )}
+              </div>
               
               <div className="space-y-2">
                 <Label htmlFor="asset-description">Description</Label>
@@ -345,15 +337,13 @@ export function AssetCreationModal({ isOpen, onClose, initialData, parentId, gen
                   id="asset-description"
                   value={formData.description}
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder={`Enter ${mode === 'note' ? 'note' : 'asset'} description...`}
+                  placeholder="Enter asset description..."
                   rows={3}
                   className="bg-glass/50 border-glass-border/40"
                 />
               </div>
             </div>
 
-            {mode === 'asset' && (
-              <>
             {/* Images */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-foreground">Images</h3>
@@ -561,8 +551,6 @@ export function AssetCreationModal({ isOpen, onClose, initialData, parentId, gen
                 </CardContent>
               </Card>
             </div>
-            </>
-            )}
           </div>
 
           <DialogFooter>

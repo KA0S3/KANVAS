@@ -243,7 +243,30 @@ export const useAuthStore = create<AuthStore>()(
         try {
           console.log('[authStore] Starting sign out process');
           
-          // Just sign out from Supabase - the auth state change listener will handle the rest
+          // Clear all Supabase session storage first
+          try {
+            // Clear any remaining Supabase session data
+            const storageKeys = [
+              'supabase.auth.token',
+              'supabase.auth.refreshToken',
+              'supabase.auth.codeVerifier',
+              'supabase.auth.pkceCodeVerifier'
+            ];
+            
+            storageKeys.forEach(key => {
+              localStorage.removeItem(key);
+              sessionStorage.removeItem(key);
+            });
+            
+            // Clear our auth store persisted data
+            localStorage.removeItem('kanvas-auth');
+            
+            console.log('[authStore] Cleared all session storage');
+          } catch (clearError) {
+            console.warn('[authStore] Error clearing session storage:', clearError);
+          }
+          
+          // Now sign out from Supabase - the auth state change listener will handle the rest
           const { error } = await supabase.auth.signOut();
           
           if (error) {
@@ -588,6 +611,24 @@ export const useAuthStore = create<AuthStore>()(
   // Debug method to clear all auth data
   clearAllAuthData: () => {
     console.log('[authStore] Clearing all auth data (debug method)');
+    
+    // Clear all Supabase session storage first
+    try {
+      const storageKeys = [
+        'supabase.auth.token',
+        'supabase.auth.refreshToken',
+        'supabase.auth.codeVerifier',
+        'supabase.auth.pkceCodeVerifier'
+      ];
+      
+      storageKeys.forEach(key => {
+        localStorage.removeItem(key);
+        sessionStorage.removeItem(key);
+      });
+    } catch (clearError) {
+      console.warn('[authStore] Error clearing session storage in debug method:', clearError);
+    }
+    
     set({
       user: null,
       plan: 'guest',

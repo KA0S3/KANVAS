@@ -623,15 +623,6 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
        {/* Header */}
       <div className="flex items-center justify-between p-1 md:p-2 border-b border-glass-border/20 flex-wrap gap-2">
         <div className="flex items-center gap-1 md:gap-2 flex-wrap">
-          {enteredAssetId && (
-            <button
-              onClick={handleExitAsset}
-              className="p-1.5 hover:bg-muted rounded transition-colors self-center"
-              title="Exit asset"
-            >
-              <ArrowLeft className="w-3 h-3 md:w-4 md:h-4 text-muted-foreground" />
-            </button>
-          )}
           {currentWorldTitle && onOpenWorldLibrary && (
             <Button
               variant="outline"
@@ -645,6 +636,15 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
                 <span className="text-xs font-medium">Library</span>
               </div>
             </Button>
+          )}
+          {enteredAssetId && (
+            <button
+              onClick={handleExitAsset}
+              className="p-1.5 hover:bg-muted rounded transition-colors self-center"
+              title="Exit asset"
+            >
+              <ArrowLeft className="w-3 h-3 md:w-4 md:h-4 text-muted-foreground" />
+            </button>
           )}
           {/* Interactive Breadcrumb Path */}
           <nav className="flex items-center text-xs text-muted-foreground bg-glass/50 px-1 md:px-2 py-1 rounded border border-glass-border/30 max-w-[200px] md:max-w-none overflow-hidden">

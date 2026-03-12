@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, CreditCard, Loader2, AlertCircle, ChevronDown, ChevronUp, Tag } from 'lucide-react';
+import { X, CreditCard, Loader2, AlertCircle, ChevronDown, ChevronUp, Tag, ExternalLink } from 'lucide-react';
 import { PAYSTACK_PRODUCTS, type PaystackProduct } from '@/lib/paystack';
 import { paymentsService, type PaymentSession } from '@/services/payments/payments-service';
 import { supabase } from '@/lib/supabase';
@@ -350,9 +350,40 @@ export function PaymentModal({ isOpen, onClose, productKey, onSuccess }: Payment
             <p className="text-sm text-muted-foreground">
               A secure payment popup will open to complete your payment.
             </p>
-            <p className="text-xs text-muted-foreground">
-              By continuing, you agree to our terms of service and privacy policy.
-            </p>
+            <div className="text-xs text-muted-foreground space-y-1">
+              <p>By continuing, you agree to our:</p>
+              <div className="flex flex-wrap gap-2 mt-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => window.open('/terms-of-service', '_blank')}
+                  className="text-xs text-muted-foreground hover:text-foreground p-0 h-auto"
+                >
+                  <ExternalLink className="w-3 h-3 mr-1" />
+                  Terms of Service
+                </Button>
+                <span>•</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => window.open('/privacy-policy', '_blank')}
+                  className="text-xs text-muted-foreground hover:text-foreground p-0 h-auto"
+                >
+                  <ExternalLink className="w-3 h-3 mr-1" />
+                  Privacy Policy
+                </Button>
+                <span>•</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => window.open('/refund-policy', '_blank')}
+                  className="text-xs text-muted-foreground hover:text-foreground p-0 h-auto"
+                >
+                  <ExternalLink className="w-3 h-3 mr-1" />
+                  Refund Policy
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
 

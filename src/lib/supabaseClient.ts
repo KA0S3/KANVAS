@@ -16,9 +16,10 @@ if (!supabaseAnonKey) {
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
-    persistSession: true,
+    persistSession: false, // Changed to false to prevent session persistence conflicts
     detectSessionInUrl: true, // Important for email confirmation
     flowType: 'pkce', // Recommended for web apps
+    storage: localStorage, // Explicit storage reference
   },
 })
 

@@ -18,13 +18,13 @@ interface AssetTreeNodeProps {
   level?: number;
   onEdit?: (asset: Asset) => void;
   onSelectAndFocus?: (asset: Asset) => void;
+  onCreateChildAsset?: (parentId: string) => void;
   isDragActive?: boolean;
 }
 
-export function AssetTreeNode({ asset, depth, searchQuery = '', level = 0, onEdit, onSelectAndFocus, isDragActive = false }: AssetTreeNodeProps) {
-  const { assets, setActiveAsset, currentActiveId } = useAssetStore();
+export function AssetTreeNode({ asset, depth, searchQuery = '', level = 0, onEdit, onSelectAndFocus, onCreateChildAsset, isDragActive = false }: AssetTreeNodeProps) {
+  const { assets, setActiveAsset, currentActiveId, toggleAssetExpansion } = useAssetStore();
   const { getAssetTags } = useTagStore();
-  const [isExpanded, setIsExpanded] = useState(asset.isExpanded || false);
   const [contextMenu, setContextMenu] = useState<{
     visible: boolean;
     x: number;
@@ -33,6 +33,7 @@ export function AssetTreeNode({ asset, depth, searchQuery = '', level = 0, onEdi
   
   const hasChildren = asset.children && asset.children.length > 0;
   const childAssets = asset.children?.map(childId => assets[childId]).filter(Boolean) || [];
+  const isExpanded = asset.isExpanded || false;
   
   // DnD sortable hook
   const {
@@ -76,7 +77,7 @@ export function AssetTreeNode({ asset, depth, searchQuery = '', level = 0, onEdi
   );
 
   const handleToggleExpand = () => {
-    setIsExpanded(!isExpanded);
+    toggleAssetExpansion(asset.id);
   };
 
   const handleSelect = () => {
@@ -209,6 +210,7 @@ export function AssetTreeNode({ asset, depth, searchQuery = '', level = 0, onEdi
               level={level + 1}
               onEdit={onEdit}
               onSelectAndFocus={onSelectAndFocus}
+              onCreateChildAsset={onCreateChildAsset}
             />
           ))}
         </div>
@@ -222,6 +224,7 @@ export function AssetTreeNode({ asset, depth, searchQuery = '', level = 0, onEdi
           onClose={closeContextMenu}
           onEdit={onEdit}
           onSelectAndFocus={onSelectAndFocus}
+          onCreateChildAsset={onCreateChildAsset}
         />
       )}
     </div>

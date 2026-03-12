@@ -52,6 +52,11 @@ interface AssetStore {
   
   // Background editing actions
   setIsEditingBackground: (editing: boolean) => void;
+  
+  // Expansion state management
+  expandAll: () => void;
+  collapseAll: () => void;
+  toggleAssetExpansion: (assetId: string) => void;
 }
 
 export const useAssetStore = create<AssetStore>()(
@@ -96,11 +101,12 @@ export const useAssetStore = create<AssetStore>()(
       // Atomic operation: Add the new asset to registry
       newAssets[id] = newAsset;
       
-      // If it has a parent, add this asset to parent's children array atomically
+      // If it has a parent, add this asset to parent's children array and expand the parent
       if (parentId && newAssets[parentId]) {
         newAssets[parentId] = {
           ...newAssets[parentId],
           children: [...newAssets[parentId].children, id],
+          isExpanded: true, // Auto-expand parent to show new asset
           updatedAt: now,
         };
       }
@@ -483,6 +489,52 @@ export const useAssetStore = create<AssetStore>()(
   // Background editing actions
   setIsEditingBackground: (editing: boolean) => {
     set({ isEditingBackground: editing });
+  },
+
+  // Expansion state management
+  expandAll: () => {
+    set((state) => {
+      const newAssets = { ...state.assets };
+      // Set all assets with children to expanded
+      Object.keys(newAssets).forEach(assetId => {
+        const asset = newAssets[assetId];
+        if (asset.children && asset.children.length > 0) {
+          newAssets[assetId] = { ...asset, isExpanded: true };
+        }
+      });
+      return { assets: newAssets };
+    });
+  },
+
+  collapseAll: () => {
+    set((state) => {
+      const newAssets = { ...state.assets };
+      // Set all assets with children to collapsed
+      Object.keys(newAssets).forEach(assetId => {
+        const asset = newAssets[assetId];
+        if (asset.children && asset.children.length > 0) {
+          newAssets[assetId] = { ...asset, isExpanded: false };
+        }
+      });
+      return { assets: newAssets };
+    });
+  },
+
+  toggleAssetExpansion: (assetId: string) => {
+    set((state) => {
+      const asset = state.assets[assetId];
+      if (!asset || !asset.children || asset.children.length === 0) return state;
+      
+      return {
+        assets: {
+          ...state.assets,
+          [assetId]: {
+            ...asset,
+            isExpanded: !asset.isExpanded,
+          },
+        },
+      };
+    });
   },
 
   // World-aware methods

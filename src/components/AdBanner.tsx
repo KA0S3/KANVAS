@@ -2,7 +2,9 @@ import React from 'react';
 import { useAuthStore } from '@/stores/authStore';
 
 const AdBanner = () => {
-  const showAds = useAuthStore(state => state.effectiveLimits?.adsEnabled ?? true);
+  // FEATURE FLAG: Change to true to re-enable ads for all users
+  const ADS_ENABLED_FOR_ALL_USERS = false;
+  const showAds = ADS_ENABLED_FOR_ALL_USERS && (useAuthStore(state => state.effectiveLimits?.adsEnabled ?? true));
   
   if (!showAds) return null;
 

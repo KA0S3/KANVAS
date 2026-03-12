@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, LogOut, Loader2, Crown, HardDrive, Shield, Lock } from 'lucide-react';
+import { User, Mail, LogOut, Loader2, Crown, HardDrive, Shield, Lock, ExternalLink } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -559,6 +559,42 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
                 </>
               )}
               </CardContent>
+
+              {/* Policy Links */}
+              <div className="pt-4 border-t border-glass-border/30">
+                <div className="text-xs text-muted-foreground text-center mb-3">
+                  By creating an account, you agree to our:
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => window.open('/terms-of-service', '_blank')}
+                    className="text-xs text-muted-foreground hover:text-foreground justify-center"
+                  >
+                    <ExternalLink className="w-3 h-3 mr-1" />
+                    Terms of Service
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => window.open('/privacy-policy', '_blank')}
+                    className="text-xs text-muted-foreground hover:text-foreground justify-center"
+                  >
+                    <ExternalLink className="w-3 h-3 mr-1" />
+                    Privacy Policy
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => window.open('/refund-policy', '_blank')}
+                    className="text-xs text-muted-foreground hover:text-foreground justify-center"
+                  >
+                    <ExternalLink className="w-3 h-3 mr-1" />
+                    Refund & Cancellation Policy
+                  </Button>
+                </div>
+              </div>
             </Card>
           ) : (
             // Logged in state - Dashboard Layout

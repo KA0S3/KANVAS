@@ -1,4 +1,4 @@
-import { Plus, Search, Settings, User, Tag, Users, Building, Sparkles, Swords, X, Image, GripVertical } from 'lucide-react';
+import { Plus, Search, Settings, User, Tag, Users, Building, Sparkles, Swords, X, Image, GripVertical, ChevronDown, ChevronRight } from 'lucide-react';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useAssetStore } from '@/stores/assetStore';
 import { AssetTreeNode } from './AssetTreeNode';
@@ -35,6 +35,17 @@ function RootAsset({ isDragActive }: { isDragActive: boolean }) {
   const { setNodeRef, isOver } = useDroppable({
     id: 'root-asset',
   });
+  const { expandAll, collapseAll } = useAssetStore();
+  const [isAllExpanded, setIsAllExpanded] = useState(false);
+  
+  const handleToggleAll = () => {
+    if (isAllExpanded) {
+      collapseAll();
+    } else {
+      expandAll();
+    }
+    setIsAllExpanded(!isAllExpanded);
+  };
   
   return (
     <div
@@ -50,8 +61,22 @@ function RootAsset({ isDragActive }: { isDragActive: boolean }) {
         <div className="w-3 h-3 rounded-full bg-gradient-to-br from-amber-400 to-orange-500" />
       </div>
       <span className="text-sm font-medium">Root</span>
+      
+      {/* Collapse/Expand All Button */}
+      <button
+        onClick={handleToggleAll}
+        className="ml-auto p-1 hover:bg-sidebar-accent/50 rounded transition-colors"
+        title={isAllExpanded ? "Collapse all" : "Expand all"}
+      >
+        {isAllExpanded ? (
+          <ChevronDown className="w-3.5 h-3.5" />
+        ) : (
+          <ChevronRight className="w-3.5 h-3.5" />
+        )}
+      </button>
+      
       {isOver && (
-        <span className="text-xs text-blue-500 font-medium animate-pulse ml-auto">
+        <span className="text-xs text-blue-500 font-medium animate-pulse ml-2">
           Drop here
         </span>
       )}
@@ -271,6 +296,43 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
     setEditingAssetId(asset.id);
   };
 
+  const handleCreateChildAsset = useCallback((parentId: string) => {
+    console.log('Creating child asset for parent:', parentId);
+    
+    // Calculate position for child asset (offset from parent)
+    const parentAsset = assets[parentId];
+    let position;
+    if (parentAsset) {
+      // Position child near parent
+      position = {
+        x: parentAsset.x + 50,
+        y: parentAsset.y + 50
+      };
+    } else {
+      // Fallback to center position
+      position = calculateViewportCenterPosition(800, 600, 200, 150);
+    }
+    
+    // Open modal with pre-filled data for child asset
+    setModalInitialData({
+      name: 'New Child Asset',
+      type: 'other',
+      x: position.x,
+      y: position.y,
+      width: 200,
+      height: 150,
+      customFields: [],
+      customFieldValues: [],
+    });
+    setIsModalOpen(true);
+    
+    // Store the parentId to pass to the modal
+    setTimeout(() => {
+      // This will be used by the modal
+      (window as any).pendingParentId = parentId;
+    }, 0);
+  }, [assets]);
+
   const handleSelectAndFocus = (asset: Asset) => {
     // Set the asset as active
     const { setActiveAsset } = useAssetStore.getState();
@@ -450,6 +512,7 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
                 searchQuery={searchQuery}
                 onEdit={handleEditAsset}
                 onSelectAndFocus={handleSelectAndFocus}
+                onCreateChildAsset={handleCreateChildAsset}
                 isDragActive={activeId !== null}
               />
             ))}
@@ -485,9 +548,11 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
           onClose={() => {
             setIsModalOpen(false);
             setGeneratorImportData(null);
+            // Clear the stored parentId
+            delete (window as any).pendingParentId;
           }}
           initialData={modalInitialData}
-          parentId={currentActiveId || undefined}
+          parentId={(window as any).pendingParentId || currentActiveId || undefined}
           generatorImportData={generatorImportData}
         />
       </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Settings as SettingsIcon, Volume2, Trash2, AlertTriangle, Download } from 'lucide-react';
+import { X, Settings as SettingsIcon, Volume2, Trash2, AlertTriangle, Download, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -490,6 +490,33 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                       <p>This software is provided "as is" without warranties of any kind, either express or implied.</p>
                     </div>
                   </div>
+                </div>
+                
+                <div className="border-t border-glass-border/30 pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => window.open('/terms-of-service', '_blank')}
+                    className="w-full glass cosmic-glow border-glass-border/40 hover:bg-glass/20 mb-3"
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    View Terms of Service
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => window.open('/privacy-policy', '_blank')}
+                    className="w-full glass cosmic-glow border-glass-border/40 hover:bg-glass/20 mb-3"
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    View Privacy Policy
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => window.open('/refund-policy', '_blank')}
+                    className="w-full glass cosmic-glow border-glass-border/40 hover:bg-glass/20"
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    View Refund & Cancellation Policy
+                  </Button>
                 </div>
                 
                 <div className="border-t border-glass-border/30 pt-4">

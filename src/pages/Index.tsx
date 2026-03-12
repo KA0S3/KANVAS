@@ -31,6 +31,9 @@ import type { Book } from "@/types/book";
 import { navigationCache } from "@/utils/navigationCache";
 
 const Index = () => {
+  // FEATURE FLAG: Change to true to re-enable ads for all users
+  const ADS_ENABLED_FOR_ALL_USERS = false;
+  
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [bookLibraryOpen, setBookLibraryOpen] = useState(true);
   const [backgroundRefreshTrigger, setBackgroundRefreshTrigger] = useState(0);
@@ -44,7 +47,7 @@ const Index = () => {
   const { getBackground } = useBackgroundStore(); // Initialize background store
   const { appPhase, showLibrary, setTransitioning, setAppPhase } = useMediaStore();
   const { initializeAuth, effectiveLimits, isAuthenticated } = useAuthStore(); // Initialize auth store
-  const showAds = effectiveLimits?.adsEnabled ?? true;
+  const showAds = ADS_ENABLED_FOR_ALL_USERS && (effectiveLimits?.adsEnabled ?? true);
 
   // Initialize auth on app mount
   useEffect(() => {

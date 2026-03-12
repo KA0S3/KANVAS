@@ -13,6 +13,7 @@ interface AssetTreeItemProps {
   onSelect?: (assetId: string) => void;
   selectedId?: string | null;
   onEdit?: (asset: Asset) => void;
+  onCreateAsset?: (options: { name: string; parentId?: string }) => void;
 }
 
 const AssetTreeItem: React.FC<AssetTreeItemProps> = ({
@@ -23,6 +24,7 @@ const AssetTreeItem: React.FC<AssetTreeItemProps> = ({
   onSelect,
   selectedId,
   onEdit,
+  onCreateAsset,
 }) => {
   const { toggleExpansion, operations } = useAssetTree();
   const [isDragOver, setIsDragOver] = useState(false);
@@ -164,6 +166,7 @@ const AssetTreeItem: React.FC<AssetTreeItemProps> = ({
               onSelect={onSelect}
               selectedId={selectedId}
               onEdit={onEdit}
+              onCreateAsset={onCreateAsset}
             />
           ))}
         </div>
@@ -176,6 +179,12 @@ const AssetTreeItem: React.FC<AssetTreeItemProps> = ({
           position={{ x: contextMenu.x, y: contextMenu.y }}
           onClose={closeContextMenu}
           onEdit={onEdit}
+          onCreateChildAsset={onCreateAsset ? (parentId: string) => {
+            const name = prompt('Enter child asset name:');
+            if (name) {
+              onCreateAsset({ name, parentId });
+            }
+          } : undefined}
         />
       )}
     </div>
@@ -246,6 +255,7 @@ export const AssetTree: React.FC<AssetTreeProps> = ({
               onSelect={handleSelect}
               selectedId={selectedAssetId}
               onEdit={onEdit}
+              onCreateAsset={onCreateAsset}
             />
           ))}
         </div>
