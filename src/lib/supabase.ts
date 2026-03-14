@@ -24,7 +24,7 @@ export const supabase = (() => {
   supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       autoRefreshToken: true,
-      persistSession: false, // Changed to false to prevent session persistence conflicts
+      persistSession: true, // Enable session persistence for 24+ hour sessions
       detectSessionInUrl: true, // Important for email confirmation
       flowType: 'pkce', // Recommended for web apps
       storage: localStorage, // Explicit storage reference

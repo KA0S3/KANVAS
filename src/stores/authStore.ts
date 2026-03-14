@@ -261,30 +261,7 @@ export const useAuthStore = create<AuthStore>()(
         try {
           console.log('[authStore] Starting sign out process');
           
-          // Clear all Supabase session storage first
-          try {
-            // Clear any remaining Supabase session data
-            const storageKeys = [
-              'supabase.auth.token',
-              'supabase.auth.refreshToken',
-              'supabase.auth.codeVerifier',
-              'supabase.auth.pkceCodeVerifier'
-            ];
-            
-            storageKeys.forEach(key => {
-              localStorage.removeItem(key);
-              sessionStorage.removeItem(key);
-            });
-            
-            // Clear our auth store persisted data
-            localStorage.removeItem('kanvas-auth');
-            
-            console.log('[authStore] Cleared all session storage');
-          } catch (clearError) {
-            console.warn('[authStore] Error clearing session storage:', clearError);
-          }
-          
-          // Now sign out from Supabase - the auth state change listener will handle the rest
+          // Sign out from Supabase - this will clear the session and storage automatically
           const { error } = await supabase.auth.signOut();
           
           if (error) {
@@ -292,7 +269,7 @@ export const useAuthStore = create<AuthStore>()(
             throw error;
           }
           
-          console.log('[authStore] Sign out initiated successfully');
+          console.log('[authStore] Sign out completed successfully');
         } catch (error) {
           console.error('Unexpected sign out error:', error);
           // If Supabase sign out fails, manually clear state
@@ -307,8 +284,6 @@ export const useAuthStore = create<AuthStore>()(
             effectiveLimits: null,
             _lastFetchedUserId: undefined,
           });
-          localStorage.removeItem('kanvas-auth');
-          updateQuotaBasedOnPlan();
           throw error;
         }
       },
@@ -666,9 +641,12 @@ export const useAuthStore = create<AuthStore>()(
     }),
     {
       name: 'kanvas-auth',
-      // Don't persist authentication state to avoid sign out issues
-      // Let Supabase handle session persistence naturally
-      skipHydration: true,
+      // Persist minimal state - let Supabase handle the actual session
+      partialize: (state) => ({
+        plan: state.plan,
+        licenseInfo: state.licenseInfo,
+      }),
+      skipHydration: false,
     }
   )
 );
