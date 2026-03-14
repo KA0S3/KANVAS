@@ -58,6 +58,8 @@ const OwnerKeyManager = () => {
   const [createdToken, setCreatedToken] = useState<string | null>(null);
   const [createLoading, setCreateLoading] = useState(false);
   
+  console.log('🚀 [OwnerKeyManager] Component initialized');
+  
   // Form state for creating new key
   const [newKey, setNewKey] = useState({
     keyName: '',
@@ -72,10 +74,28 @@ const OwnerKeyManager = () => {
   });
 
   const fetchOwnerKeys = async () => {
+    console.log('🔍 [OwnerKeyManager] Starting fetchOwnerKeys');
+    
     try {
       setLoading(true);
       setError(null);
+      
+      // Check authentication first
+      const { data: { session }, error: authError } = await supabase.auth.getSession();
+      if (authError) {
+        console.error('❌ [OwnerKeyManager] Auth error:', authError);
+        setError('Authentication error');
+        return;
+      }
+      
+      console.log('🔑 [OwnerKeyManager] Auth session:', {
+        userId: session?.user?.id,
+        email: session?.user?.email,
+        hasSession: !!session
+      });
 
+      console.log('📡 [OwnerKeyManager] Executing owner_keys query');
+      
       const { data: keys, error: keysError } = await supabase
         .from('owner_keys')
         .select(`
@@ -86,7 +106,33 @@ const OwnerKeyManager = () => {
         `)
         .order('created_at', { ascending: false });
 
-      if (keysError) throw keysError;
+      if (keysError) {
+        console.error('❌ [OwnerKeyManager] Query failed:', {
+          error: keysError,
+          details: {
+            message: keysError.message,
+            details: keysError.details,
+            hint: keysError.hint,
+            code: keysError.code
+          },
+          query: {
+            table: 'owner_keys',
+            withJoins: ['user', 'revoked_by_user', 'created_by_user']
+          }
+        });
+        setError(`Failed to fetch owner keys: ${keysError.message}`);
+        return;
+      }
+
+      console.log('✅ [OwnerKeyManager] Query successful:', {
+        keyCount: keys?.length || 0,
+        sampleKey: keys?.[0] ? {
+          id: keys[0].id,
+          key_name: keys[0].key_name,
+          user_email: keys[0].user?.email,
+          is_revoked: keys[0].is_revoked
+        } : null
+      });
 
       const formattedKeys = keys?.map(key => ({
         ...key,
@@ -95,11 +141,21 @@ const OwnerKeyManager = () => {
         created_by_email: key.created_by_user?.email
       })) || [];
 
+      console.log('🔄 [OwnerKeyManager] Data formatted:', {
+        originalCount: keys?.length || 0,
+        formattedCount: formattedKeys.length
+      });
+
       setOwnerKeys(formattedKeys);
     } catch (err) {
-      console.error('Error fetching owner keys:', err);
-      setError('Failed to fetch owner keys');
+      console.error('💥 [OwnerKeyManager] Unexpected error:', {
+        error: err,
+        message: err instanceof Error ? err.message : 'Unknown error',
+        stack: err instanceof Error ? err.stack : undefined
+      });
+      setError('An unexpected error occurred while fetching owner keys');
     } finally {
+      console.log('🏁 [OwnerKeyManager] fetchOwnerKeys completed');
       setLoading(false);
     }
   };
@@ -205,6 +261,7 @@ const OwnerKeyManager = () => {
   };
 
   useEffect(() => {
+    console.log('🔄 [OwnerKeyManager] useEffect triggered - fetching keys');
     fetchOwnerKeys();
   }, []);
 

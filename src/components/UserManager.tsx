@@ -5,7 +5,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Users, ChevronLeft, ChevronRight, Search, Edit } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Users, ChevronLeft, ChevronRight, Search, Edit, AlertTriangle } from "lucide-react";
 import UserAccessEditor from "@/components/UserAccessEditor";
 import { formatBytes } from "@/lib/utils";
 
@@ -34,17 +35,35 @@ interface UserData {
 const UserManager: React.FC = () => {
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalUsers, setTotalUsers] = useState(0);
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const usersPerPage = 25;
+  
+  console.log('🚀 [UserManager] Component initialized');
 
   const fetchUsers = async (page: number = 1, search: string = "") => {
-    console.log('[UserManager] Starting fetchUsers...', { page, search, loading });
+    console.log(`🔍 [UserManager] Starting fetchUsers - Page: ${page}, Search: "${search}"`);
     setLoading(true);
+    setError(null);
+    
     try {
+      // Log authentication state
+      const { data: { session }, error: authError } = await supabase.auth.getSession();
+      if (authError) {
+        console.error('❌ [UserManager] Auth error:', authError);
+        setError('Authentication error');
+        return;
+      }
+      console.log('🔑 [UserManager] Auth session:', { 
+        userId: session?.user?.id, 
+        email: session?.user?.email,
+        hasSession: !!session 
+      });
+      
       const offset = (page - 1) * usersPerPage;
       let query = supabase
         .from('users')
@@ -56,17 +75,40 @@ const UserManager: React.FC = () => {
         query = query.ilike('email', `%${search}%`);
       }
 
+      console.log('📡 [UserManager] Executing query:', { 
+        table: 'users', 
+        select: 'id, email, plan_type, storage_quota_mb, created_at',
+        range: `${offset}-${offset + usersPerPage - 1}`,
+        search: search || 'none'
+      });
+      
       const { data, error, count } = await query;
 
-      console.log('[UserManager] Supabase query result:', { data, error, count });
-
       if (error) {
-        console.error('[UserManager] Error fetching users:', error);
-        console.error('[UserManager] Full error details:', JSON.stringify(error, null, 2));
+        console.error('❌ [UserManager] Supabase query failed:', {
+          error,
+          details: {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code
+          },
+          query: {
+            table: 'users',
+            page,
+            search
+          }
+        });
+        setError(`Failed to load users: ${error.message}`);
         return;
       }
 
-      console.log('[UserManager] Successfully fetched users:', { data: data?.length, count });
+      console.log(`✅ [UserManager] Query successful:`, {
+        userCount: data?.length || 0,
+        totalCount: count,
+        page,
+        hasMore: (data?.length || 0) === usersPerPage
+      });
       
       // Transform data to match our interface, adding default values for missing fields
       const transformedData = (data || []).map(user => ({
@@ -78,20 +120,39 @@ const UserManager: React.FC = () => {
         import_export_enabled: PLAN_FEATURES[user.plan_type as PlanType || 'free'].importExport,
       }));
 
-      console.log('[UserManager] Transformed data:', transformedData);
+      console.log('🔄 [UserManager] Data transformed:', {
+        originalCount: data?.length || 0,
+        transformedCount: transformedData.length,
+        sampleUser: transformedData[0] ? {
+          id: transformedData[0].id,
+          email: transformedData[0].email,
+          plan: transformedData[0].plan_type
+        } : null
+      });
+      
       setUsers(transformedData);
       setTotalUsers(count || 0);
-    } catch (error) {
-      console.error('[UserManager] Unexpected error fetching users:', error);
-      console.error('[UserManager] Full unexpected error:', JSON.stringify(error, null, 2));
+    } catch (err) {
+      console.error('💥 [UserManager] Unexpected error:', {
+        error: err,
+        message: err instanceof Error ? err.message : 'Unknown error',
+        stack: err instanceof Error ? err.stack : undefined,
+        context: { page, search }
+      });
+      setError('An unexpected error occurred while loading users');
     } finally {
-      console.log('[UserManager] fetchUsers completed, setting loading to false');
+      console.log('🏁 [UserManager] fetchUsers completed');
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    console.log('[UserManager] useEffect triggered - fetching users...', { currentPage, searchTerm });
+    console.log('🔄 [UserManager] useEffect triggered:', {
+      currentPage,
+      searchTerm,
+      loading,
+      usersCount: users.length
+    });
     fetchUsers(currentPage, searchTerm);
   }, [currentPage, searchTerm]);
 
@@ -101,21 +162,64 @@ const UserManager: React.FC = () => {
   };
 
   const handleUserUpdate = async (userId: string, updates: Partial<UserData>) => {
+    console.log(`💾 [UserManager] Starting user update:`, {
+      userId,
+      updates,
+      updateKeys: Object.keys(updates)
+    });
+    
     try {
-      const { error } = await supabase
+      // Verify authentication before update
+      const { data: { session }, error: authError } = await supabase.auth.getSession();
+      if (authError || !session) {
+        console.error('❌ [UserManager] Auth error during update:', authError);
+        setError('Authentication required for updates');
+        return;
+      }
+      
+      console.log('🔑 [UserManager] Update auth verified:', {
+        updaterEmail: session.user.email,
+        updaterId: session.user.id
+      });
+      
+      const { data, error } = await supabase
         .from('users')
         .update(updates)
-        .eq('id', userId);
+        .eq('id', userId)
+        .select()
+        .single();
 
       if (error) {
-        console.error('Error updating user:', error);
+        console.error('❌ [UserManager] Update failed:', {
+          error,
+          details: {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code
+          },
+          context: { userId, updates }
+        });
+        setError(`Failed to update user: ${error.message}`);
         return;
       }
 
+      console.log('✅ [UserManager] Update successful:', {
+        updatedUser: data,
+        userId,
+        appliedUpdates: updates
+      });
+
       // Refresh the user list
-      fetchUsers(currentPage, searchTerm);
+      await fetchUsers(currentPage, searchTerm);
     } catch (error) {
-      console.error('Unexpected error updating user:', error);
+      console.error('💥 [UserManager] Unexpected update error:', {
+        error,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        context: { userId, updates }
+      });
+      setError('An unexpected error occurred while updating user');
     }
   };
 
@@ -164,6 +268,18 @@ const UserManager: React.FC = () => {
         </div>
       </CardHeader>
       <CardContent>
+        {error && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              <div className="space-y-2">
+                <p><strong>Error:</strong> {error}</p>
+                <p className="text-xs opacity-75">Check browser console for detailed logs</p>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <div className="text-sm text-muted-foreground">Loading users...</div>

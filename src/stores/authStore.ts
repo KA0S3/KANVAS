@@ -78,16 +78,21 @@ export const useAuthStore = create<AuthStore>()(
       initializeAuth: () => {
         // Prevent multiple initializations
         if (get().loading === false || get()._authStateInitialized) {
-          console.log('[authStore] Auth store already initialized');
+          console.log('🔒 [authStore] Auth store already initialized');
           return;
         }
         
-        console.log('[authStore] Initializing auth store');
+        console.log('🚀 [authStore] Initializing auth store');
         set({ _authStateInitialized: true });
         
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (event, session) => {
-            console.log('[authStore] Auth state changed:', event, session?.user?.email);
+            console.log('🔄 [authStore] Auth state changed:', {
+              event,
+              userEmail: session?.user?.email,
+              userId: session?.user?.id,
+              hasSession: !!session
+            });
             
             if (session?.user) {
               // User is signed in
@@ -96,11 +101,17 @@ export const useAuthStore = create<AuthStore>()(
               
               // Clear verification pending state when user successfully signs in
               if (get().isVerificationPending) {
+                console.log('✅ [authStore] Clearing verification pending state');
                 set({ isVerificationPending: false, verificationEmail: null });
               }
               
               // Only fetch plan data if user actually changed
               if (currentUserId !== lastUserId) {
+                console.log('👤 [authStore] New user detected, fetching data:', {
+                  currentUserId,
+                  lastUserId,
+                  email: session.user.email
+                });
                 set({
                   user: session.user,
                   isAuthenticated: true,
@@ -116,6 +127,7 @@ export const useAuthStore = create<AuthStore>()(
                   get().fetchOwnerKeys(session.user.id),
                 ]);
               } else {
+                console.log('🔄 [authStore] Same user, updating session only');
                 // Just update user object, don't re-fetch plan
                 set({
                   user: session.user,
@@ -127,6 +139,7 @@ export const useAuthStore = create<AuthStore>()(
               }
             } else {
               // User is signed out
+              console.log('🚪 [authStore] User signed out, clearing state');
               set({
                 user: null,
                 plan: 'guest',
@@ -148,7 +161,11 @@ export const useAuthStore = create<AuthStore>()(
 
         // Simple session check without timeout
         supabase.auth.getSession().then(async ({ data: { session } }) => {
-          console.log('[authStore] Initial session:', session?.user?.email);
+          console.log('🔍 [authStore] Initial session check:', {
+            hasSession: !!session,
+            userEmail: session?.user?.email,
+            userId: session?.user?.id
+          });
           if (session?.user) {
             set({
               user: session.user,
@@ -163,6 +180,7 @@ export const useAuthStore = create<AuthStore>()(
               get().fetchOwnerKeys(session.user.id),
             ]);
           } else {
+            console.log('🚫 [authStore] No initial session found');
             set({
               user: null,
               plan: 'guest',
