@@ -496,7 +496,7 @@ export const useAuthStore = create<AuthStore>()(
           }
 
           if (data && data.length > 0) {
-            const ownerKey = data[0];
+            const ownerKey = data[0] as any;
             set({
               ownerKeyInfo: {
                 isValid: true,
@@ -666,13 +666,9 @@ export const useAuthStore = create<AuthStore>()(
     }),
     {
       name: 'kanvas-auth',
-      // Only persist minimal state - authentication should be fresh each time
-      partialize: (state) => ({
-        plan: state.plan,
-        licenseInfo: state.licenseInfo,
-      }),
       // Don't persist authentication state to avoid sign out issues
-      skipHydration: false,
+      // Let Supabase handle session persistence naturally
+      skipHydration: true,
     }
   )
 );
