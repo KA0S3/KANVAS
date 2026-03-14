@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { supabase, authUtils } from '@/lib/supabaseClient'
+import { supabase, authUtils } from "@/lib/supabase";
 import { toast } from 'sonner'
 
 interface UseAuthFlowReturn {

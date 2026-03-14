@@ -31,7 +31,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useCloudStore } from '@/stores/cloudStore';
 import { formatBytes } from '@/lib/utils';
 import { toast } from 'sonner';
-import { supabase } from '@/lib/supabaseClient';
+import { supabase, authUtils } from "@/lib/supabase";
 
 interface AccountModalProps {
   isOpen: boolean;
