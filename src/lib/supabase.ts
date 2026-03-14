@@ -11,4 +11,16 @@ if (!supabaseAnonKey) {
   throw new Error('VITE_SUPABASE_ANON_KEY environment variable is missing')
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Singleton pattern to prevent multiple instances
+let supabaseInstance: ReturnType<typeof createClient> | null = null
+
+export const supabase = (() => {
+  if (supabaseInstance) {
+    console.warn('⚠️ [Supabase] Returning existing instance to prevent multiple clients')
+    return supabaseInstance
+  }
+  
+  supabaseInstance = createClient(supabaseUrl, supabaseAnonKey)
+  console.log('✅ [Supabase] Created new singleton instance')
+  return supabaseInstance
+})()
