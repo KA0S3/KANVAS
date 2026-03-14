@@ -110,7 +110,7 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
     },
   });
 
-  // Reset form and error when modal opens/closes or mode changes
+  // Reset form and error when modal opens
   useEffect(() => {
     if (isOpen) {
       setAuthError(null);

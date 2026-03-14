@@ -45,3 +45,11 @@ server/
 
 # GitHub workflows (require special permissions)
 .github/workflows/
+
+# Additional security exclusions
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+debug-localstorage.js
