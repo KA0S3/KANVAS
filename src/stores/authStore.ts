@@ -78,21 +78,16 @@ export const useAuthStore = create<AuthStore>()(
       initializeAuth: () => {
         // Prevent multiple initializations
         if (get().loading === false || get()._authStateInitialized) {
-          console.log('🔒 [authStore] Auth store already initialized');
+          console.log('[authStore] Auth store already initialized');
           return;
         }
         
-        console.log('🚀 [authStore] Initializing auth store');
+        console.log('[authStore] Initializing auth store');
         set({ _authStateInitialized: true });
         
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (event, session) => {
-            console.log('🔄 [authStore] Auth state changed:', {
-              event,
-              userEmail: session?.user?.email,
-              userId: session?.user?.id,
-              hasSession: !!session
-            });
+            console.log('[authStore] Auth state changed:', event, session?.user?.email);
             
             if (session?.user) {
               // User is signed in
@@ -101,17 +96,11 @@ export const useAuthStore = create<AuthStore>()(
               
               // Clear verification pending state when user successfully signs in
               if (get().isVerificationPending) {
-                console.log('✅ [authStore] Clearing verification pending state');
                 set({ isVerificationPending: false, verificationEmail: null });
               }
               
               // Only fetch plan data if user actually changed
               if (currentUserId !== lastUserId) {
-                console.log('👤 [authStore] New user detected, fetching data:', {
-                  currentUserId,
-                  lastUserId,
-                  email: session.user.email
-                });
                 set({
                   user: session.user,
                   isAuthenticated: true,
@@ -127,7 +116,6 @@ export const useAuthStore = create<AuthStore>()(
                   get().fetchOwnerKeys(session.user.id),
                 ]);
               } else {
-                console.log('🔄 [authStore] Same user, updating session only');
                 // Just update user object, don't re-fetch plan
                 set({
                   user: session.user,
@@ -139,7 +127,6 @@ export const useAuthStore = create<AuthStore>()(
               }
             } else {
               // User is signed out
-              console.log('🚪 [authStore] User signed out, clearing state');
               set({
                 user: null,
                 plan: 'guest',
@@ -161,11 +148,7 @@ export const useAuthStore = create<AuthStore>()(
 
         // Simple session check without timeout
         supabase.auth.getSession().then(async ({ data: { session } }) => {
-          console.log('🔍 [authStore] Initial session check:', {
-            hasSession: !!session,
-            userEmail: session?.user?.email,
-            userId: session?.user?.id
-          });
+          console.log('[authStore] Initial session:', session?.user?.email);
           if (session?.user) {
             set({
               user: session.user,
@@ -180,7 +163,6 @@ export const useAuthStore = create<AuthStore>()(
               get().fetchOwnerKeys(session.user.id),
             ]);
           } else {
-            console.log('🚫 [authStore] No initial session found');
             set({
               user: null,
               plan: 'guest',
@@ -261,7 +243,30 @@ export const useAuthStore = create<AuthStore>()(
         try {
           console.log('[authStore] Starting sign out process');
           
-          // Sign out from Supabase - this will clear the session and storage automatically
+          // Clear all Supabase session storage first
+          try {
+            // Clear any remaining Supabase session data
+            const storageKeys = [
+              'supabase.auth.token',
+              'supabase.auth.refreshToken',
+              'supabase.auth.codeVerifier',
+              'supabase.auth.pkceCodeVerifier'
+            ];
+            
+            storageKeys.forEach(key => {
+              localStorage.removeItem(key);
+              sessionStorage.removeItem(key);
+            });
+            
+            // Clear our auth store persisted data
+            localStorage.removeItem('kanvas-auth');
+            
+            console.log('[authStore] Cleared all session storage');
+          } catch (clearError) {
+            console.warn('[authStore] Error clearing session storage:', clearError);
+          }
+          
+          // Now sign out from Supabase - the auth state change listener will handle the rest
           const { error } = await supabase.auth.signOut();
           
           if (error) {
@@ -269,7 +274,7 @@ export const useAuthStore = create<AuthStore>()(
             throw error;
           }
           
-          console.log('[authStore] Sign out completed successfully');
+          console.log('[authStore] Sign out initiated successfully');
         } catch (error) {
           console.error('Unexpected sign out error:', error);
           // If Supabase sign out fails, manually clear state
@@ -284,6 +289,8 @@ export const useAuthStore = create<AuthStore>()(
             effectiveLimits: null,
             _lastFetchedUserId: undefined,
           });
+          localStorage.removeItem('kanvas-auth');
+          updateQuotaBasedOnPlan();
           throw error;
         }
       },
@@ -471,7 +478,7 @@ export const useAuthStore = create<AuthStore>()(
           }
 
           if (data && data.length > 0) {
-            const ownerKey = data[0] as any;
+            const ownerKey = data[0];
             set({
               ownerKeyInfo: {
                 isValid: true,
@@ -641,11 +648,12 @@ export const useAuthStore = create<AuthStore>()(
     }),
     {
       name: 'kanvas-auth',
-      // Persist minimal state - let Supabase handle the actual session
+      // Only persist minimal state - authentication should be fresh each time
       partialize: (state) => ({
         plan: state.plan,
         licenseInfo: state.licenseInfo,
       }),
+      // Don't persist authentication state to avoid sign out issues
       skipHydration: false,
     }
   )
