@@ -44,9 +44,9 @@ interface AuthStore {
   
   // Methods
   initializeAuth: () => void;
-  signIn: (email: string, password: string) => Promise<{ error?: string; success?: boolean }>;
+  signIn: (email: string, password: string) => Promise<{ error?: string; success?: boolean; provider?: string }>;
   signInWithGoogle: () => Promise<{ error?: string; success?: boolean }>;
-  signUp: (email: string, password: string) => Promise<{ error?: string; success?: boolean }>;
+  signUp: (email: string, password: string) => Promise<{ error?: string; success?: boolean; provider?: string }>;
   signOut: () => Promise<void>;
   setPlan: (plan: Plan) => void;
   fetchUserPlan: (userId: string) => Promise<void>;
@@ -58,6 +58,11 @@ interface AuthStore {
   refreshUserData: () => Promise<void>; // New method for real-time updates
   clearAllAuthData: () => void; // Debug method to clear all auth data
   setVerificationPending: (pending: boolean, email?: string) => void; // New method for verification state
+  
+  // Enhanced auth methods for provider conflict resolution
+  checkUserExists: (email: string) => Promise<{ exists: boolean; providers: string[]; userId?: string }>;
+  linkPasswordToGoogleUser: (email: string, password: string) => Promise<{ error?: string; success?: boolean }>;
+  detectAuthProvider: (email: string) => Promise<{ provider: string | null; canUseEmail: boolean; canUseGoogle: boolean }>;
 }
 
 export const useAuthStore = create<AuthStore>()(
@@ -187,6 +192,28 @@ export const useAuthStore = create<AuthStore>()(
       // Sign in method
       signIn: async (email: string, password: string) => {
         try {
+          console.log('[authStore] Starting sign in process for:', email);
+          
+          // First detect if user exists and their preferred provider
+          const providerDetection = await get().detectAuthProvider(email);
+          
+          if (providerDetection.provider && !providerDetection.canUseEmail) {
+            console.log('[authStore] User exists but cannot use email login, provider:', providerDetection.provider);
+            
+            if (providerDetection.provider === 'google') {
+              return { 
+                error: 'This email is registered with Google. Please sign in with Google instead.',
+                provider: 'google'
+              };
+            } else {
+              return { 
+                error: `This email is registered with ${providerDetection.provider}. Please use the correct sign-in method.`,
+                provider: providerDetection.provider
+              };
+            }
+          }
+          
+          // Attempt email sign in
           const { data, error } = await supabase.auth.signInWithPassword({
             email,
             password,
@@ -194,9 +221,22 @@ export const useAuthStore = create<AuthStore>()(
 
           if (error) {
             console.error('Sign in error:', error);
+            
+            // Check if this might be a provider conflict
+            if (error.message === 'Invalid login credentials') {
+              const userCheck = await get().checkUserExists(email);
+              if (userCheck.exists && userCheck.providers.includes('google')) {
+                return { 
+                  error: 'This email is registered with Google. Please sign in with Google instead.',
+                  provider: 'google'
+                };
+              }
+            }
+            
             return { error: error.message };
           }
 
+          console.log('[authStore] Sign in successful');
           // The onAuthStateChange listener will handle updating the state
           return { success: true };
         } catch (error) {
@@ -232,6 +272,33 @@ export const useAuthStore = create<AuthStore>()(
       // Sign up method
       signUp: async (email: string, password: string) => {
         try {
+          console.log('[authStore] Starting sign up process for:', email);
+          
+          // First check if user already exists
+          const userCheck = await get().checkUserExists(email);
+          
+          if (userCheck.exists) {
+            console.log('[authStore] User already exists with providers:', userCheck.providers);
+            
+            if (userCheck.providers.includes('google')) {
+              return { 
+                error: 'This email is already registered with Google. Would you like to sign in with Google, or create a password for your account?',
+                provider: 'google'
+              };
+            } else if (userCheck.providers.includes('email')) {
+              return { 
+                error: 'An account with this email already exists. Please sign in instead.',
+                provider: 'email'
+              };
+            } else {
+              return { 
+                error: 'An account with this email already exists. Please sign in with the correct method.',
+                provider: userCheck.providers[0] || 'unknown'
+              };
+            }
+          }
+          
+          // Attempt to sign up the user
           const { data, error } = await supabase.auth.signUp({
             email,
             password,
@@ -242,18 +309,50 @@ export const useAuthStore = create<AuthStore>()(
 
           if (error) {
             console.error('Sign up error:', error);
+            
+            // Handle specific Supabase errors that might indicate user exists
+            if (error.message.includes('user_already_exists') || 
+                error.message.includes('duplicate') ||
+                error.message.includes('already registered')) {
+              
+              // Double-check with our own detection
+              const doubleCheck = await get().checkUserExists(email);
+              if (doubleCheck.exists) {
+                if (doubleCheck.providers.includes('google')) {
+                  return { 
+                    error: 'This email is already registered with Google. Please sign in with Google instead.',
+                    provider: 'google'
+                  };
+                } else {
+                  return { 
+                    error: 'An account with this email already exists. Please sign in instead.',
+                    provider: 'email'
+                  };
+                }
+              }
+            }
+            
             return { error: error.message };
           }
 
-          // Check if user needs email confirmation
+          console.log('[authStore] Sign up response received:', { 
+            user: !!data.user, 
+            emailConfirmed: !!data.user?.email_confirmed_at 
+          });
+
+          // Handle different sign up scenarios
           if (data.user && !data.user.email_confirmed_at) {
+            console.log('[authStore] User created, email confirmation required');
             set({ isVerificationPending: true, verificationEmail: email });
             return { success: true };
           } else if (data.user && data.user.email_confirmed_at) {
-            // User is already confirmed (rare case)
+            console.log('[authStore] User created and already confirmed');
+            // User is already confirmed (might happen if email confirmation is disabled)
             return { success: true };
           } else {
-            // No user returned, likely email confirmation required
+            console.log('[authStore] No user object returned, likely email confirmation required');
+            // This is the "fake success" case - Supabase returns success but no user object
+            // when email confirmation is enabled and user needs to confirm
             set({ isVerificationPending: true, verificationEmail: email });
             return { success: true };
           }
@@ -669,6 +768,140 @@ export const useAuthStore = create<AuthStore>()(
     });
     localStorage.removeItem('kanvas-auth');
     updateQuotaBasedOnPlan();
+  },
+
+  // Enhanced auth methods for provider conflict resolution
+  
+  // Check if user exists and what providers they have
+  checkUserExists: async (email: string) => {
+    try {
+      console.log('[authStore] Checking if user exists:', email);
+      
+      // Method 1: Try to get user by email using admin API (if available)
+      // For now, we'll use a client-side approach by attempting sign-in methods
+      
+      // Check if user exists in auth.users by trying to sign in with a dummy password
+      // This is a workaround since we don't have direct admin access
+      
+      // Try to get current user info to see if email matches
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user?.email === email) {
+        console.log('[authStore] User found in current session');
+        const providers = Array.isArray(user.app_metadata?.provider) 
+          ? user.app_metadata.provider 
+          : user.app_metadata?.provider 
+            ? [user.app_metadata.provider] 
+            : ['email'];
+        return { 
+          exists: true, 
+          providers,
+          userId: user.id 
+        };
+      }
+      
+      // Try to check via auth.signInWithPassword with a known invalid password
+      // This will tell us if the user exists (invalid credentials) vs doesn't exist
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: 'invalid-password-for-checking-existence-only'
+      });
+      
+      if (signInError?.message === 'Invalid login credentials') {
+        console.log('[authStore] User exists but wrong password');
+        // User exists, now check their providers
+        return { 
+          exists: true, 
+          providers: ['email'], // Default assumption
+          userId: undefined 
+        };
+      } else if (signInError?.message.includes('Email not confirmed')) {
+        console.log('[authStore] User exists but email not confirmed');
+        return { 
+          exists: true, 
+          providers: ['email'], 
+          userId: undefined 
+        };
+      } else if (signInError?.message.includes('Invalid login credentials')) {
+        console.log('[authStore] User does not exist');
+        return { exists: false, providers: [] };
+      }
+      
+      // Default fallback - assume user doesn't exist
+      console.log('[authStore] Could not determine user existence, assuming false');
+      return { exists: false, providers: [] };
+      
+    } catch (error) {
+      console.error('[authStore] Error checking user existence:', error);
+      return { exists: false, providers: [] };
+    }
+  },
+
+  // Detect which auth provider a user can/should use
+  detectAuthProvider: async (email: string) => {
+    try {
+      console.log('[authStore] Detecting auth provider for:', email);
+      
+      const userCheck = await get().checkUserExists(email);
+      
+      if (!userCheck.exists) {
+        return { 
+          provider: null, 
+          canUseEmail: true, 
+          canUseGoogle: true 
+        };
+      }
+      
+      const providers = userCheck.providers || [];
+      const canUseEmail = providers.includes('email');
+      const canUseGoogle = providers.includes('google');
+      
+      console.log('[authStore] Provider detection result:', {
+        providers,
+        canUseEmail,
+        canUseGoogle
+      });
+      
+      return {
+        provider: providers[0] || null,
+        canUseEmail,
+        canUseGoogle
+      };
+      
+    } catch (error) {
+      console.error('[authStore] Error detecting auth provider:', error);
+      return { 
+        provider: null, 
+        canUseEmail: true, 
+        canUseGoogle: true 
+      };
+    }
+  },
+
+  // Link password to existing Google user
+  linkPasswordToGoogleUser: async (email: string, password: string) => {
+    try {
+      console.log('[authStore] Attempting to link password to Google user:', email);
+      
+      // This is a complex operation that requires the user to be signed in with Google first
+      // For now, we'll guide them through the password reset flow
+      
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${import.meta.env.VITE_APP_URL || window.location.origin}/auth/reset-password`
+      });
+      
+      if (error) {
+        console.error('[authStore] Error sending password reset:', error);
+        return { error: error.message };
+      }
+      
+      console.log('[authStore] Password reset sent successfully');
+      return { success: true };
+      
+    } catch (error) {
+      console.error('[authStore] Unexpected error linking password:', error);
+      return { error: 'An unexpected error occurred while setting up password access' };
+    }
   },
     }),
     {
