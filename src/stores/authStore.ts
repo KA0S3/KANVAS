@@ -45,6 +45,7 @@ interface AuthStore {
   // Methods
   initializeAuth: () => void;
   signIn: (email: string, password: string) => Promise<{ error?: string; success?: boolean }>;
+  signInWithGoogle: () => Promise<{ error?: string; success?: boolean }>;
   signUp: (email: string, password: string) => Promise<{ error?: string; success?: boolean }>;
   signOut: () => Promise<void>;
   setPlan: (plan: Plan) => void;
@@ -201,6 +202,30 @@ export const useAuthStore = create<AuthStore>()(
         } catch (error) {
           console.error('Unexpected sign in error:', error);
           return { error: 'An unexpected error occurred during sign in' };
+        }
+      },
+
+      // Sign in with Google method
+      signInWithGoogle: async () => {
+        try {
+          const { data, error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+              redirectTo: `${window.location.origin}/auth/callback`,
+            },
+          });
+
+          if (error) {
+            console.error('Google sign in error:', error);
+            return { error: error.message };
+          }
+
+          // OAuth flow will redirect to Google, then to our callback
+          // The onAuthStateChange listener will handle updating the state
+          return { success: true };
+        } catch (error) {
+          console.error('Unexpected Google sign in error:', error);
+          return { error: 'An unexpected error occurred during Google sign in' };
         }
       },
 

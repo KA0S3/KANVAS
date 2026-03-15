@@ -27,11 +27,12 @@ import { PaymentModal } from '@/components/subscription/PaymentModal';
 import { FeatureTeaserCard } from '@/components/upgrade/FeatureTeaserCard';
 import { UpgradePromptModal } from '@/components/UpgradePromptModal';
 import { CheckEmailView } from '@/components/auth/CheckEmailView';
+import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
 import { useAuthStore } from '@/stores/authStore';
 import { useCloudStore } from '@/stores/cloudStore';
 import { formatBytes } from '@/lib/utils';
 import { toast } from 'sonner';
-import { supabase, authUtils } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 
 interface AccountModalProps {
   isOpen: boolean;
@@ -75,6 +76,7 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
     isAuthenticated, 
     loading: authLoading, 
     signIn, 
+    signInWithGoogle,
     signUp, 
     signOut,
     initializeAuth,
@@ -456,20 +458,24 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
                         )}
                       />
 
-                      <Button
-                        type="submit"
-                        disabled={isSubmitting}
-                        className="w-full"
-                      >
-                        {isSubmitting ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Signing in...
-                          </>
-                        ) : (
-                          'Sign In'
-                        )}
-                      </Button>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Button
+                          type="submit"
+                          disabled={isSubmitting}
+                          className="w-full"
+                        >
+                          {isSubmitting ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Signing in...
+                            </>
+                          ) : (
+                            'Sign In'
+                          )}
+                        </Button>
+
+                        <GoogleSignInButton fullWidth />
+                      </div>
                     </form>
                   </Form>
                 ) : (
@@ -539,20 +545,24 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
                         )}
                       />
 
-                      <Button
-                        type="submit"
-                        disabled={isSubmitting}
-                        className="w-full"
-                      >
-                        {isSubmitting ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Creating account...
-                          </>
-                        ) : (
-                          'Create Account'
-                        )}
-                      </Button>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Button
+                          type="submit"
+                          disabled={isSubmitting}
+                          className="w-full"
+                        >
+                          {isSubmitting ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Creating account...
+                            </>
+                          ) : (
+                            'Create Account'
+                          )}
+                        </Button>
+
+                        <GoogleSignInButton fullWidth />
+                      </div>
                     </form>
                   </Form>
                 )}
@@ -560,39 +570,10 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
               )}
               </CardContent>
 
-              {/* Policy Links */}
-              <div className="pt-4 border-t border-glass-border/30">
-                <div className="text-xs text-muted-foreground text-center mb-3">
-                  By creating an account, you agree to our:
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => window.open('/terms-of-service', '_blank')}
-                    className="text-xs text-muted-foreground hover:text-foreground justify-center"
-                  >
-                    <ExternalLink className="w-3 h-3 mr-1" />
-                    Terms of Service
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => window.open('/privacy-policy', '_blank')}
-                    className="text-xs text-muted-foreground hover:text-foreground justify-center"
-                  >
-                    <ExternalLink className="w-3 h-3 mr-1" />
-                    Privacy Policy
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => window.open('/refund-policy', '_blank')}
-                    className="text-xs text-muted-foreground hover:text-foreground justify-center"
-                  >
-                    <ExternalLink className="w-3 h-3 mr-1" />
-                    Refund & Cancellation Policy
-                  </Button>
+              {/* Authentication Optional Notice */}
+              <div className="px-6 pb-4">
+                <div className="text-xs text-muted-foreground text-center p-3 bg-glass/20 rounded-lg border border-glass-border/20">
+                  ⚠️ Authentication is optional - app works fully offline
                 </div>
               </div>
             </Card>
@@ -819,9 +800,40 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
 
         </div>
         
-        {/* Footer note */}
-        <div className="text-xs text-muted-foreground text-center p-4 border-t border-border/20">
-          ⚠️ Authentication is optional - app works fully offline
+        {/* Footer with Terms and Conditions */}
+        <div className="border-t border-glass-border/30 p-2">
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            {/* Top row - text spanning all 3 columns */}
+            <div className="col-span-3 text-center text-muted-foreground mb-1">
+              By creating an account, you agree to our:
+            </div>
+            
+            {/* Bottom row - 3 columns with links */}
+            <a
+              href="/terms-of-service"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-center text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Terms of Service
+            </a>
+            <a
+              href="/privacy-policy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-center text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Privacy Policy
+            </a>
+            <a
+              href="/refund-policy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-center text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Refund & Cancellation Policy
+            </a>
+          </div>
         </div>
       </DialogContent>
       
