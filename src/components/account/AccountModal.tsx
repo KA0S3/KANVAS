@@ -92,7 +92,8 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
     setVerificationPending,
     checkUserExists,
     detectAuthProvider,
-    linkPasswordToGoogleUser
+    linkPasswordToGoogleUser,
+    createPasswordForGoogleUser
   } = useAuthStore();
 
   const { quota } = useCloudStore();
@@ -314,8 +315,12 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
         setAuthError(result.error);
         toast.error(result.error);
       } else {
-        toast.success('Password setup link sent to your email!');
+        toast.success(result.message || 'Password setup link sent to your email!');
         setShowPasswordLinking(true);
+        
+        // Clear the conflict but show helpful message
+        setProviderConflict(null);
+        setAuthError('Check your email for the password setup link. You can then sign in with either Google or your new password.');
       }
     } catch (error) {
       const errorMessage = 'Failed to send password setup link';
@@ -472,7 +477,11 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
                 {/* Display auth error */}
                 {authError && (
                   <div className="space-y-3">
-                    <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-sm text-destructive">
+                    <div className={`p-3 rounded-md border text-sm ${
+                      showPasswordLinking 
+                        ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-200'
+                        : 'bg-destructive/10 border-destructive/20 text-destructive'
+                    }`}>
                       {authError}
                     </div>
                     
@@ -556,8 +565,24 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
                       </div>
                     )}
                     
+                    {/* Show password linking success message */}
+                    {showPasswordLinking && !providerConflict && (
+                      <div className="flex flex-col items-center space-y-3">
+                        <p className="text-sm text-muted-foreground text-center">
+                          After setting up your password, you'll be able to sign in with either Google or your email.
+                        </p>
+                        <Button
+                          onClick={clearProviderConflict}
+                          variant="outline"
+                          className="w-full"
+                        >
+                          Got it, thanks!
+                        </Button>
+                      </div>
+                    )}
+                    
                     {/* Show Sign Up button for invalid credentials error */}
-                    {!providerConflict && authError.includes('Invalid login credentials') && (
+                    {!providerConflict && !showPasswordLinking && authError.includes('Invalid login credentials') && (
                       <div className="flex flex-col items-center space-y-2">
                         <p className="text-sm text-muted-foreground text-center">
                           Don't have an account yet?

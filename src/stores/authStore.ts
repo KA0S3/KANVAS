@@ -61,7 +61,8 @@ interface AuthStore {
   
   // Enhanced auth methods for provider conflict resolution
   checkUserExists: (email: string) => Promise<{ exists: boolean; providers: string[]; userId?: string }>;
-  linkPasswordToGoogleUser: (email: string, password: string) => Promise<{ error?: string; success?: boolean }>;
+  linkPasswordToGoogleUser: (email: string, password: string) => Promise<{ error?: string; success?: boolean; message?: string }>;
+  createPasswordForGoogleUser: (email: string, newPassword: string, resetToken?: string) => Promise<{ error?: string; success?: boolean; message?: string }>;
   detectAuthProvider: (email: string) => Promise<{ provider: string | null; canUseEmail: boolean; canUseGoogle: boolean }>;
 }
 
@@ -883,11 +884,11 @@ export const useAuthStore = create<AuthStore>()(
     try {
       console.log('[authStore] Attempting to link password to Google user:', email);
       
-      // This is a complex operation that requires the user to be signed in with Google first
-      // For now, we'll guide them through the password reset flow
+      // Method 1: Try to update the user's password directly
+      // This requires the user to be authenticated first, so we'll use password reset
       
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${import.meta.env.VITE_APP_URL || window.location.origin}/auth/reset-password`
+        redirectTo: `${import.meta.env.VITE_APP_URL || window.location.origin}/auth/reset-password?setup=true`
       });
       
       if (error) {
@@ -896,11 +897,37 @@ export const useAuthStore = create<AuthStore>()(
       }
       
       console.log('[authStore] Password reset sent successfully');
-      return { success: true };
+      return { success: true, message: 'Password setup link sent to your email! Check your inbox to continue.' };
       
     } catch (error) {
       console.error('[authStore] Unexpected error linking password:', error);
       return { error: 'An unexpected error occurred while setting up password access' };
+    }
+  },
+
+  // Enhanced method to create password for Google users
+  createPasswordForGoogleUser: async (email: string, newPassword: string, resetToken?: string) => {
+    try {
+      console.log('[authStore] Creating password for Google user:', email);
+      
+      // This would typically be called from the reset password flow
+      // For now, we'll use the reset password approach
+      
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+      
+      if (error) {
+        console.error('[authStore] Error updating password:', error);
+        return { error: error.message };
+      }
+      
+      console.log('[authStore] Password created successfully');
+      return { success: true, message: 'Password created successfully! You can now sign in with either Google or your password.' };
+      
+    } catch (error) {
+      console.error('[authStore] Unexpected error creating password:', error);
+      return { error: 'An unexpected error occurred while creating your password' };
     }
   },
     }),
