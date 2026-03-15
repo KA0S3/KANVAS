@@ -461,9 +461,32 @@ export function AssetItem({ asset, onDelete, onMouseDown, onTouchStart, onDouble
         </>
       ) : (
         /* Square Asset Layout (original) */
-        <div className={`glass cosmic-glow border border-glass-border/40 h-full overflow-hidden ${
-          portraitImage ? 'relative' : 'flex flex-col'
+        <div className={`glass cosmic-glow border border-glass-border/40 h-full overflow-hidden relative ${
+          portraitImage ? 'pt-8' : 'flex flex-col'
         }`}>
+          {/* Top section for text - only shown when portraitImage exists */}
+          {portraitImage && (
+            <div className="absolute top-0 left-0 right-0 h-8 border-b z-10" style={{ backgroundColor: '#25355a', borderColor: '#25355a' }}>
+              <div className="flex items-center gap-2 p-2 h-full">
+                <Move className="w-4 h-4 text-foreground/80 opacity-70 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                <Icon className={`w-5 h-5 ${colorClass} flex-shrink-0`} />
+                {displaySettings.name && (
+                  <span className="flex-1 text-sm font-medium text-foreground truncate">{asset.name}</span>
+                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit?.(asset);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-blue-500/20 rounded flex-shrink-0"
+                  title="Edit asset"
+                >
+                  <Edit className="w-4 h-4 text-blue-400" />
+                </button>
+              </div>
+            </div>
+          )}
+          
           {/* Thumbnail with overlay content */}
           {portraitImage ? (
             <>
@@ -472,44 +495,20 @@ export function AssetItem({ asset, onDelete, onMouseDown, onTouchStart, onDouble
                 <img
                   src={portraitImage}
                   alt={`${asset.name} portrait`}
-                  className="w-full h-full object-cover"
+                  className="absolute top-8 left-0 w-full h-[calc(100%-2rem)] object-cover"
                   style={{
                     filter: `blur(${displaySettings.portraitBlur * 8}px)`,
                   }}
                 />
                 {/* Dark gradient overlay for text legibility */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+                <div className="absolute top-8 left-0 w-full h-[calc(100%-2rem)] bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
               </div>
               
-              {/* Content overlay positioned at bottom */}
-              <div className="relative z-10 h-full flex flex-col justify-between p-3">
-                {/* Top section with name tab and controls */}
-                <div className="flex items-start justify-between gap-2">
-                  {/* Name with tab styling */}
-                  {displaySettings.name && (
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <Move className="w-4 h-4 text-white/80 opacity-70 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-                      <Icon className={`w-5 h-5 ${colorClass} flex-shrink-0`} />
-                      <div className="fantasy-tab flex-1 min-w-0">
-                        <span className="text-sm font-medium text-white truncate drop-shadow-lg">{asset.name}</span>
-                      </div>
-                    </div>
-                  )}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEdit?.(asset);
-                    }}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-blue-500/20 rounded flex-shrink-0"
-                    title="Edit asset"
-                  >
-                    <Edit className="w-4 h-4 text-blue-400" />
-                  </button>
-                </div>
-
+              {/* Content overlay positioned at bottom - now without name since it's in top section */}
+              <div className="relative z-10 h-full flex flex-col justify-end p-3">
                 {/* Middle section with description */}
                 {displaySettings.description && asset.description && (
-                  <div className="flex-1 flex items-center">
+                  <div className="mb-2">
                     <div className="text-xs text-white/90 line-clamp-3 drop-shadow-md">
                       {asset.description}
                     </div>
