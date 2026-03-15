@@ -281,7 +281,12 @@ export const useAuthStore = create<AuthStore>()(
           if (userCheck.exists) {
             console.log('[authStore] User already exists with providers:', userCheck.providers);
             
-            if (userCheck.providers.includes('google')) {
+            if (userCheck.providers.includes('google') && userCheck.providers.includes('email')) {
+              return { 
+                error: 'This email is already registered. Please sign in instead, or if you\'re a Google user, click "Create password" to set up email access.',
+                provider: 'conflict'
+              };
+            } else if (userCheck.providers.includes('google')) {
               return { 
                 error: 'This email is already registered with Google. Would you like to sign in with Google, or create a password for your account?',
                 provider: 'google'
@@ -809,11 +814,11 @@ export const useAuthStore = create<AuthStore>()(
       });
       
       if (signInError?.message === 'Invalid login credentials') {
-        console.log('[authStore] User exists but wrong password');
-        // User exists, now check their providers
+        console.log('[authStore] User exists but wrong password - could be Google or Email user');
+        // User exists, but we don't know which provider - return both to trigger conflict detection
         return { 
           exists: true, 
-          providers: ['email'], // Default assumption
+          providers: ['email', 'google'], // Return both to trigger conflict UI
           userId: undefined 
         };
       } else if (signInError?.message.includes('Email not confirmed')) {
@@ -862,6 +867,15 @@ export const useAuthStore = create<AuthStore>()(
         canUseEmail,
         canUseGoogle
       });
+      
+      // If both providers are possible, we need to let the actual sign-in attempt determine
+      if (providers.length > 1) {
+        return {
+          provider: null, // Let the actual sign-in determine
+          canUseEmail: true,
+          canUseGoogle: true
+        };
+      }
       
       return {
         provider: providers[0] || null,
