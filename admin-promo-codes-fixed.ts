@@ -7,18 +7,15 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    // Initialize Supabase client with service role key
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Get the authenticated user from the request
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       return new Response(
@@ -27,7 +24,6 @@ serve(async (req) => {
       )
     }
 
-    // Extract user from JWT token
     const token = authHeader.replace('Bearer ', '')
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
     
@@ -38,7 +34,6 @@ serve(async (req) => {
       )
     }
 
-    // Check if user is owner
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('plan_type, email')
@@ -54,7 +49,6 @@ serve(async (req) => {
 
     console.log(`[admin-promo-codes] Owner access granted: ${userData.email}`)
 
-    // Handle different HTTP methods
     switch (req.method) {
       case 'GET':
         return handleGetPromoCodes(supabase, req, corsHeaders)
@@ -142,7 +136,7 @@ async function handleCreatePromoCode(supabase: any, req: Request, corsHeaders: R
       )
     }
 
-    console.log(`[admin-promo-codes] Successfully created promo code ${promoData.code}`)
+    console.log(`[admin-promo-codes] Successfully created promo code: ${promoData.code}`)
 
     return new Response(
       JSON.stringify({ data }),
@@ -162,11 +156,11 @@ async function handleCreatePromoCode(supabase: any, req: Request, corsHeaders: R
 
 async function handleUpdatePromoCode(supabase: any, req: Request, corsHeaders: Record<string, string>) {
   try {
-    const { id, updates } = await req.json()
+    const { id, ...updates } = await req.json()
 
-    if (!id || !updates) {
+    if (!id) {
       return new Response(
-        JSON.stringify({ error: 'Missing id or updates' }),
+        JSON.stringify({ error: 'Missing required field: id' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -208,12 +202,11 @@ async function handleUpdatePromoCode(supabase: any, req: Request, corsHeaders: R
 
 async function handleDeletePromoCode(supabase: any, req: Request, corsHeaders: Record<string, string>) {
   try {
-    const url = new URL(req.url)
-    const id = url.searchParams.get('id')
+    const { id } = await req.json()
 
     if (!id) {
       return new Response(
-        JSON.stringify({ error: 'Missing id parameter' }),
+        JSON.stringify({ error: 'Missing required field: id' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }

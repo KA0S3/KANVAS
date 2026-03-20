@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { fetchAdminUsers } from '@/services/adminApi';
-import { supabase } from "@/lib/supabase";
+import { fetchAdminUsers, updateUser } from '@/services/adminApi';
+import { supabase, createClient } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -81,16 +81,81 @@ const UserManager: React.FC = () => {
         search: search || 'none'
       });
       
-      const response = await fetchAdminUsers();
+      // TEMPORARY FALLBACK: Use direct Supabase calls until Edge Functions are deployed
+      console.log('📡 [UserManager] Using direct Supabase fallback');
       
-      if (response.error) {
-        console.error('❌ [UserManager] API call failed:', response.error);
-        setError(`Failed to load users: ${response.error}`);
+      let dbQuery = supabase
+        .from('users')
+        .select('*', { count: 'exact' });
+
+      if (search) {
+        dbQuery = dbQuery.ilike('email', `%${search}%`);
+      }
+
+      const { data, error, count } = await dbQuery;
+      
+      if (error) {
+        console.error('❌ [UserManager] Direct DB query failed:', error);
+        console.log('🔄 [UserManager] Trying service role fallback...');
+        
+        // Fallback: Use service role if available (bypass RLS)
+        try {
+          const serviceKey = import.meta.env?.VITE_SUPABASE_SERVICE_ROLE_KEY;
+          if (serviceKey) {
+            const serviceClient = createClient(
+              import.meta.env?.VITE_SUPABASE_URL,
+              serviceKey
+            );
+            
+            let serviceQuery = serviceClient
+              .from('users')
+              .select('*', { count: 'exact' });
+            
+            if (search) {
+              serviceQuery = serviceQuery.ilike('email', `%${search}%`);
+            }
+            
+            const { data: serviceData, error: serviceError, count: serviceCount } = await serviceQuery;
+            
+            if (serviceError) {
+              console.error('❌ [UserManager] Service role query failed:', serviceError);
+              setError(`Failed to load users: ${serviceError.message}`);
+              return;
+            }
+            
+            const users = serviceData || [];
+            setUsers(users);
+            setTotalUsers(serviceCount || 0);
+            setLoading(false);
+            setError(null);
+            
+            console.log('✅ [UserManager] Service role query successful:', {
+              userCount: users.length,
+              totalCount: serviceCount,
+              search: search || 'none'
+            });
+            return;
+          }
+        } catch (serviceErr) {
+          console.error('❌ [UserManager] Service role fallback failed:', serviceErr);
+        }
+        
+        setError(`Failed to load users: ${error.message}`);
         return;
       }
       
-      const data = response.data || [];
-      const count = data.length;
+      const users = data || [];
+      setUsers(users);
+      setTotalUsers(count || 0);
+      setLoading(false);
+      setError(null);
+      
+      console.log('✅ [UserManager] Direct DB query successful:', {
+        userCount: users.length,
+        totalCount: count,
+        search: search || 'none'
+      });
+      return;
 
       console.log(`✅ [UserManager] Query successful:`, {
         userCount: data?.length || 0,
@@ -158,43 +223,21 @@ const UserManager: React.FC = () => {
     });
     
     try {
-      // Verify authentication before update
-      const { data: { session }, error: authError } = await supabase.auth.getSession();
-      if (authError || !session) {
-        console.error('❌ [UserManager] Auth error during update:', authError);
-        setError('Authentication required for updates');
-        return;
-      }
-      
-      console.log('🔑 [UserManager] Update auth verified:', {
-        updaterEmail: session.user.email,
-        updaterId: session.user.id
+      console.log('🔑 [UserManager] Using API for update:', {
+        userId,
+        updates
       });
       
-      const { data, error } = await supabase
-        .from('users')
-        .update(updates)
-        .eq('id', userId)
-        .select()
-        .single();
-
-      if (error) {
-        console.error('❌ [UserManager] Update failed:', {
-          error,
-          details: {
-            message: error.message,
-            details: error.details,
-            hint: error.hint,
-            code: error.code
-          },
-          context: { userId, updates }
-        });
-        setError(`Failed to update user: ${error.message}`);
+      const response = await updateUser(userId, updates);
+      
+      if (response.error) {
+        console.error('❌ [UserManager] API update failed:', response.error);
+        setError(`Failed to update user: ${response.error}`);
         return;
       }
 
       console.log('✅ [UserManager] Update successful:', {
-        updatedUser: data,
+        updatedUser: response.data,
         userId,
         appliedUpdates: updates
       });

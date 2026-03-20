@@ -7,18 +7,15 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    // Initialize Supabase client with service role key
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Get the authenticated user from the request
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       return new Response(
@@ -27,7 +24,6 @@ serve(async (req) => {
       )
     }
 
-    // Extract user from JWT token
     const token = authHeader.replace('Bearer ', '')
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
     
@@ -38,7 +34,6 @@ serve(async (req) => {
       )
     }
 
-    // Check if user is owner
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('plan_type, email')
@@ -52,18 +47,15 @@ serve(async (req) => {
       )
     }
 
-    console.log(`[admin-promo-codes] Owner access granted: ${userData.email}`)
+    console.log(`[admin-owner-keys] Owner access granted: ${userData.email}`)
 
-    // Handle different HTTP methods
     switch (req.method) {
       case 'GET':
-        return handleGetPromoCodes(supabase, req, corsHeaders)
+        return handleGetOwnerKeys(supabase, req, corsHeaders)
       case 'POST':
-        return handleCreatePromoCode(supabase, req, corsHeaders)
+        return handleCreateOwnerKey(supabase, req, corsHeaders)
       case 'PUT':
-        return handleUpdatePromoCode(supabase, req, corsHeaders)
-      case 'DELETE':
-        return handleDeletePromoCode(supabase, req, corsHeaders)
+        return handleRevokeOwnerKey(supabase, req, corsHeaders)
       default:
         return new Response(
           JSON.stringify({ error: 'Method not allowed' }),
@@ -72,7 +64,7 @@ serve(async (req) => {
     }
 
   } catch (error) {
-    console.error('[admin-promo-codes] Unexpected error:', error)
+    console.error('[admin-owner-keys] Unexpected error:', error)
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -80,24 +72,29 @@ serve(async (req) => {
   }
 })
 
-async function handleGetPromoCodes(supabase: any, req: Request, corsHeaders: Record<string, string>) {
+async function handleGetOwnerKeys(supabase: any, req: Request, corsHeaders: Record<string, string>) {
   try {
-    console.log(`[admin-promo-codes] Fetching promo codes`)
+    console.log(`[admin-owner-keys] Fetching owner keys`)
 
     const { data, error } = await supabase
-      .from('promo_codes')
-      .select('*')
+      .from('owner_keys')
+      .select(`
+        *,
+        user:users(email),
+        revoked_by_user:users(email),
+        created_by_user:users(email)
+      `)
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('[admin-promo-codes] Database error:', error)
+      console.error('[admin-owner-keys] Database error:', error)
       return new Response(
         JSON.stringify({ error: `Database error: ${error.message}` }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log(`[admin-promo-codes] Successfully fetched ${data?.length || 0} promo codes`)
+    console.log(`[admin-owner-keys] Successfully fetched ${data?.length || 0} owner keys`)
 
     return new Response(
       JSON.stringify({ data: data || [] }),
@@ -107,42 +104,49 @@ async function handleGetPromoCodes(supabase: any, req: Request, corsHeaders: Rec
       }
     )
   } catch (error) {
-    console.error('[admin-promo-codes] GET error:', error)
+    console.error('[admin-owner-keys] GET error:', error)
     return new Response(
-      JSON.stringify({ error: 'Failed to fetch promo codes' }),
+      JSON.stringify({ error: 'Failed to fetch owner keys' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 }
 
-async function handleCreatePromoCode(supabase: any, req: Request, corsHeaders: Record<string, string>) {
+async function handleCreateOwnerKey(supabase: any, req: Request, corsHeaders: Record<string, string>) {
   try {
-    const promoData = await req.json()
+    const { email, notes } = await req.json()
 
-    if (!promoData.code || !promoData.discount_type || !promoData.discount_value) {
+    if (!email) {
       return new Response(
-        JSON.stringify({ error: 'Missing required fields: code, discount_type, discount_value' }),
+        JSON.stringify({ error: 'Missing required field: email' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log(`[admin-promo-codes] Creating promo code: ${promoData.code}`)
+    console.log(`[admin-owner-keys] Creating owner key for: ${email}`)
+
+    const key = `owner_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`
 
     const { data, error } = await supabase
-      .from('promo_codes')
-      .insert([promoData])
+      .from('owner_keys')
+      .insert([{
+        key,
+        email,
+        notes: notes || null,
+        created_by: (await supabase.auth.getUser(req.headers.get('Authorization')!.replace('Bearer ', ''))).data.user?.id
+      }])
       .select()
       .single()
 
     if (error) {
-      console.error('[admin-promo-codes] Create error:', error)
+      console.error('[admin-owner-keys] Create error:', error)
       return new Response(
         JSON.stringify({ error: `Create failed: ${error.message}` }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log(`[admin-promo-codes] Successfully created promo code ${promoData.code}`)
+    console.log(`[admin-owner-keys] Successfully created owner key for ${email}`)
 
     return new Response(
       JSON.stringify({ data }),
@@ -152,88 +156,45 @@ async function handleCreatePromoCode(supabase: any, req: Request, corsHeaders: R
       }
     )
   } catch (error) {
-    console.error('[admin-promo-codes] POST error:', error)
+    console.error('[admin-owner-keys] POST error:', error)
     return new Response(
-      JSON.stringify({ error: 'Failed to create promo code' }),
+      JSON.stringify({ error: 'Failed to create owner key' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 }
 
-async function handleUpdatePromoCode(supabase: any, req: Request, corsHeaders: Record<string, string>) {
+async function handleRevokeOwnerKey(supabase: any, req: Request, corsHeaders: Record<string, string>) {
   try {
-    const { id, updates } = await req.json()
-
-    if (!id || !updates) {
-      return new Response(
-        JSON.stringify({ error: 'Missing id or updates' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    console.log(`[admin-promo-codes] Updating promo code ${id}:`, updates)
-
-    const { data, error } = await supabase
-      .from('promo_codes')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single()
-
-    if (error) {
-      console.error('[admin-promo-codes] Update error:', error)
-      return new Response(
-        JSON.stringify({ error: `Update failed: ${error.message}` }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    console.log(`[admin-promo-codes] Successfully updated promo code ${id}`)
-
-    return new Response(
-      JSON.stringify({ data }),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    )
-  } catch (error) {
-    console.error('[admin-promo-codes] PUT error:', error)
-    return new Response(
-      JSON.stringify({ error: 'Failed to update promo code' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
-  }
-}
-
-async function handleDeletePromoCode(supabase: any, req: Request, corsHeaders: Record<string, string>) {
-  try {
-    const url = new URL(req.url)
-    const id = url.searchParams.get('id')
+    const { id } = await req.json()
 
     if (!id) {
       return new Response(
-        JSON.stringify({ error: 'Missing id parameter' }),
+        JSON.stringify({ error: 'Missing required field: id' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log(`[admin-promo-codes] Deleting promo code ${id}`)
+    console.log(`[admin-owner-keys] Revoking owner key ${id}`)
 
     const { error } = await supabase
-      .from('promo_codes')
-      .delete()
+      .from('owner_keys')
+      .update({ 
+        is_revoked: true,
+        revoked_at: new Date().toISOString(),
+        revoked_by: (await supabase.auth.getUser(req.headers.get('Authorization')!.replace('Bearer ', ''))).data.user?.id
+      })
       .eq('id', id)
 
     if (error) {
-      console.error('[admin-promo-codes] Delete error:', error)
+      console.error('[admin-owner-keys] Revoke error:', error)
       return new Response(
-        JSON.stringify({ error: `Delete failed: ${error.message}` }),
+        JSON.stringify({ error: `Revoke failed: ${error.message}` }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log(`[admin-promo-codes] Successfully deleted promo code ${id}`)
+    console.log(`[admin-owner-keys] Successfully revoked owner key ${id}`)
 
     return new Response(
       JSON.stringify({ success: true }),
@@ -243,9 +204,9 @@ async function handleDeletePromoCode(supabase: any, req: Request, corsHeaders: R
       }
     )
   } catch (error) {
-    console.error('[admin-promo-codes] DELETE error:', error)
+    console.error('[admin-owner-keys] PUT error:', error)
     return new Response(
-      JSON.stringify({ error: 'Failed to delete promo code' }),
+      JSON.stringify({ error: 'Failed to revoke owner key' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
