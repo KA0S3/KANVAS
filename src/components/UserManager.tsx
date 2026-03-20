@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { fetchAdminUsers } from '@/services/adminApi';
 import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -75,33 +76,21 @@ const UserManager: React.FC = () => {
         query = query.ilike('email', `%${search}%`);
       }
 
-      console.log('📡 [UserManager] Executing query:', { 
-        table: 'users', 
-        select: 'id, email, plan_type, storage_quota_mb, created_at',
-        range: `${offset}-${offset + usersPerPage - 1}`,
+      console.log('📡 [UserManager] Executing API call:', { 
+        endpoint: '/api/admin/users',
         search: search || 'none'
       });
       
-      const { data, error, count } = await query;
-
-      if (error) {
-        console.error('❌ [UserManager] Supabase query failed:', {
-          error,
-          details: {
-            message: error.message,
-            details: error.details,
-            hint: error.hint,
-            code: error.code
-          },
-          query: {
-            table: 'users',
-            page,
-            search
-          }
-        });
-        setError(`Failed to load users: ${error.message}`);
+      const response = await fetchAdminUsers();
+      
+      if (response.error) {
+        console.error('❌ [UserManager] API call failed:', response.error);
+        setError(`Failed to load users: ${response.error}`);
         return;
       }
+      
+      const data = response.data || [];
+      const count = data.length;
 
       console.log(`✅ [UserManager] Query successful:`, {
         userCount: data?.length || 0,
