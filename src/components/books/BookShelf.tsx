@@ -99,13 +99,8 @@ const BookShelf: React.FC<BookShelfProps> = ({
       const ownerEmail = import.meta.env.VITE_OWNER_EMAIL;
       const isOwner = user.email === ownerEmail && plan === 'owner';
       
-      if (isOwner) {
-        // Redirect to owner dashboard
-        navigate('/owner');
-      } else {
-        // Open regular account modal for non-owners
-        setIsAccountModalOpen(true);
-      }
+      // Always open account modal for all users including owners
+      setIsAccountModalOpen(true);
     } else {
       // Open account modal for non-authenticated users
       setIsAccountModalOpen(true);

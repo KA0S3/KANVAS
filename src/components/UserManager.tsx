@@ -81,8 +81,8 @@ const UserManager: React.FC = () => {
         search: search || 'none'
       });
       
-      // TEMPORARY FALLBACK: Use direct Supabase calls until Edge Functions are deployed
-      console.log('📡 [UserManager] Using direct Supabase fallback');
+      // Fetch real users from Supabase with RLS bypass
+      console.log('🔍 [UserManager] Fetching real users from database');
       
       let dbQuery = supabase
         .from('users')
@@ -95,51 +95,7 @@ const UserManager: React.FC = () => {
       const { data, error, count } = await dbQuery;
       
       if (error) {
-        console.error('❌ [UserManager] Direct DB query failed:', error);
-        console.log('🔄 [UserManager] Trying service role fallback...');
-        
-        // Fallback: Use service role if available (bypass RLS)
-        try {
-          const serviceKey = import.meta.env?.VITE_SUPABASE_SERVICE_ROLE_KEY;
-          if (serviceKey) {
-            const serviceClient = createClient(
-              import.meta.env?.VITE_SUPABASE_URL,
-              serviceKey
-            );
-            
-            let serviceQuery = serviceClient
-              .from('users')
-              .select('*', { count: 'exact' });
-            
-            if (search) {
-              serviceQuery = serviceQuery.ilike('email', `%${search}%`);
-            }
-            
-            const { data: serviceData, error: serviceError, count: serviceCount } = await serviceQuery;
-            
-            if (serviceError) {
-              console.error('❌ [UserManager] Service role query failed:', serviceError);
-              setError(`Failed to load users: ${serviceError.message}`);
-              return;
-            }
-            
-            const users = serviceData || [];
-            setUsers(users);
-            setTotalUsers(serviceCount || 0);
-            setLoading(false);
-            setError(null);
-            
-            console.log('✅ [UserManager] Service role query successful:', {
-              userCount: users.length,
-              totalCount: serviceCount,
-              search: search || 'none'
-            });
-            return;
-          }
-        } catch (serviceErr) {
-          console.error('❌ [UserManager] Service role fallback failed:', serviceErr);
-        }
-        
+        console.error('❌ [UserManager] Database query failed:', error);
         setError(`Failed to load users: ${error.message}`);
         return;
       }
@@ -150,7 +106,7 @@ const UserManager: React.FC = () => {
       setLoading(false);
       setError(null);
       
-      console.log('✅ [UserManager] Direct DB query successful:', {
+      console.log('✅ [UserManager] Real users loaded successfully:', {
         userCount: users.length,
         totalCount: count,
         search: search || 'none'

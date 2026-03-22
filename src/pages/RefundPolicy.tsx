@@ -7,14 +7,18 @@ import { useNavigate } from 'react-router-dom';
 const RefundPolicy = () => {
   const navigate = useNavigate();
 
+  const handleBack = () => {
+    navigate(-1);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-background/90 p-4">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-4xl mx-auto h-screen flex flex-col">
         {/* Header */}
-        <div className="mb-6">
+        <div className="mb-6 flex-shrink-0">
           <Button
             variant="ghost"
-            onClick={() => navigate(-1)}
+            onClick={handleBack}
             className="mb-4 glass cosmic-glow border-glass-border/40 hover:bg-glass/20"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -33,8 +37,9 @@ const RefundPolicy = () => {
         </div>
 
         {/* Refund Policy Content */}
-        <Card className="glass cosmic-glow border-glass-border/40">
-          <CardContent className="p-8 space-y-8">
+        <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-glass-border/40 scrollbar-track-transparent hover:scrollbar-thumb-glass-border/60">
+          <Card className="glass cosmic-glow border-glass-border/40">
+            <CardContent className="p-8 space-y-8">
             {/* Section 1 */}
             <section className="space-y-4">
               <h2 className="text-2xl font-semibold text-foreground">1. The Nature of Digital Purchases</h2>
@@ -123,8 +128,9 @@ const RefundPolicy = () => {
                 © 2026 KANVAS. All Rights Reserved.
               </p>
             </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

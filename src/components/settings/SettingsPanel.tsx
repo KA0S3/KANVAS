@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Settings as SettingsIcon, Volume2, Trash2, AlertTriangle, Download, ExternalLink } from 'lucide-react';
+import { X, Settings as SettingsIcon, Volume2, Trash2, AlertTriangle, Download, ExternalLink, Star, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -33,6 +33,9 @@ import { toast } from 'sonner';
 import type { Book } from '@/types/book';
 import { supabase } from '@/lib/supabase';
 import DataManager from '@/components/DataManager';
+import { PricingModal } from '@/components/PricingModal';
+import { ContactSheet } from '@/components/ContactSheet';
+import { useNavigate } from 'react-router-dom';
 
 // Error boundary component
 class AudioErrorBoundary extends React.Component<
@@ -73,6 +76,7 @@ interface SettingsPanelProps {
 }
 
 export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
+  const navigate = useNavigate();
   const {
     assets,
     globalCustomFields,
@@ -96,6 +100,8 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   const [activeTab, setActiveTab] = useState('general');
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteUnlocked, setDeleteUnlocked] = useState(false);
+  const [showPricingModal, setShowPricingModal] = useState(false);
+  const [showContactSheet, setShowContactSheet] = useState(false);
   
   const allBooks = getAllBooks();
 
@@ -460,11 +466,41 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                 </div>
                 
                 <div className="border-t border-glass-border/30 pt-4">
+                  <div className="text-sm space-y-3">
+                    <div className="font-semibold text-foreground">About KANVAS</div>
+                    <div className="text-muted-foreground space-y-2">
+                      <p>
+                        KANVAS represents a revolutionary approach to creative planning and organization. 
+                        Imagine having the intuitive structure of a file manager combined with the visual 
+                        freedom of a digital whiteboard - that's the power of KANVAS.
+                      </p>
+                      <p>
+                        Our innovative nesting system allows you to organize assets hierarchically, 
+                        just like folders in a file manager, while providing a stunning visual canvas 
+                        where you can arrange, connect, and manipulate your ideas spatially. Whether you're 
+                        planning novels, managing projects, or organizing complex creative works, KANVAS 
+                        adapts to your unique workflow.
+                      </p>
+                      <p>
+                        Experience the perfect blend of structure and creativity - where organization 
+                        meets imagination, and where your ideas can truly take shape in the most intuitive 
+                        and visually appealing way possible.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="border-t border-glass-border/30 pt-4">
                   <div className="text-sm space-y-2">
-                    <div className="font-semibold text-foreground">Copyright & Ownership</div>
-                    <div className="text-muted-foreground space-y-1">
-                      <p>This application, compendium, and all related features are the exclusive property of its creator.</p>
-                      <p>All inventive functions, coding, operating systems, and intellectual property contained herein are owned by the developer.</p>
+                    <div className="font-semibold text-foreground">Unlock Your Full Potential</div>
+                    <div className="text-muted-foreground">
+                      Get access to more features with a Pro account. 
+                      <button 
+                        onClick={() => setShowPricingModal(true)}
+                        className="text-primary hover:underline ml-1"
+                      >
+                        See pricing information here
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -495,7 +531,10 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                 <div className="border-t border-glass-border/30 pt-4">
                   <Button
                     variant="outline"
-                    onClick={() => window.open('/terms-of-service', '_blank')}
+                    onClick={() => {
+                      navigate('/terms-of-service');
+                      onClose();
+                    }}
                     className="w-full glass cosmic-glow border-glass-border/40 hover:bg-glass/20 mb-3"
                   >
                     <ExternalLink className="w-4 h-4 mr-2" />
@@ -503,7 +542,10 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={() => window.open('/privacy-policy', '_blank')}
+                    onClick={() => {
+                      navigate('/privacy-policy');
+                      onClose();
+                    }}
                     className="w-full glass cosmic-glow border-glass-border/40 hover:bg-glass/20 mb-3"
                   >
                     <ExternalLink className="w-4 h-4 mr-2" />
@@ -511,7 +553,10 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={() => window.open('/refund-policy', '_blank')}
+                    onClick={() => {
+                      navigate('/refund-policy');
+                      onClose();
+                    }}
                     className="w-full glass cosmic-glow border-glass-border/40 hover:bg-glass/20"
                   >
                     <ExternalLink className="w-4 h-4 mr-2" />
@@ -523,6 +568,15 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                   <div className="text-xs text-muted-foreground text-center">
                     <p>This software is provided "as is" without warranty of any kind.</p>
                     <p>By using this application, you agree to respect the intellectual property rights of the creator.</p>
+                    <div className="mt-2">
+                      <button
+                        onClick={() => setShowContactSheet(true)}
+                        className="text-xs text-primary hover:underline flex items-center gap-1 mx-auto"
+                      >
+                        <Mail className="w-3 h-3" />
+                        Contact Support
+                      </button>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -587,6 +641,18 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        
+        {/* Pricing Modal */}
+        <PricingModal 
+          isOpen={showPricingModal} 
+          onClose={() => setShowPricingModal(false)} 
+        />
+        
+        {/* Contact Sheet */}
+        <ContactSheet 
+          isOpen={showContactSheet} 
+          onClose={() => setShowContactSheet(false)} 
+        />
       </DialogContent>
     </Dialog>
   );

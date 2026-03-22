@@ -351,6 +351,8 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
           return { name: 'Pro', color: 'text-blue-600', icon: Crown };
         case 'lifetime':
           return { name: 'Lifetime', color: 'text-purple-600', icon: Crown };
+        case 'owner':
+          return { name: 'Owner', color: 'text-red-600', icon: Shield };
         default:
           return { name: 'Free', color: 'text-gray-600', icon: User };
       }
@@ -381,6 +383,12 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
             >
               Upgrade
             </Button>
+          )}
+          {(effectiveLimits?.source.plan === 'owner' || plan === 'owner') && (
+            <Badge variant="secondary" className="text-xs bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-700">
+              <Shield className="w-3 h-3 mr-1" />
+              Owner Access
+            </Badge>
           )}
         </div>
 
@@ -888,11 +896,14 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
                               (effectiveLimits?.source.plan === 'pro' || plan === 'pro') ? 'text-blue-600' : 
                               (effectiveLimits?.source.plan === 'lifetime' || plan === 'lifetime') ? 'text-purple-600' : 
+                              (effectiveLimits?.source.plan === 'owner' || plan === 'owner') ? 'text-red-600' :
                               'text-gray-600'
                             } bg-current/10`}>
                               {(effectiveLimits?.source.plan === 'pro' || plan === 'pro') || 
                                (effectiveLimits?.source.plan === 'lifetime' || plan === 'lifetime') ? 
                                 <Crown className="w-4 h-4" /> : 
+                               (effectiveLimits?.source.plan === 'owner' || plan === 'owner') ?
+                                <Shield className="w-4 h-4" /> :
                                 <User className="w-4 h-4" />
                             }
                             </div>
@@ -900,15 +911,18 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
                               <div className="text-sm font-medium">
                                 {(effectiveLimits?.source.plan === 'pro' || plan === 'pro') ? 'Pro' : 
                                  (effectiveLimits?.source.plan === 'lifetime' || plan === 'lifetime') ? 'Lifetime' : 
+                                 (effectiveLimits?.source.plan === 'owner' || plan === 'owner') ? 'Owner' :
                                  'Free'}
                               </div>
                               <div className={`text-xs font-semibold ${
                                 (effectiveLimits?.source.plan === 'pro' || plan === 'pro') ? 'text-blue-600' : 
                                 (effectiveLimits?.source.plan === 'lifetime' || plan === 'lifetime') ? 'text-purple-600' : 
+                                (effectiveLimits?.source.plan === 'owner' || plan === 'owner') ? 'text-red-600' :
                                 'text-gray-600'
                               }`}>
                                 {(effectiveLimits?.source.plan === 'pro' || plan === 'pro') ? 'Monthly' : 
                                  (effectiveLimits?.source.plan === 'lifetime' || plan === 'lifetime') ? 'Forever' : 
+                                 (effectiveLimits?.source.plan === 'owner' || plan === 'owner') ? 'Unlimited' :
                                  'Basic'}
                               </div>
                             </div>

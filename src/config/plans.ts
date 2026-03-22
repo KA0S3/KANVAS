@@ -65,8 +65,8 @@ export const PLANS_CONFIG: Record<string, PlanConfig> = {
   
   pro: {
     id: 'pro',
-    label: 'Pro',
-    description: 'Professional subscription with premium features',
+    label: 'PAYG Monthly',
+    description: 'Pay-as-you-go monthly fee for advanced features',
     quotaBytes: 10 * 1024 * 1024 * 1024, // 10GB
     maxBooks: -1, // Unlimited
     adsEnabled: false,
@@ -79,18 +79,18 @@ export const PLANS_CONFIG: Record<string, PlanConfig> = {
       prioritySupport: true
     },
     pricing: {
-      priceCents: 2000, // $20 USD
+      priceCents: 500, // $5 USD
       currency: 'USD',
       recurring: true,
-      skuId: 'pro_monthly',
-      paystackProductKey: 'PRO_SUBSCRIPTION'
+      skuId: 'payg_monthly',
+      paystackProductKey: 'PAYG_SUBSCRIPTION'
     }
   },
   
   lifetime: {
     id: 'lifetime',
-    label: 'Lifetime',
-    description: 'One-time purchase for lifetime access',
+    label: 'One-Time Fee',
+    description: 'Permanent access to the core visual tracking system',
     quotaBytes: 15 * 1024 * 1024 * 1024, // 15GB
     maxBooks: -1, // Unlimited
     adsEnabled: false,
@@ -115,7 +115,7 @@ export const PLANS_CONFIG: Record<string, PlanConfig> = {
   owner: {
     id: 'owner',
     label: 'Owner',
-    description: 'Unrestricted owner access with full control',
+    description: 'Unrestricted access with premium features',
     quotaBytes: -1, // Unlimited storage
     maxBooks: -1, // Unlimited books
     adsEnabled: false,
@@ -126,9 +126,7 @@ export const PLANS_CONFIG: Record<string, PlanConfig> = {
       collaboration: true,
       advancedFeatures: true,
       prioritySupport: true,
-      adminAccess: true,
-      unrestricted: true,
-      ownerDashboard: true
+      unrestricted: true
     }
   }
 };

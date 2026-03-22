@@ -4,7 +4,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
-import OwnerDashboard from "./pages/OwnerDashboard";
 import AuthConfirm from "./pages/AuthConfirm";
 import AuthCallback from "./pages/AuthCallback";
 import AuthResetPassword from "./pages/AuthResetPassword";
@@ -27,8 +26,7 @@ const App = () => (
           <Route path="/auth/confirm" element={<AuthConfirm />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/auth/reset-password" element={<AuthResetPassword />} />
-          <Route path="/owner" element={<OwnerDashboard />} />
-          <Route path="/terms-of-service" element={<TermsOfService />} />
+                    <Route path="/terms-of-service" element={<TermsOfService />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/refund-policy" element={<RefundPolicy />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

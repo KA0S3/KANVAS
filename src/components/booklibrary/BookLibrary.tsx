@@ -112,13 +112,8 @@ export function BookLibrary({ isOpen, onClose, onBookSelect }: BookLibraryProps)
       const ownerEmail = import.meta.env.VITE_OWNER_EMAIL;
       const isOwner = user.email === ownerEmail && plan === 'owner';
       
-      if (isOwner) {
-        // Redirect to owner dashboard
-        navigate('/owner');
-      } else {
-        // Open regular account modal for non-owners
-        setShowAccountModal(true);
-      }
+      // Always open account modal for all users including owners
+      setShowAccountModal(true);
     } else {
       // Open account modal for non-authenticated users
       setShowAccountModal(true);
