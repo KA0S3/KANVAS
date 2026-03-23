@@ -35,7 +35,7 @@ export const useCloudStore = create<CloudStore>()(
   persist(
     (set, get) => ({
       // Initial state
-      syncEnabled: false,
+      syncEnabled: true,
       quota: {
         used: 0,
         available: QUOTA_LIMITS.free,

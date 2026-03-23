@@ -5,6 +5,7 @@ import { useBackgroundStore } from '@/stores/backgroundStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useCloudStore } from '@/stores/cloudStore';
 import { assetUploadService } from './assetUploadService';
+import { hybridSyncService } from './hybridSyncService';
 
 export type AutosaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -160,26 +161,25 @@ class AutosaveService {
   private async performAutosave(): Promise<void> {
     const { isAuthenticated, user } = useAuthStore.getState();
     
-    if (!isAuthenticated || !user) {
-      console.log('[AutosaveService] Skipping autosave - user not authenticated');
-      return;
-    }
-
-    if (!this.hasPendingChanges()) {
-      console.log('[AutosaveService] No pending changes to save');
-      return;
-    }
-
+    // Always save locally first (local-first architecture)
     this.updateState({ 
       status: 'saving', 
       errorMessage: null 
     });
 
     try {
-      console.log('[AutosaveService] Starting autosave cycle');
+      console.log('[AutosaveService] Starting autosave cycle - local-first with cloud sync');
       
-      // Save assets and world data to Supabase
-      await this.saveToSupabase();
+      // Local save is handled automatically by zustand persist middleware
+      // Just ensure local state is current
+      
+      // Sync to cloud if user is authenticated (regardless of plan)
+      if (isAuthenticated && user) {
+        console.log('[AutosaveService] User authenticated, syncing to cloud');
+        await hybridSyncService.syncToCloud();
+      } else {
+        console.log('[AutosaveService] User not authenticated, local save only');
+      }
       
       // Clear queue
       this.queue = {
@@ -250,14 +250,18 @@ class AutosaveService {
   }
 
   private async saveWorldData(userId: string, bookId: string, worldData: any): Promise<void> {
+    // Save world data to projects table metadata field
     const { error } = await supabase
-      .from('books')
-      .update({
-        world_data: worldData,
+      .from('projects')
+      .upsert({
+        id: bookId, // Using bookId as projectId
+        user_id: userId,
+        name: worldData.bookTitle || 'Untitled Project',
+        description: JSON.stringify(worldData),
         updated_at: new Date().toISOString(),
-      })
-      .eq('id', bookId)
-      .eq('user_id', userId);
+      }, {
+        onConflict: 'id,user_id'
+      });
 
     if (error) {
       throw new Error(`Failed to save world data: ${error.message}`);
@@ -265,17 +269,22 @@ class AutosaveService {
   }
 
   private async saveBackgroundData(userId: string, bookId: string, configs: any): Promise<void> {
-    // Save background configs to user preferences or a separate table
+    // Save background configs to assets table as metadata
     const { error } = await supabase
-      .from('user_preferences')
+      .from('assets')
       .upsert({
+        id: `${bookId}-backgrounds`, // Unique ID for background configs
         user_id: userId,
-        book_id: bookId,
-        preference_type: 'background_configs',
-        preference_data: configs,
+        project_id: bookId,
+        name: 'Background Configurations',
+        file_path: `backgrounds/${bookId}.json`,
+        file_type: 'application/json',
+        file_size_bytes: JSON.stringify(configs).length,
+        mime_type: 'application/json',
+        metadata: { configs, type: 'background_configurations' },
         updated_at: new Date().toISOString(),
       }, {
-        onConflict: 'user_id,book_id,preference_type'
+        onConflict: 'id,user_id'
       });
 
     if (error) {
