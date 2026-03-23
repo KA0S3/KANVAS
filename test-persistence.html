@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Persistence</title>
+</head>
+<body>
+    <h1>Persistence Test</h1>
+    <p>Open this file to test if asset data persists in localStorage.</p>
+    
+    <div>
+        <h2>Current Assets in localStorage:</h2>
+        <pre id="assets-content">Loading...</pre>
+    </div>
+    
+    <div>
+        <h2>All localStorage Keys:</h2>
+        <pre id="localStorage-keys">Loading...</pre>
+    </div>
+    
+    <script>
+        // Check for kanvas-assets-storage
+        const assetsData = localStorage.getItem('kanvas-assets-storage');
+        const assetsContent = document.getElementById('assets-content');
+        const keysContent = document.getElementById('localStorage-keys');
+        
+        if (assetsData) {
+            try {
+                const parsed = JSON.parse(assetsData);
+                assetsContent.textContent = JSON.stringify(parsed, null, 2);
+            } catch (e) {
+                assetsContent.textContent = 'Error parsing assets data: ' + e.message;
+            }
+        } else {
+            assetsContent.textContent = 'No assets data found in localStorage';
+        }
+        
+        // Show all localStorage keys
+        const keys = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            keys.push(key);
+        }
+        keysContent.textContent = JSON.stringify(keys, null, 2);
+    </script>
+</body>
+</html>

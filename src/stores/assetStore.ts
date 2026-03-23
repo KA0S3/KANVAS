@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { subscribeWithSelector } from 'zustand/middleware';
+import { subscribeWithSelector, persist, createJSONStorage } from 'zustand/middleware';
 import type { Asset } from '@/components/AssetItem';
 import type { CustomField, CustomFieldValue, GlobalCustomField, ViewportDisplaySettings } from '@/types/extendedAsset';
 import { DEFAULT_VIEWPORT_DISPLAY_SETTINGS } from '@/types/extendedAsset';
@@ -60,7 +60,9 @@ interface AssetStore {
 }
 
 export const useAssetStore = create<AssetStore>()(
-  subscribeWithSelector((set, get) => ({
+  subscribeWithSelector(
+    persist(
+      (set, get) => ({
     // Initial state
     assets: {},
     currentActiveId: null,
@@ -565,7 +567,18 @@ export const useAssetStore = create<AssetStore>()(
       globalCustomFields: [],
     });
   },
-})));
+})),
+      {
+        name: 'kanvas-assets-storage',
+        storage: createJSONStorage(() => localStorage),
+        partialize: (state) => ({
+          assets: state.assets,
+          globalCustomFields: state.globalCustomFields,
+        }),
+      }
+    )
+  )
+);
 
 // Auto-save functionality: Now handled by autosaveService
 // This subscription is kept for compatibility but autosaveService handles cloud saves
