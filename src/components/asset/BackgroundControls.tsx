@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { X, Save, Upload } from 'lucide-react';
 import { useAssetStore } from '@/stores/assetStore';
 import { useBookStore } from '@/stores/bookStoreSimple';
-import { useBackgroundStore } from '@/stores/backgroundStore';
+import { useBackgroundStoreClean } from "@/stores/backgroundStoreClean";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,7 +11,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import type { Asset } from '@/components/AssetItem';
 import type { BackgroundConfig, BackgroundMode } from '@/types/background';
 import { isColorPickerVisible, getBackgroundColor, validateBackgroundConfig } from '@/utils/backgroundUtils';
-import { getAssetKeyWithBook } from '@/stores/backgroundStore';
+import { getAssetKeyWithBookClean } from "@/stores/backgroundStoreClean";
 
 interface BackgroundControlsProps {
   assetId: string | null;
@@ -22,13 +22,13 @@ interface BackgroundControlsProps {
 export function BackgroundControls({ assetId, onSave, onToggleSidebar }: BackgroundControlsProps) {
   const { assets, updateAsset, setIsEditingBackground } = useAssetStore();
   const { getCurrentBook, getWorldData, updateWorldData } = useBookStore();
-  const { getBackground, setBackground, migrateLegacyConfig } = useBackgroundStore();
+  const { getBackground, setBackground, migrateLegacyConfig } = useBackgroundStoreClean();
   
   const asset = assetId ? assets[assetId] : null;
   const currentBook = getCurrentBook();
   
   // Get background config using new store
-  const backgroundConfig = getBackground(getAssetKeyWithBook(assetId || 'root', currentBook?.id));
+  const backgroundConfig = getBackground(getAssetKeyWithBookClean(assetId || 'root', currentBook?.id));
   const [localConfig, setLocalConfig] = useState<BackgroundConfig>(backgroundConfig);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [imageNaturalSize, setImageNaturalSize] = useState<{ width: number; height: number } | null>(null);
@@ -92,7 +92,7 @@ export function BackgroundControls({ assetId, onSave, onToggleSidebar }: Backgro
     setHasUnsavedChanges(true);
     
     // Auto-save immediately via store
-    const assetKey = getAssetKeyWithBook(assetId || 'root', currentBook?.id);
+    const assetKey = getAssetKeyWithBookClean(assetId || 'root', currentBook?.id);
     setBackground(assetKey, updatedConfig);
   };
 
@@ -139,7 +139,7 @@ export function BackgroundControls({ assetId, onSave, onToggleSidebar }: Backgro
         setHasUnsavedChanges(true);
         
         // Auto-save immediately via store
-        const assetKey = getAssetKeyWithBook(assetId || 'root', currentBook?.id);
+        const assetKey = getAssetKeyWithBookClean(assetId || 'root', currentBook?.id);
         setBackground(assetKey, updatedConfig);
       };
       reader.readAsDataURL(file);
@@ -152,7 +152,7 @@ export function BackgroundControls({ assetId, onSave, onToggleSidebar }: Backgro
     setHasUnsavedChanges(true);
     
     // Auto-save immediately via store
-    const assetKey = getAssetKeyWithBook(assetId || 'root', currentBook?.id);
+    const assetKey = getAssetKeyWithBookClean(assetId || 'root', currentBook?.id);
     setBackground(assetKey, updatedConfig);
   };
 
@@ -162,7 +162,7 @@ export function BackgroundControls({ assetId, onSave, onToggleSidebar }: Backgro
     setHasUnsavedChanges(true);
     
     // Auto-save immediately via store
-    const assetKey = getAssetKeyWithBook(assetId || 'root', currentBook?.id);
+    const assetKey = getAssetKeyWithBookClean(assetId || 'root', currentBook?.id);
     setBackground(assetKey, updatedConfig);
   };
 

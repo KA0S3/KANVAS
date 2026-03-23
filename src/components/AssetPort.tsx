@@ -2,17 +2,20 @@
 import { useNavigate } from "react-router-dom";
 import { Sparkles, ArrowLeft, Plus, PanelRight, BookOpen, User } from "lucide-react";
 import { AssetItem, type Asset } from "./AssetItem";
-import { AssetCreationModal } from "./asset/AssetCreationModal";
+import { AssetCreationModalFixed } from "./asset/AssetCreationModalFixed";
 import { AssetEditModal } from "./asset/AssetEditModal";
 import { EmptySpaceContextMenu } from "./EmptySpaceContextMenu";
 import { useAssetTree } from "@/hooks/useAssetTree";
 import { useAssetStore } from "@/stores/assetStore";
 import { useBookStore } from "@/stores/bookStoreSimple";
-import { useBackgroundStore } from "@/stores/backgroundStore";
+import { useBackgroundStoreClean } from "@/stores/backgroundStoreClean";
 import { useAuthStore } from "@/stores/authStore";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
 import { BackgroundControls } from "@/components/asset/BackgroundControls";
+import { BackgroundMigrationDialog } from "@/components/BackgroundMigrationDialog";
+import { BackgroundMigration } from "@/utils/backgroundMigration";
 import { AccountModal } from "@/components/account/AccountModal";
+import { StorageResetButton } from "@/components/StorageResetButton";
 import { Button } from "@/components/ui/button";
 import { useSampleData } from "@/hooks/useSampleData";
 import { AutosaveIndicator } from "@/components/autosave/AutosaveIndicator";
@@ -26,7 +29,7 @@ import {
   type ViewportConfig 
 } from "@/utils/coordinateUtils";
 import { getBackgroundColor, shouldShowParchmentOverlay, shouldShowGlassEffect } from "@/utils/backgroundUtils";
-import { getAssetKeyWithBook } from "@/stores/backgroundStore";
+import { getAssetKeyWithBookClean } from "@/stores/backgroundStoreClean";
 import type { BackgroundConfig } from "@/types/background";
 
 const initialAssets: Omit<Asset, 'id' | 'children'>[] = [];
@@ -51,6 +54,7 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showBackgroundControls, setShowBackgroundControls] = useState(false);
+  const [showMigrationDialog, setShowMigrationDialog] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalInitialData, setModalInitialData] = useState<any>(null);
@@ -86,6 +90,19 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
   // Initialize sample data
   useSampleData();
 
+  // Check for background migration needs
+  useEffect(() => {
+    const checkMigration = () => {
+      if (BackgroundMigration.needsMigration()) {
+        setShowMigrationDialog(true);
+      }
+    };
+
+    // Delay check to allow app to initialize
+    const timeout = setTimeout(checkMigration, 2000);
+    return () => clearTimeout(timeout);
+  }, []);
+
   // Listen for background save events
   useEffect(() => {
     const handleBackgroundSave = () => {
@@ -112,7 +129,7 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
   
   const { currentActiveId, setCurrentViewportId, currentViewportId, isEditingBackground, updateAsset } = useAssetStore();
   const { getCurrentBook, getWorldData, updateWorldData } = useBookStore();
-  const { getBackground, setBackground } = useBackgroundStore();
+  const { getBackground, setBackground, migrateLegacyConfig } = useBackgroundStoreClean();
   const { user, plan, isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
   
@@ -133,10 +150,10 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
   const effectiveViewportSize = getEffectiveViewportSize();
   
   // Log effective viewport size changes for debugging
-  useEffect(() => {
-    console.log('🎯 AssetPort: Effective viewport size changed:', effectiveViewportSize);
-    console.log('🎯 AssetPort: Currently in asset:', enteredAssetId || 'root');
-  }, [effectiveViewportSize, enteredAssetId]);
+  // useEffect(() => {
+  //   console.log('🎯 AssetPort: Effective viewport size changed:', effectiveViewportSize);
+  //   console.log('🎯 AssetPort: Currently in asset:', enteredAssetId || 'root');
+  // }, [effectiveViewportSize, enteredAssetId]);
   
   // Get book-specific viewport settings, falling back to defaults if no book is selected
   const currentBook = getCurrentBook();
@@ -322,7 +339,7 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
     
     const containerRect = containerRef.current.getBoundingClientRect();
     const screenX = touch.clientX - containerRect.left - dragOffset.x;
-    const screenY = touch.clientY - containerRect.top - dragOffset.y;
+    const screenY = touch.clientY - containerRef.current.getBoundingClientRect().top - dragOffset.y;
     
     // Keep within bounds of container
     const boundedX = Math.max(0, Math.min(screenX, containerRect.width - 200));
@@ -341,7 +358,7 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
     
     const containerRect = containerRef.current.getBoundingClientRect();
     const screenX = e.clientX - containerRect.left - dragOffset.x;
-    const screenY = e.clientY - containerRect.top - dragOffset.y;
+    const screenY = e.clientY - containerRef.current.getBoundingClientRect().top - dragOffset.y;
     
     // Keep within bounds of container
     const boundedX = Math.max(0, Math.min(screenX, containerRect.width - 200));
@@ -468,7 +485,7 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
   const breadcrumbPath = getBreadcrumbPath();
 
   // Get current background config from new store
-  const backgroundConfig = getBackground(getAssetKeyWithBook(enteredAssetId || 'root', currentBook?.id));
+  const backgroundConfig = getBackground(getAssetKeyWithBookClean(enteredAssetId || 'root', currentBook?.id));
   
   // State for tracking image natural size
   const [imageNaturalSize, setImageNaturalSize] = useState<{ width: number; height: number } | null>(null);
@@ -489,13 +506,13 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
       if (!backgroundConfig.imageSize || 
           backgroundConfig.imageSize.width !== newSize.width || 
           backgroundConfig.imageSize.height !== newSize.height) {
-        const assetKey = getAssetKeyWithBook(enteredAssetId || 'root', currentBook?.id);
+        const assetKey = getAssetKeyWithBookClean(enteredAssetId || 'root', currentBook?.id);
         const updatedConfig = { ...backgroundConfig, imageSize: newSize };
         setBackground(assetKey, updatedConfig);
       }
     };
     img.src = backgroundConfig.imageUrl;
-  }, [backgroundConfig?.imageUrl, backgroundConfig?.imageSize, enteredAssetId, currentBook?.id, setBackground]);
+  }, [backgroundConfig?.imageUrl, backgroundConfig?.imageSize, enteredAssetId, currentBook?.id]);
 
   // Background editing handlers
   const handleBackgroundMouseDown = useCallback((e: React.MouseEvent) => {
@@ -532,16 +549,16 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
   }, []);
 
   const updateBackgroundPosition = useCallback((x: number, y: number) => {
-    const assetKey = getAssetKeyWithBook(enteredAssetId || 'root', currentBook?.id);
+    const assetKey = getAssetKeyWithBookClean(enteredAssetId || 'root', currentBook?.id);
     const updatedConfig = { ...backgroundConfig, position: { x, y } };
     setBackground(assetKey, updatedConfig);
-  }, [enteredAssetId, currentBook, backgroundConfig, setBackground]);
+  }, [enteredAssetId, currentBook, backgroundConfig]);
 
   const updateBackgroundScale = useCallback((scale: number) => {
-    const assetKey = getAssetKeyWithBook(enteredAssetId || 'root', currentBook?.id);
+    const assetKey = getAssetKeyWithBookClean(enteredAssetId || 'root', currentBook?.id);
     const updatedConfig = { ...backgroundConfig, scale };
     setBackground(assetKey, updatedConfig);
-  }, [enteredAssetId, currentBook, backgroundConfig, setBackground]);
+  }, [enteredAssetId, currentBook, backgroundConfig]);
 
   const handleBackgroundWheel = useCallback((e: WheelEvent) => {
     if (!isEditingBackground || !backgroundConfig?.imageUrl) return;
@@ -691,13 +708,15 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
           <Button
             variant="outline"
             size="sm"
-            onClick={handleAccountClick}
-            className="gap-2"
-            title="Account"
+            onClick={() => setShowAccountModal(true)}
+            className="gap-1 md:gap-2 self-center text-xs md:text-sm"
           >
-            <User className="w-4 h-4" />
+            <User className="w-3 h-3 md:w-4 md:h-4" />
             <span className="hidden sm:inline">Account</span>
           </Button>
+
+          {/* Storage Reset Button */}
+          <StorageResetButton className="gap-1 md:gap-2 self-center text-xs md:text-sm" />
           
           {onToggleSidebar && (
             <button
@@ -906,7 +925,7 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
       )}
 
       {/* Asset Creation Modal */}
-      <AssetCreationModal
+      <AssetCreationModalFixed
         isOpen={isModalOpen}
         onClose={() => {
           setIsModalOpen(false);
@@ -933,6 +952,12 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
       <AccountModal
         isOpen={showAccountModal}
         onClose={() => setShowAccountModal(false)}
+      />
+
+      {/* Background Migration Dialog */}
+      <BackgroundMigrationDialog
+        isOpen={showMigrationDialog}
+        onClose={() => setShowMigrationDialog(false)}
       />
 
       </div>
