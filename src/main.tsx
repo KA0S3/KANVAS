@@ -5,7 +5,6 @@ import "./lib/legacyPlanDetection.ts"; // Import to enable legacy plan detection
 import { ConsoleFilter } from "./utils/consoleFilter";
 import { silentConsole } from "./utils/silentConsole"; // Import silent console
 import "./utils/debugBackgroundStorage"; // Import debug utility
-import "./utils/localStorageCleanup"; // Import cleanup utility
 
 // Enable console filtering to reduce log spam
 ConsoleFilter.enableFiltering();

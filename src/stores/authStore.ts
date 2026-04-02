@@ -1,8 +1,8 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { supabase } from '@/lib/supabase';
-import { ownerKeyService } from '@/services/ownerKeyService';
-import { updateQuotaBasedOnPlan } from '@/stores/cloudStore';
+import { secureStorage } from '@/utils/secureStorage';
+import { dataMigrationService, type MigrationConflict, type MigrationResult } from '@/services/dataMigrationService';
 import { getPlanConfig, migrateLegacyPlanId } from '@/lib/plans';
 import { getEffectiveLimitsWithFallback, type EffectiveLimits } from '@/services/effectiveLimitsService';
 import type { User } from '@supabase/supabase-js';
@@ -64,6 +64,11 @@ interface AuthStore {
   linkPasswordToGoogleUser: (email: string, password: string) => Promise<{ error?: string; success?: boolean; message?: string }>;
   createPasswordForGoogleUser: (email: string, newPassword: string, resetToken?: string) => Promise<{ error?: string; success?: boolean; message?: string }>;
   detectAuthProvider: (email: string) => Promise<{ provider: string | null; canUseEmail: boolean; canUseGoogle: boolean }>;
+  
+  // Data migration methods
+  checkForMigrationConflicts: (userId: string) => Promise<MigrationConflict | null>;
+  shouldShowGuestImport: () => Promise<boolean>;
+  executeDataMigration: (strategy: any, userId: string) => Promise<MigrationResult>;
 }
 
 export const useAuthStore = create<AuthStore>()(
@@ -944,9 +949,53 @@ export const useAuthStore = create<AuthStore>()(
       return { error: 'An unexpected error occurred while creating your password' };
     }
   },
+
+  // Data migration methods
+  checkForMigrationConflicts: async (userId: string) => {
+    try {
+      console.log('[authStore] Checking for migration conflicts for user:', userId);
+      const conflict = await dataMigrationService.checkMigrationConflicts(userId);
+      return conflict;
+    } catch (error) {
+      console.error('[authStore] Error checking migration conflicts:', error);
+      return null;
+    }
+  },
+
+  shouldShowGuestImport: async () => {
+    try {
+      console.log('[authStore] Checking if guest import should be shown');
+      const shouldShow = await dataMigrationService.shouldMigrateLocalData();
+      return shouldShow;
+    } catch (error) {
+      console.error('[authStore] Error checking guest import:', error);
+      return false;
+    }
+  },
+
+  executeDataMigration: async (strategy: any, userId: string) => {
+    try {
+      console.log('[authStore] Executing data migration with strategy:', strategy);
+      const result = await dataMigrationService.executeMigration(strategy, userId);
+      return result;
+    } catch (error) {
+      console.error('[authStore] Error executing data migration:', error);
+      return {
+        success: false,
+        strategy,
+        message: 'Migration failed. Please try again.'
+      };
+    }
+  },
     }),
     {
       name: 'kanvas-auth',
+      // Use secure storage for sensitive authentication data
+      storage: {
+        getItem: (name) => secureStorage.getItem(name),
+        setItem: (name, value) => secureStorage.setItem(name, value, { encrypt: true }),
+        removeItem: (name) => secureStorage.removeItem(name),
+      },
       // Only persist minimal state - authentication should be fresh each time
       partialize: (state) => ({
         plan: state.plan,

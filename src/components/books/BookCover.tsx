@@ -235,7 +235,7 @@ const BookCover: React.FC<BookCoverProps> = ({
 
       // Use cover page settings if enabled
       if (book.coverPageSettings?.showCoverPage) {
-        const { title, description } = book.coverPageSettings;
+        const { title, subheading, description } = book.coverPageSettings;
         
         if (isHovered) {
           // Show description overlay on hover instead of stats
@@ -250,7 +250,7 @@ const BookCover: React.FC<BookCoverProps> = ({
           );
         }
 
-        // Show title and description with custom positioning and styling
+        // Show title, subheading, and description with custom positioning and styling
         return (
           <div className="absolute inset-0 h-full p-2">
             {/* Title */}
@@ -267,6 +267,24 @@ const BookCover: React.FC<BookCoverProps> = ({
                 }}
               >
                 {title.text}
+              </div>
+            )}
+            
+            {/* Subheading */}
+            {subheading?.text && (
+              <div 
+                className="absolute"
+                style={{
+                  left: `${subheading.position.x}%`,
+                  top: `${subheading.position.y}%`,
+                  transform: 'translate(-50%, -50%)',
+                  ...getTextStyle(subheading.style),
+                  writingMode: 'horizontal-tb',
+                  fontSize: '12px',
+                  opacity: 0.9
+                }}
+              >
+                {subheading.text}
               </div>
             )}
             
@@ -326,8 +344,13 @@ const BookCover: React.FC<BookCoverProps> = ({
           <div className="font-bold mb-1" style={{ writingMode: 'horizontal-tb' }}>
             {book.title}
           </div>
+          {book.subheading && (
+            <div className="text-sm opacity-90 mb-1" style={{ writingMode: 'horizontal-tb' }}>
+              {book.subheading}
+            </div>
+          )}
           {book.description && (
-            <div className="text-xs opacity-80 line-clamp-3">
+            <div className="text-xs opacity-80 line-clamp-2">
               {book.description}
             </div>
           )}

@@ -243,20 +243,33 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] glass cosmic-glow border-glass-border/40 flex flex-col overflow-y-auto scrollbar-thin scrollbar-thumb-glass-border/40 scrollbar-track-transparent hover:scrollbar-thumb-glass-border/60">
-        <DialogHeader className="flex-shrink-0 sticky top-0 bg-glass/90 backdrop-blur-sm z-10 pb-4">
-          <DialogTitle className="flex items-center gap-2">
+    <>
+      <style>{`
+        [data-radix-dialog-close] {
+          display: none !important;
+        }
+      `}</style>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-2xl max-h-[80vh] glass cosmic-glow border-glass-border/40 flex flex-col overflow-y-auto scrollbar-thin scrollbar-thumb-glass-border/40 scrollbar-track-transparent hover:scrollbar-thumb-glass-border/60" showCloseButton={false}>
+        <DialogHeader className="flex-shrink-0 sticky top-0 bg-glass/90 backdrop-blur-sm z-20 pb-2 relative">
+          <DialogTitle className="flex items-center gap-2 h-6 translate-y-px">
             <SettingsIcon className="w-5 h-5" />
             Settings
           </DialogTitle>
+          <button
+            onClick={onClose}
+            className="absolute right-0 -top-1 p-2 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          >
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </button>
         </DialogHeader>
         
         <div className="flex-1">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col">
-            <TabsList className="grid w-full grid-cols-4 flex-shrink-0 sticky top-16 bg-glass/90 backdrop-blur-sm z-10">
+            <TabsList className="grid w-full grid-cols-4 flex-shrink-0 bg-glass/90 backdrop-blur-sm z-10">
               <TabsTrigger value="general">General</TabsTrigger>
-              <TabsTrigger value="audio">A&V</TabsTrigger>
+              <TabsTrigger value="audio">Sound & Video</TabsTrigger>
               <TabsTrigger value="data">Data Management</TabsTrigger>
               <TabsTrigger value="about">About</TabsTrigger>
             </TabsList>
@@ -655,5 +668,6 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
         />
       </DialogContent>
     </Dialog>
+    </>
   );
 }

@@ -4,7 +4,6 @@ import { useBookStore } from '@/stores/bookStoreSimple';
 import { useBackgroundStore } from '@/stores/backgroundStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useCloudStore } from '@/stores/cloudStore';
-import { assetUploadService } from './assetUploadService';
 import { hybridSyncService } from './hybridSyncService';
 
 export type AutosaveStatus = 'idle' | 'saving' | 'saved' | 'error';
@@ -12,8 +11,8 @@ export type AutosaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 interface AutosaveState {
   status: AutosaveStatus;
   lastSavedTime: Date | null;
-  errorMessage: string | null;
   pendingChanges: boolean;
+  errorMessage: string | null;
 }
 
 interface AutosaveQueue {
@@ -26,11 +25,14 @@ class AutosaveService {
   private static instance: AutosaveService;
   private state: AutosaveState;
   private queue: AutosaveQueue;
-  private autosaveInterval: number | null = null;
   private debounceTimer: number | null = null;
+  private autosaveTimer: number | null = null;
   private subscribers: Set<(state: AutosaveState) => void> = new Set();
-  private readonly AUTOSAVE_INTERVAL = 60000; // 60 seconds
+  
+  // Configurable intervals (in milliseconds)
   private readonly DEBOUNCE_DELAY = 2000; // 2 seconds
+  private readonly AUTOSAVE_INTERVAL = 15000; // 15 seconds (reduced from 60)
+  private readonly MANUAL_SAVE_INTERVAL = 5000; // 5 seconds for manual saves
 
   static getInstance(): AutosaveService {
     if (!AutosaveService.instance) {
@@ -43,161 +45,128 @@ class AutosaveService {
     this.state = {
       status: 'idle',
       lastSavedTime: null,
-      errorMessage: null,
       pendingChanges: false,
+      errorMessage: null,
     };
     this.queue = {
       assets: false,
       backgrounds: false,
       worldData: false,
     };
-  }
 
-  // Public API
-  startAutosave(): void {
-    if (this.autosaveInterval) return;
-
-    console.log('[AutosaveService] Starting autosave');
-    
-    // Set up store subscriptions
     this.setupStoreSubscriptions();
-    
-    // Set up periodic autosave
-    this.autosaveInterval = window.setInterval(() => {
-      this.performAutosave();
-    }, this.AUTOSAVE_INTERVAL);
-
-    // Initial save if there are pending changes
-    if (this.hasPendingChanges()) {
-      this.performAutosave();
-    }
+    this.startPeriodicAutosave();
   }
 
-  stopAutosave(): void {
-    if (this.autosaveInterval) {
-      clearInterval(this.autosaveInterval);
-      this.autosaveInterval = null;
-    }
-
-    if (this.debounceTimer) {
-      clearTimeout(this.debounceTimer);
-      this.debounceTimer = null;
-    }
-
-    console.log('[AutosaveService] Stopped autosave');
-  }
-
-  async triggerManualSave(): Promise<void> {
-    console.log('[AutosaveService] Manual save triggered');
-    await this.performAutosave();
-  }
-
-  getStatus(): AutosaveStatus {
-    return this.state.status;
-  }
-
-  getLastSavedTime(): Date | null {
-    return this.state.lastSavedTime;
-  }
-
-  getErrorMessage(): string | null {
-    return this.state.errorMessage;
-  }
-
-  hasPendingChanges(): boolean {
-    return this.state.pendingChanges;
-  }
-
-  subscribe(callback: (state: AutosaveState) => void): () => void {
-    this.subscribers.add(callback);
-    callback(this.getState());
-    
-    return () => {
-      this.subscribers.delete(callback);
-    };
-  }
-
-  getState(): AutosaveState {
-    return { ...this.state };
-  }
-
-  // Private methods
   private setupStoreSubscriptions(): void {
     // Subscribe to asset store changes
-    useAssetStore.subscribe((state) => {
-      // Queue asset changes when assets or global custom fields change
-      this.queueChange('assets');
-    });
+    const unsubscribeAssets = useAssetStore.subscribe(
+      (state) => state,
+      (state, prevState) => {
+        if (state.assets !== prevState.assets) {
+          this.queue.assets = true;
+          this.queue.worldData = true;
+          this.updateState({ pendingChanges: true });
+          this.debounceAutosave();
+        }
+      }
+    );
 
     // Subscribe to background store changes
-    useBackgroundStore.subscribe((state) => {
-      this.queueChange('backgrounds');
-    });
-
-    // Subscribe to book store changes
-    useBookStore.subscribe((state) => {
-      if (state.currentBookId) {
-        this.queueChange('worldData');
+    const unsubscribeBackgrounds = useBackgroundStore.subscribe(
+      (state) => state,
+      (state, prevState) => {
+        if (state.configs !== prevState.configs) {
+          this.queue.backgrounds = true;
+          this.updateState({ pendingChanges: true });
+          this.debounceAutosave();
+        }
       }
-    });
+    );
+
+    // Cleanup on service destruction (not typically needed in single-page apps)
+    // return () => {
+    //   unsubscribeAssets();
+    //   unsubscribeBackgrounds();
+    // };
   }
 
-  private queueChange(type: keyof AutosaveQueue): void {
-    this.queue[type] = true;
-    this.updateState({ pendingChanges: true });
-
-    // Debounce rapid changes
+  private debounceAutosave(): void {
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
     }
 
     this.debounceTimer = window.setTimeout(() => {
-      if (this.hasPendingChanges()) {
-        this.performAutosave();
-      }
+      this.performAutosave();
     }, this.DEBOUNCE_DELAY);
   }
 
+  // Cloud-first autosave
   private async performAutosave(): Promise<void> {
-    const { isAuthenticated, user } = useAuthStore.getState();
+    const { isAuthenticated } = useAuthStore.getState();
+    const { isOnline } = useCloudStore.getState();
     
-    // Always save locally first (local-first architecture)
     this.updateState({ 
       status: 'saving', 
       errorMessage: null 
     });
 
     try {
-      console.log('[AutosaveService] Starting autosave cycle - local-first with cloud sync');
+      console.log('[AutosaveService] Starting cloud-first autosave cycle');
       
-      // Local save is handled automatically by zustand persist middleware
-      // Just ensure local state is current
-      
-      // Sync to cloud if user is authenticated (regardless of plan)
-      if (isAuthenticated && user) {
-        console.log('[AutosaveService] User authenticated, syncing to cloud');
-        await hybridSyncService.syncToCloud();
+      // For authenticated users: prioritize cloud sync
+      if (isAuthenticated) {
+        if (isOnline) {
+          console.log('[AutosaveService] User authenticated and online, syncing to cloud');
+          const cloudSyncSuccess = await hybridSyncService.syncToCloud();
+          
+          if (cloudSyncSuccess) {
+            console.log('[AutosaveService] Cloud sync successful');
+            this.updateState({
+              status: 'saved',
+              lastSavedTime: new Date(),
+              pendingChanges: false,
+              errorMessage: null,
+            });
+          } else {
+            console.log('[AutosaveService] Cloud sync failed, data queued for retry');
+            this.updateState({
+              status: 'error',
+              lastSavedTime: new Date(),
+              pendingChanges: true,
+              errorMessage: 'Cloud sync failed - data queued for retry',
+            });
+          }
+        } else {
+          console.log('[AutosaveService] User authenticated but offline, data queued');
+          this.updateState({
+            status: 'saved',
+            lastSavedTime: new Date(),
+            pendingChanges: true,
+            errorMessage: 'Offline - changes queued for sync',
+          });
+        }
       } else {
-        console.log('[AutosaveService] User not authenticated, local save only');
+        // For guest users: local save only (handled by zustand persist)
+        console.log('[AutosaveService] Guest user - local save only');
+        this.updateState({
+          status: 'saved',
+          lastSavedTime: new Date(),
+          pendingChanges: false,
+          errorMessage: null,
+        });
       }
-      
-      // Clear queue
+
+      // Clear queue after successful save
       this.queue = {
         assets: false,
         backgrounds: false,
         worldData: false,
       };
 
-      this.updateState({
-        status: 'saved',
-        lastSavedTime: new Date(),
-        pendingChanges: false,
-        errorMessage: null,
-      });
-
       console.log('[AutosaveService] Autosave completed successfully');
 
-      // Reset to idle after a short delay
+      // Reset to idle after showing saved status
       setTimeout(() => {
         if (this.state.status === 'saved') {
           this.updateState({ status: 'idle' });
@@ -210,6 +179,7 @@ class AutosaveService {
       this.updateState({
         status: 'error',
         errorMessage: error instanceof Error ? error.message : 'Autosave failed',
+        pendingChanges: true,
       });
 
       // Reset to idle after error
@@ -219,34 +189,38 @@ class AutosaveService {
     }
   }
 
-  private async saveToSupabase(): Promise<void> {
-    const { user } = useAuthStore.getState();
-    const { currentBookId } = useBookStore.getState();
+  // Manual save with shorter interval
+  async triggerManualSave(): Promise<boolean> {
+    console.log('[AutosaveService] Manual save triggered');
     
-    if (!user || !currentBookId) {
-      throw new Error('User or current book not available');
+    // Temporarily use shorter interval for manual save
+    const originalInterval = this.AUTOSAVE_INTERVAL;
+    if (this.autosaveTimer) {
+      clearInterval(this.autosaveTimer);
     }
+    
+    this.autosaveTimer = window.setInterval(() => {
+      this.performPeriodicAutosave();
+    }, this.MANUAL_SAVE_INTERVAL);
 
-    const savePromises: Promise<void>[] = [];
-
-    // Save assets and world data if changed
-    if (this.queue.assets || this.queue.worldData) {
-      const assetStore = useAssetStore.getState();
-      const worldData = {
-        assets: assetStore.assets,
-        globalCustomFields: assetStore.globalCustomFields,
-      };
-
-      savePromises.push(this.saveWorldData(user.id, currentBookId, worldData));
+    // Clear debounce and trigger immediate save
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
     }
+    
+    await this.performAutosave();
+    
+    // Restore original interval after manual save
+    setTimeout(() => {
+      if (this.autosaveTimer) {
+        clearInterval(this.autosaveTimer);
+      }
+      this.autosaveTimer = window.setInterval(() => {
+        this.performPeriodicAutosave();
+      }, originalInterval);
+    }, 5000);
 
-    // Save backgrounds if changed
-    if (this.queue.backgrounds) {
-      const backgroundStore = useBackgroundStore.getState();
-      savePromises.push(this.saveBackgroundData(user.id, currentBookId, backgroundStore.configs));
-    }
-
-    await Promise.all(savePromises);
+    return this.state.status === 'saved';
   }
 
   private async saveWorldData(userId: string, bookId: string, worldData: any): Promise<void> {
@@ -292,26 +266,79 @@ class AutosaveService {
     }
   }
 
+  private startPeriodicAutosave(): void {
+    this.autosaveTimer = window.setInterval(() => {
+      this.performPeriodicAutosave();
+    }, this.AUTOSAVE_INTERVAL);
+  }
+
+  private async performPeriodicAutosave(): Promise<void> {
+    // Only perform periodic save if there are pending changes
+    if (this.state.pendingChanges) {
+      await this.performAutosave();
+    }
+  }
+
+  stopPeriodicAutosave(): void {
+    if (this.autosaveTimer) {
+      clearInterval(this.autosaveTimer);
+      this.autosaveTimer = null;
+    }
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+    }
+  }
+
   private updateState(updates: Partial<AutosaveState>): void {
     this.state = { ...this.state, ...updates };
-    
-    // Update cloud store status for global access
-    const cloudStore = useCloudStore.getState();
-    if (updates.status) {
-      cloudStore.setAutosaveStatus(updates.status);
-    }
-    if (updates.lastSavedTime) {
-      cloudStore.setLastSyncTime(updates.lastSavedTime);
-    }
-    
     this.notifySubscribers();
   }
 
-  private notifySubscribers(): void {
-    this.subscribers.forEach(callback => callback(this.getState()));
+  subscribe(callback: (state: AutosaveState) => void): () => void {
+    this.subscribers.add(callback);
+    callback(this.state); // Send current state immediately
+    return () => this.subscribers.delete(callback);
   }
 
-  // Utility methods
+  private notifySubscribers(): void {
+    this.subscribers.forEach(callback => callback(this.state));
+  }
+
+  getState(): AutosaveState {
+    return { ...this.state };
+  }
+
+  // Force save regardless of pending changes
+  async forceSave(): Promise<boolean> {
+    this.updateState({ pendingChanges: true });
+    return await this.triggerManualSave();
+  }
+
+  // Check if there are unsaved changes
+  hasUnsavedChanges(): boolean {
+    return this.state.pendingChanges;
+  }
+
+  // Get save status for UI display
+  getSaveStatus(): {
+    status: 'idle' | 'saving' | 'saved' | 'error';
+    lastSavedTime: Date | null;
+    errorMessage: string | null;
+    pendingChanges: boolean;
+    isOnline: boolean;
+    isAuthenticated: boolean;
+  } {
+    const { isOnline } = useCloudStore.getState();
+    const { isAuthenticated } = useAuthStore.getState();
+    
+    return {
+      ...this.state,
+      isOnline,
+      isAuthenticated,
+    };
+  }
+
   isOnline(): boolean {
     return navigator.onLine;
   }

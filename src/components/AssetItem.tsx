@@ -267,6 +267,7 @@ export function AssetItem({ asset, onDelete, onMouseDown, onTouchStart, onDouble
       } ${
         asset.borderShape === 'circle' ? 'rounded-full' : ''
       } ${showExternalText ? 'z-50' : ''}`}
+      id={asset.id}
     >
       {asset.borderShape === 'circle' ? (
         /* Circular Asset Layout */

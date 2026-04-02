@@ -1,6 +1,7 @@
 export interface Book {
   id: string;
   title: string;
+  subheading?: string;
   description?: string;
   coverImage?: string;
   color: string;
@@ -36,6 +37,20 @@ export interface Book {
       };
     };
     description?: {
+      text: string;
+      position: { x: number; y: number };
+      style: {
+        type: 'serif' | 'sans-serif' | 'monospace' | 'cursive' | 'fantasy' | 'custom';
+        customFont?: string;
+        color: string;
+        size: 'small' | 'medium' | 'large' | 'extra-large';
+        sizePx?: number;
+        outlineColor?: string;
+        outlineThickness?: number;
+        shadowEnabled?: boolean;
+      };
+    };
+    subheading?: {
       text: string;
       position: { x: number; y: number };
       style: {

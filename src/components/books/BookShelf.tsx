@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { Button } from '@/components/ui/button';
 import { SettingsPanel } from '@/components/settings/SettingsPanel';
 import { AccountModal } from '@/components/account/AccountModal';
+import { LocalStorageWarning } from '@/components/LocalStorageWarning';
 import { AutosaveIndicator } from '@/components/autosave/AutosaveIndicator';
 import type { Book } from '@/types/book';
 import SingleBookFocus from './SingleBookFocus';
@@ -182,6 +183,11 @@ const BookShelf: React.FC<BookShelfProps> = ({
           </div>
           
           <div className="flex items-center gap-2">
+            {/* LocalStorage Warning - only show when not authenticated */}
+            {!isAuthenticated && (
+              <LocalStorageWarning onOpenAccountModal={handleAccountClick} />
+            )}
+            
             <Button
               variant="outline"
               size="sm"
@@ -191,10 +197,10 @@ const BookShelf: React.FC<BookShelfProps> = ({
                   ? 'border-white/20 text-white hover:bg-white/10' 
                   : 'border-border text-foreground hover:bg-accent'
               }`}
-              title="Account"
+              title={isAuthenticated ? "Account" : "Sign In"}
             >
               <User className="w-4 h-4" />
-              <span className="hidden sm:inline">Account</span>
+              <span className="hidden sm:inline">{isAuthenticated ? 'Account' : 'Sign In'}</span>
             </Button>
             
             <Button
@@ -315,7 +321,7 @@ const BookShelf: React.FC<BookShelfProps> = ({
             }`}>
               Create your first book to get started with your library
             </p>
-        </div>
+          </div>
         </div>
       )}
 

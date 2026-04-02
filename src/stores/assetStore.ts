@@ -569,16 +569,68 @@ export const useAssetStore = create<AssetStore>()(
   },
 })),
       {
-        name: 'kanvas-assets-storage',
+        name: 'kanvas-assets',
         storage: createJSONStorage(() => localStorage),
+        // Only persist essential data, exclude large binary files
         partialize: (state) => ({
           assets: state.assets,
+          currentActiveId: state.currentActiveId,
+          currentViewportId: state.currentViewportId,
           globalCustomFields: state.globalCustomFields,
+          isEditingBackground: state.isEditingBackground,
         }),
+        // Custom serialization to handle large assets
+        serialize: (state) => {
+          try {
+            // Create a clean version of assets without large binary data
+            const cleanAssets: Record<string, Asset> = {};
+            Object.entries(state.assets).forEach(([id, asset]) => {
+              cleanAssets[id] = {
+                ...asset,
+                // Exclude large binary data, keep metadata only
+                file: asset.file ? {
+                  name: asset.file.name,
+                  size: asset.file.size,
+                  type: asset.file.type,
+                  lastModified: asset.file.lastModified,
+                } : undefined,
+              };
+            });
+            
+            return JSON.stringify({
+              ...state,
+              assets: cleanAssets,
+            });
+          } catch (error) {
+            console.error('[AssetStore] Serialization error:', error);
+            return JSON.stringify({
+              assets: {},
+              currentActiveId: null,
+              currentViewportId: null,
+              globalCustomFields: [],
+              isEditingBackground: false,
+            });
+          }
+        },
+        // Custom deserialization to restore asset structure
+        deserialize: (str) => {
+          try {
+            const parsed = JSON.parse(str);
+            return parsed;
+          } catch (error) {
+            console.error('[AssetStore] Deserialization error:', error);
+            return {
+              assets: {},
+              currentActiveId: null,
+              currentViewportId: null,
+              globalCustomFields: [],
+              isEditingBackground: false,
+            };
+          }
+        },
       }
     )
-  )
-);
+  );
 
 // Auto-save functionality: Now handled by autosaveService
 // This subscription is kept for compatibility but autosaveService handles cloud saves

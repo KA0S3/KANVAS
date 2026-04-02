@@ -51,6 +51,7 @@ const ViewModeSelector: React.FC<ViewModeSelectorProps> = ({
           return (
             <button
               key={mode.id}
+              id={mode.id === 'spine' ? 'view-mode-selector' : undefined}
               onClick={() => !mode.disabled && onModeChange(mode.id)}
               disabled={mode.disabled}
               className={`

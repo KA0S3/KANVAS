@@ -150,7 +150,6 @@ const SingleBookFocus: React.FC<SingleBookFocusProps> = ({
   if (!currentBook) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className={theme === 'dark' ? 'text-gray-400' : 'text-muted-foreground'}>No books available</p>
       </div>
     );
   }

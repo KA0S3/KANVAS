@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { BookOpen, ChevronLeft, Database, Trash2, Edit } from "lucide-react";
 import cosmicBackground from "@/assets/cosmic-background.png";
 import lightBackground from "@/assets/BG-light.png";
@@ -13,8 +13,8 @@ import BookEditDialog from "@/components/BookEditDialog";
 import "@/components/books/leather-styles.css";
 import SideAdBanner from "@/components/SideAdBanner";
 import { QuotaWarningBar } from "@/components/QuotaWarningBar";
-import { LocalStorageWarning } from "@/components/LocalStorageWarning";
-import { AccountModal } from "@/components/account/AccountModal";
+import { EnhancedAccountModal } from "@/components/account/EnhancedAccountModal";
+import { CompactSyncStatus } from "@/components/SyncStatusIndicator";
 import { useAssetStore } from "@/stores/assetStore";
 import { useBookStore } from "@/stores/bookStoreSimple";
 import { useTagStore } from "@/stores/tagStore";
@@ -27,6 +27,7 @@ import { autosaveService } from "@/services/autosaveService";
 import SplashScreen from "@/components/media/SplashScreen";
 import IntroVideo from "@/components/media/IntroVideo";
 import BookEntryAnimation from "@/components/media/BookEntryAnimation";
+import OnboardingPopup from "@/components/OnboardingPopup";
 import type { Book } from "@/types/book";
 import { navigationCache } from "@/utils/navigationCache";
 
@@ -40,6 +41,7 @@ const Index = () => {
   const [showBookEntryAnimation, setShowBookEntryAnimation] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const createWorldButtonRef = useRef<HTMLButtonElement>(null);
   const { currentActiveId, loadWorldData, isEditingBackground, setIsEditingBackground, currentViewportId, setActiveAsset, assets, setCurrentViewportId } = useAssetStore();
   const { loadWorldData: loadTagWorldData } = useTagStore();
   const { currentBookId, setCurrentBook, getAllBooks, deleteBook } = useBookStore();
@@ -57,18 +59,12 @@ const Index = () => {
   // Initialize autosave service when authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      autosaveService.startAutosave();
-      console.log('[Index] Autosave service started');
+      console.log('[Index] User authenticated, autosave will be handled by autosaveService');
     } else {
-      autosaveService.stopAutosave();
-      console.log('[Index] Autosave service stopped');
+      console.log('[Index] User not authenticated, local save only');
     }
-
-    // Cleanup on unmount
-    return () => {
-      autosaveService.stopAutosave();
-    };
   }, [isAuthenticated]);
+
 
   useEffect(() => {
     document.documentElement.className = theme;
@@ -249,8 +245,12 @@ const Index = () => {
       {/* Quota Warning Bar */}
       <QuotaWarningBar />
       
-      {/* LocalStorage Warning */}
-      <LocalStorageWarning onOpenAccountModal={() => setShowAccountModal(true)} />
+      {/* Sync Status Indicator - only show for authenticated users */}
+      {isAuthenticated && (
+        <div className="absolute top-16 right-4 z-40">
+          <CompactSyncStatus />
+        </div>
+      )}
       
       {/* Media Experience Layers */}
       {appPhase === 'SPLASH' && <SplashScreen />}
@@ -315,11 +315,14 @@ const Index = () => {
             {/* Create Book Button */}
             <div className="absolute bottom-6 left-6 z-10">
               <WorldCreationDialog onWorldCreated={handleWorldCreated}>
-                <Button className={`${
-                  theme === 'dark' 
-                    ? 'bg-blue-600 hover:bg-blue-700' 
-                    : 'bg-primary hover:bg-primary/90'
-                }`}>
+                <Button 
+                  id="create-world-button"
+                  ref={createWorldButtonRef}
+                  className={`${
+                    theme === 'dark' 
+                      ? 'bg-blue-600 hover:bg-blue-700' 
+                      : 'bg-primary hover:bg-primary/90'
+                  }`}>
                   ✨ Create New World
                 </Button>
               </WorldCreationDialog>
@@ -328,11 +331,15 @@ const Index = () => {
             {/* Backup/Restore Button */}
             <div className="absolute bottom-6 right-6 z-10">
               <DataManager>
-                <Button variant="outline" size="sm" className={`${
-                  theme === 'dark'
-                    ? 'border-gray-600 text-gray-200 hover:bg-gray-800'
-                    : 'border-border text-foreground hover:bg-accent'
-                }`}>
+                <Button 
+                  id="backup-restore-button"
+                  variant="outline" 
+                  size="sm" 
+                  className={`${
+                    theme === 'dark'
+                      ? 'border-gray-600 text-gray-200 hover:bg-gray-800'
+                      : 'border-border text-foreground hover:bg-accent'
+                  }`}>
                   <Database className="w-4 h-4 mr-2" />
                   Backup/Restore
                 </Button>
@@ -384,7 +391,7 @@ const Index = () => {
       </div>
       
       {/* Account Modal */}
-      <AccountModal
+      <EnhancedAccountModal
         isOpen={showAccountModal}
         onClose={() => setShowAccountModal(false)}
       />
@@ -395,6 +402,10 @@ const Index = () => {
         open={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
       />
+
+      {/* Onboarding Helper Popup */}
+      <OnboardingPopup anchorElement={createWorldButtonRef.current} />
+
     </div>
   );
 };

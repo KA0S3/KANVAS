@@ -383,10 +383,6 @@ const BookSpineView: React.FC<BookSpineViewProps> = ({
   if (books.length === 0) {
     return (
       <div className={`flex items-center justify-center h-full ${className}`}>
-        <div className="text-center">
-          <p className="text-gray-400 text-lg mb-4">No books yet</p>
-          <p className="text-gray-500 text-sm">Create your first book to get started</p>
-        </div>
       </div>
     );
   }

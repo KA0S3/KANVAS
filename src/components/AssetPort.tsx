@@ -2,8 +2,8 @@
 import { useNavigate } from "react-router-dom";
 import { Sparkles, ArrowLeft, Plus, PanelRight, BookOpen, User } from "lucide-react";
 import { AssetItem, type Asset } from "./AssetItem";
-import { AssetCreationModalFixed } from "./asset/AssetCreationModalFixed";
-import { AssetEditModal } from "./asset/AssetEditModal";
+import { AssetCreationModalImproved } from "./asset/AssetCreationModalImproved";
+import { AssetEditModalImproved } from "./asset/AssetEditModalImproved";
 import { EmptySpaceContextMenu } from "./EmptySpaceContextMenu";
 import { useAssetTree } from "@/hooks/useAssetTree";
 import { useAssetStore } from "@/stores/assetStore";
@@ -15,7 +15,7 @@ import { BackgroundControls } from "@/components/asset/BackgroundControls";
 import { BackgroundMigrationDialog } from "@/components/BackgroundMigrationDialog";
 import { BackgroundMigration } from "@/utils/backgroundMigration";
 import { AccountModal } from "@/components/account/AccountModal";
-import { StorageResetButton } from "@/components/StorageResetButton";
+import { LocalStorageWarning } from "@/components/LocalStorageWarning";
 import { Button } from "@/components/ui/button";
 import { useSampleData } from "@/hooks/useSampleData";
 import { AutosaveIndicator } from "@/components/autosave/AutosaveIndicator";
@@ -637,16 +637,30 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
         <div className="flex items-center gap-1 md:gap-2 flex-wrap">
           {currentWorldTitle && onOpenWorldLibrary && (
             <Button
+              id="world-library-button"
+              className="gap-1 md:gap-2 self-center glass cosmic-glow border-glass-border/40 text-xs md:text-sm"
               variant="outline"
               size="sm"
               onClick={onOpenWorldLibrary}
-              className="gap-1 md:gap-2 self-center glass cosmic-glow border-glass-border/40 text-xs md:text-sm"
             >
               <ArrowLeft className="w-3 h-3 md:w-4 md:h-4" />
               <div className="flex flex-col leading-tight">
                 <span className="text-xs">Back to</span>
                 <span className="text-xs font-medium">Library</span>
               </div>
+            </Button>
+          )}
+          {/* Library Management Button for Asset Viewport */}
+          {!currentWorldTitle && (
+            <Button
+              id="library-button-asset"
+              variant="outline"
+              size="sm"
+              onClick={onOpenWorldLibrary}
+              className="gap-1 md:gap-2 self-center glass cosmic-glow border-glass-border/40 text-xs md:text-sm"
+            >
+              <BookOpen className="w-3 h-3 md:w-4 md:h-4" />
+              <span className="hidden sm:inline">Library</span>
             </Button>
           )}
           {enteredAssetId && (
@@ -692,6 +706,7 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
           </nav>
           {!isEditingBackground && (
             <Button
+              id="add-asset-button"
               variant="cosmic"
               size="sm"
               className="gap-1 md:gap-2 self-center text-xs md:text-sm"
@@ -704,22 +719,27 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
           )}
         </div>
         <div className="flex items-center gap-2">
+          {/* LocalStorage Warning - only show when not authenticated */}
+          {!isAuthenticated && (
+            <LocalStorageWarning onOpenAccountModal={() => setShowAccountModal(true)} />
+          )}
+          
           {/* Account Button */}
           <Button
+            id="account-sync-button"
             variant="outline"
             size="sm"
             onClick={() => setShowAccountModal(true)}
             className="gap-1 md:gap-2 self-center text-xs md:text-sm"
+            title={isAuthenticated ? "Account" : "Sign In"}
           >
             <User className="w-3 h-3 md:w-4 md:h-4" />
-            <span className="hidden sm:inline">Account</span>
+            <span className="hidden sm:inline">{isAuthenticated ? 'Account' : 'Sign In'}</span>
           </Button>
 
-          {/* Storage Reset Button */}
-          <StorageResetButton className="gap-1 md:gap-2 self-center text-xs md:text-sm" />
-          
           {onToggleSidebar && (
             <button
+              id="sidebar-toggle-button"
               onClick={onToggleSidebar}
               className="p-1.5 md:p-2 hover:bg-muted rounded transition-colors"
               title="Toggle Shelf"
@@ -732,6 +752,7 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
 
       {/* Canvas Area */}
       <div
+        id="asset-canvas-area"
         ref={containerRef}
         onClick={handleContainerClick}
         onDoubleClick={handleContainerDoubleClick}
@@ -925,7 +946,7 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
       )}
 
       {/* Asset Creation Modal */}
-      <AssetCreationModalFixed
+      <AssetCreationModalImproved
         isOpen={isModalOpen}
         onClose={() => {
           setIsModalOpen(false);
@@ -938,7 +959,7 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
       />
 
       {/* Asset Edit Modal */}
-      <AssetEditModal
+      <AssetEditModalImproved
         isOpen={isEditModalOpen}
         onClose={() => {
           setIsEditModalOpen(false);

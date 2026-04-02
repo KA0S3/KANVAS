@@ -1,10 +1,20 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { connectivityService } from '@/services/connectivityService';
 import { useAuthStore } from './authStore';
 
 interface Quota {
   used: number;
   available: number;
+}
+
+interface SyncQueueItem {
+  id: string;
+  type: 'asset' | 'background' | 'project';
+  data: any;
+  timestamp: number;
+  retryCount: number;
+  lastRetryTime?: number;
 }
 
 interface CloudStore {
@@ -13,6 +23,10 @@ interface CloudStore {
   pendingUploads: number;
   autosaveStatus: 'idle' | 'saving' | 'saved' | 'error';
   lastSyncTime: Date | null;
+  isOnline: boolean;
+  syncQueue: SyncQueueItem[];
+  offlineMode: boolean;
+  lastSyncError: string | null;
   
   // Methods
   toggleSync: () => void;
@@ -21,6 +35,12 @@ interface CloudStore {
   forceUpdateSync: () => void; // Debug method
   setAutosaveStatus: (status: 'idle' | 'saving' | 'saved' | 'error') => void;
   setLastSyncTime: (time: Date | null) => void;
+  setOnlineStatus: (online: boolean) => void;
+  addToSyncQueue: (item: Omit<SyncQueueItem, 'id' | 'timestamp' | 'retryCount'>) => void;
+  removeFromSyncQueue: (id: string) => void;
+  clearSyncQueue: () => void;
+  setLastSyncError: (error: string | null) => void;
+  updateQuotaUsage: (bytes: number) => void;
 }
 
 // Default quota limits based on plan
@@ -43,6 +63,10 @@ export const useCloudStore = create<CloudStore>()(
       pendingUploads: 0,
       autosaveStatus: 'idle',
       lastSyncTime: null,
+      isOnline: connectivityService.isOnline(),
+      syncQueue: [],
+      offlineMode: false,
+      lastSyncError: null,
 
       // Toggle sync functionality
       toggleSync: () => {
@@ -63,11 +87,11 @@ export const useCloudStore = create<CloudStore>()(
 
       // Check if upload is possible within quota
       canUpload: (bytes: number): boolean => {
-        const { syncEnabled, quota } = get();
+        const { syncEnabled, quota, isOnline } = get();
         const effectiveLimits = useAuthStore.getState().effectiveLimits;
         
-        // If sync is disabled, no cloud features active
-        if (!syncEnabled) {
+        // If sync is disabled or offline, no cloud features active
+        if (!syncEnabled || !isOnline) {
           return false;
         }
         
@@ -93,6 +117,74 @@ export const useCloudStore = create<CloudStore>()(
       setLastSyncTime: (time: Date | null) => {
         set({ lastSyncTime: time });
       },
+
+      // Set online status
+      setOnlineStatus: (online: boolean) => {
+        const wasOffline = !get().isOnline;
+        set({ 
+          isOnline: online,
+          offlineMode: !online,
+          lastSyncError: online ? null : get().lastSyncError
+        });
+        
+        // If coming back online, trigger sync queue processing
+        if (online && wasOffline && get().syncQueue.length > 0) {
+          console.log('[cloudStore] Back online, processing sync queue...');
+          // This will be handled by the sync service
+        }
+      },
+
+      // Add item to sync queue
+      addToSyncQueue: (item: Omit<SyncQueueItem, 'id' | 'timestamp' | 'retryCount'>) => {
+        const queueItem: SyncQueueItem = {
+          ...item,
+          id: crypto.randomUUID(),
+          timestamp: Date.now(),
+          retryCount: 0,
+        };
+        
+        set((state) => ({
+          syncQueue: [...state.syncQueue, queueItem],
+          pendingUploads: state.pendingUploads + 1,
+        }));
+        
+        console.log('[cloudStore] Added item to sync queue:', queueItem.type);
+      },
+
+      // Remove item from sync queue
+      removeFromSyncQueue: (id: string) => {
+        set((state) => {
+          const newQueue = state.syncQueue.filter(item => item.id !== id);
+          return {
+            syncQueue: newQueue,
+            pendingUploads: Math.max(0, state.pendingUploads - 1),
+          };
+        });
+      },
+
+      // Clear sync queue
+      clearSyncQueue: () => {
+        set({
+          syncQueue: [],
+          pendingUploads: 0,
+        });
+      },
+
+      // Set last sync error
+      setLastSyncError: (error: string | null) => {
+        set({ lastSyncError: error });
+      },
+
+      // Update quota usage
+      updateQuotaUsage: (bytes: number) => {
+        const currentUsed = get().quota.used;
+        set((state) => ({
+          quota: {
+            ...state.quota,
+            used: Math.max(0, currentUsed + bytes),
+          },
+        }));
+      },
     }),
     {
       name: 'kanvas-cloud',
@@ -100,6 +192,8 @@ export const useCloudStore = create<CloudStore>()(
       partialize: (state) => ({
         syncEnabled: state.syncEnabled,
         quota: state.quota,
+        isOnline: state.isOnline,
+        offlineMode: state.offlineMode,
       }),
     }
   )
@@ -135,3 +229,22 @@ export const updateQuotaBasedOnPlan = () => {
     useCloudStore.getState().setQuota(currentUsed, limit);
   }
 };
+
+// Initialize connectivity detection
+if (typeof window !== 'undefined') {
+  const handleOnline = () => {
+    console.log('[cloudStore] Network connection restored');
+    useCloudStore.getState().setOnlineStatus(true);
+  };
+
+  const handleOffline = () => {
+    console.log('[cloudStore] Network connection lost');
+    useCloudStore.getState().setOnlineStatus(false);
+  };
+
+  window.addEventListener('online', handleOnline);
+  window.addEventListener('offline', handleOffline);
+
+  // Cleanup function (will be called when store is destroyed)
+  // Note: In production, you might want to add proper cleanup
+}

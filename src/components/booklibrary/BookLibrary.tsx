@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Plus, BookOpen, User, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
+import { X, Plus, BookOpen, User, ChevronDown, ChevronUp, Sparkles, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -19,6 +19,7 @@ import { AccountModal } from '@/components/account/AccountModal';
 import { UpgradePromptModal } from '@/components/UpgradePromptModal';
 import { FeatureTeaserCard } from '@/components/upgrade/FeatureTeaserCard';
 import { AutosaveIndicator } from '@/components/autosave/AutosaveIndicator';
+import { SettingsPanel } from '@/components/settings/SettingsPanel';
 import type { Book } from '@/types/book';
 
 interface BookLibraryProps {
@@ -46,6 +47,7 @@ export function BookLibrary({ isOpen, onClose, onBookSelect }: BookLibraryProps)
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
   const [bookToDelete, setBookToDelete] = useState<Book | null>(null);
   const [upgradePrompt, setUpgradePrompt] = useState<{
     title: string;
@@ -209,6 +211,7 @@ export function BookLibrary({ isOpen, onClose, onBookSelect }: BookLibraryProps)
                     onClick={() => setGeneratorsOpen(!generatorsOpen)}
                     className="gap-2"
                     title="Generators"
+                    id="generators-button-library"
                   >
                     <Sparkles className="w-4 h-4" />
                     <span className="hidden sm:inline">Generators</span>
@@ -253,10 +256,23 @@ export function BookLibrary({ isOpen, onClose, onBookSelect }: BookLibraryProps)
                   size="sm"
                   onClick={handleAccountClick}
                   className="gap-2"
-                  title="Account"
+                  title={isAuthenticated ? "Account" : "Sign In"}
                 >
                   <User className="w-4 h-4" />
-                  <span className="hidden sm:inline">Account</span>
+                  <span className="hidden sm:inline">{isAuthenticated ? 'Account' : 'Sign In'}</span>
+                </Button>
+                
+                {/* Settings Button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSettingsPanelOpen(true)}
+                  className="gap-2"
+                  title="Settings"
+                  id="settings-button-library"
+                >
+                  <Settings className="w-4 h-4" />
+                  <span className="hidden sm:inline">Settings</span>
                 </Button>
                 
                 {/* Create Book Button */}
@@ -369,6 +385,14 @@ export function BookLibrary({ isOpen, onClose, onBookSelect }: BookLibraryProps)
         isOpen={showAccountModal}
         onClose={() => setShowAccountModal(false)}
       />
+
+      {/* Settings Panel */}
+      {settingsPanelOpen && (
+        <SettingsPanel
+          isOpen={settingsPanelOpen}
+          onClose={() => setSettingsPanelOpen(false)}
+        />
+      )}
 
       {/* Upgrade Prompt Modal */}
       {upgradePrompt && (

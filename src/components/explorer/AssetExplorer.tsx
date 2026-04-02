@@ -383,21 +383,26 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
               }
             }}
             title="Background Map"
+            id="background-editor-button"
           >
             <Image className="w-3.5 h-3.5" />
           </Button>
-                    <Button
+          <Button
             size="sm"
             variant="ghost"
             className="h-6 w-6 p-0"
             onClick={() => setSettingsPanelOpen(true)}
             title="Settings"
+            id="settings-button-asset"
           >
             <Settings className="w-3.5 h-3.5" />
           </Button>
-          <GlobalTagManager />
+          <div id="tag-manager-button">
+            <GlobalTagManager />
+          </div>
           {onToggleSidebar && (
             <Button
+              id="asset-explorer-toggle"
               size="sm"
               variant="ghost"
               className="h-6 w-6 p-0"
@@ -410,7 +415,7 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
         </div>
         
         {/* Four main buttons */}
-        <div className="flex gap-1">
+        <div id="generators-button" className="flex gap-1">
           <button
             type="button"
             className="whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border hover:text-accent-foreground py-2 h-10 flex-1 flex flex-col items-center justify-center gap-0.5 bg-sidebar-accent/20 border-sidebar-border hover:bg-sidebar-accent/40 px-1 fantasy-tab"
@@ -530,6 +535,12 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
           )}
         </DragOverlay>
         
+        {/* Settings Panel */}
+        <SettingsPanel
+          isOpen={settingsPanelOpen}
+          onClose={() => setSettingsPanelOpen(false)}
+        />
+
         {/* Settings Panel */}
         <SettingsPanel
           isOpen={settingsPanelOpen}
