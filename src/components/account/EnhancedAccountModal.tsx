@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, LogOut, Loader2, Crown, HardDrive, Shield, Lock, ExternalLink } from 'lucide-react';
+import { User, Mail, LogOut, Loader2, Crown, HardDrive, Shield, Lock, ExternalLink, AlertTriangle, AlertCircle } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -31,7 +31,7 @@ import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
 import { DataMigrationDialog } from '@/components/DataMigrationDialog';
 import { GuestImportDialog } from '@/components/GuestImportDialog';
 import { useAuthFlowWithMigration } from '@/hooks/useAuthFlowWithMigration';
-import { useAuthStore } from '@/stores/authStore';
+import { useSimpleAuthStore } from '@/stores/simpleAuthStore';
 import { useCloudStore } from '@/stores/cloudStore';
 import { formatBytes } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -109,9 +109,13 @@ export function EnhancedAccountModal({ isOpen, onClose }: EnhancedAccountModalPr
     detectAuthProvider,
     linkPasswordToGoogleUser,
     createPasswordForGoogleUser
-  } = useAuthStore();
+  } = useSimpleAuthStore();
 
   const { quota } = useCloudStore();
+
+  // Check if storage quota is exceeded - use effectiveLimits for consistency
+  const isQuotaExceeded = effectiveLimits && quota && quota.used >= effectiveLimits.quotaBytes;
+  const usagePercentage = effectiveLimits && quota ? (quota.used / effectiveLimits.quotaBytes) * 100 : 0;
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -132,15 +136,20 @@ export function EnhancedAccountModal({ isOpen, onClose }: EnhancedAccountModalPr
 
   // Enhanced login handler with migration
   const onLoginSubmit = async (data: LoginFormData) => {
+    console.log('[EnhancedAccountModal] Login form submitted:', { email: data.email, isSubmitting, isMigrating });
     setIsSubmitting(true);
     setAuthError(null);
     
     try {
+      console.log('[EnhancedAccountModal] Calling handleSignIn...');
       const result = await handleSignIn(data.email, data.password);
+      console.log('[EnhancedAccountModal] handleSignIn result:', result);
       
       if (!result.success) {
+        console.log('[EnhancedAccountModal] Login failed:', result.error);
         setAuthError(result.error || 'Login failed');
       } else {
+        console.log('[EnhancedAccountModal] Login successful, closing modal');
         // Success! Migration dialog will show if needed
         loginForm.reset();
         onClose();
@@ -149,6 +158,7 @@ export function EnhancedAccountModal({ isOpen, onClose }: EnhancedAccountModalPr
       console.error('[EnhancedAccountModal] Login error:', error);
       setAuthError('An unexpected error occurred');
     } finally {
+      console.log('[EnhancedAccountModal] Setting isSubmitting to false');
       setIsSubmitting(false);
     }
   };
@@ -255,14 +265,45 @@ export function EnhancedAccountModal({ isOpen, onClose }: EnhancedAccountModalPr
             </DialogHeader>
 
             <div className="space-y-4">
+              {/* Storage Quota Warning */}
+              {isQuotaExceeded && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <h3 className="font-semibold text-red-800">Storage Quota Exceeded!</h3>
+                      <p className="text-sm text-red-700">
+                        You have used all your available cloud storage. Your data cannot sync properly and you may lose work if you continue.
+                      </p>
+                      <p className="text-sm text-red-600 font-medium">
+                        ⚠️ Please upgrade your storage plan immediately to keep the app working and prevent data loss.
+                      </p>
+                      <div className="mt-3">
+                        <Button 
+                          onClick={() => setShowPaymentModal(true)}
+                          className="bg-red-600 hover:bg-red-700 text-white"
+                          size="sm"
+                        >
+                          <Crown className="w-4 h-4 mr-2" />
+                          Upgrade Storage Now
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* User Info */}
               <Card>
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between mb-4">
                     <div>
                       <p className="font-medium">{user.email}</p>
-                      <Badge className={getPlanBadgeColor(plan)}>
+                      <Badge className={`${getPlanBadgeColor(plan)} ${isQuotaExceeded ? 'ring-2 ring-red-500 ring-offset-2' : ''}`}>
                         {plan.charAt(0).toUpperCase() + plan.slice(1)}
+                        {isQuotaExceeded && (
+                          <AlertTriangle className="w-3 h-3 ml-1 inline" />
+                        )}
                       </Badge>
                     </div>
                     <Button variant="outline" size="sm" onClick={handleSignOut}>
@@ -274,13 +315,22 @@ export function EnhancedAccountModal({ isOpen, onClose }: EnhancedAccountModalPr
                   {/* Storage Usage */}
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span>Storage Used</span>
-                      <span>{formatBytes(quota.used)} / {formatBytes(quota.available)}</span>
+                      <span className={isQuotaExceeded ? 'font-semibold text-red-600' : ''}>
+                        Storage Used {isQuotaExceeded && '(⚠️ FULL)'}
+                      </span>
+                      <span className={isQuotaExceeded ? 'font-semibold text-red-600' : ''}>
+                        {formatBytes(quota.used)} / {formatBytes(effectiveLimits?.quotaBytes || quota.available)}
+                      </span>
                     </div>
                     <Progress 
-                      value={(quota.used / quota.available) * 100} 
-                      className="h-2"
+                      value={Math.min(usagePercentage, 100)} 
+                      className={`h-2 ${isQuotaExceeded ? 'bg-red-100' : ''}`}
                     />
+                    {isQuotaExceeded && (
+                      <p className="text-xs text-red-600 font-medium">
+                        Your storage is full. Upgrade immediately to continue syncing.
+                      </p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -311,7 +361,7 @@ export function EnhancedAccountModal({ isOpen, onClose }: EnhancedAccountModalPr
               )}
 
               {/* Upgrade Button */}
-              {plan === 'free' && (
+              {plan === 'free' ? (
                 <Button 
                   onClick={() => setShowPaymentModal(true)}
                   className="w-full"
@@ -319,7 +369,15 @@ export function EnhancedAccountModal({ isOpen, onClose }: EnhancedAccountModalPr
                   <Crown className="w-4 h-4 mr-2" />
                   Upgrade to Pro
                 </Button>
-              )}
+              ) : isQuotaExceeded ? (
+                <Button 
+                  onClick={() => setShowPaymentModal(true)}
+                  className="w-full bg-red-600 hover:bg-red-700"
+                >
+                  <AlertTriangle className="w-4 h-4 mr-2" />
+                  Get More Storage Now
+                </Button>
+              ) : null}
             </div>
           </DialogContent>
         </Dialog>
@@ -406,7 +464,10 @@ export function EnhancedAccountModal({ isOpen, onClose }: EnhancedAccountModalPr
             {/* Forms */}
             {mode === 'login' ? (
               <Form {...loginForm}>
-                <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
+                <form onSubmit={(e) => {
+                  console.log('[EnhancedAccountModal] Form onSubmit triggered');
+                  return loginForm.handleSubmit(onLoginSubmit)(e);
+                }} className="space-y-4">
                   <FormField
                     control={loginForm.control}
                     name="email"
@@ -447,6 +508,7 @@ export function EnhancedAccountModal({ isOpen, onClose }: EnhancedAccountModalPr
                     type="submit" 
                     className="w-full"
                     disabled={isSubmitting || isMigrating}
+                    onClick={() => console.log('[EnhancedAccountModal] Sign In button clicked', { isSubmitting, isMigrating })}
                   >
                     {isSubmitting ? (
                       <>

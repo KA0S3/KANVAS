@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { useSimpleAuthStore } from '@/stores/simpleAuthStore';
+import { useAuthStore } from '@/stores/authStore';
 import { dataMigrationService, type MigrationConflict, type MigrationResult, type MigrationStrategy } from '@/services/dataMigrationService';
 import { toast } from 'sonner';
 
@@ -36,7 +36,7 @@ export const useAuthFlowWithMigration = (): UseAuthFlowWithMigrationReturn => {
     checkForMigrationConflicts,
     shouldShowGuestImport,
     executeDataMigration,
-  } = useSimpleAuthStore();
+  } = useAuthStore();
 
   // Check for guest import on component mount
   useEffect(() => {
@@ -112,6 +112,7 @@ export const useAuthFlowWithMigration = (): UseAuthFlowWithMigrationReturn => {
     setIsMigrating(true);
     
     try {
+      // Attempt sign up
       const signUpResult = await signUp(email, password);
       
       if (!signUpResult.success || signUpResult.error) {
@@ -137,6 +138,7 @@ export const useAuthFlowWithMigration = (): UseAuthFlowWithMigrationReturn => {
     setIsMigrating(true);
     
     try {
+      // Attempt Google sign in
       const signInResult = await signInWithGoogle();
       
       if (!signInResult.success || signInResult.error) {
@@ -193,15 +195,16 @@ export const useAuthFlowWithMigration = (): UseAuthFlowWithMigrationReturn => {
         
         // If they chose to delete current data, we might need to refresh some stores
         if (strategy === 'delete-current') {
-          // Trigger a refresh of the app state
+          // The migration service already cleared local data
+          // You might want to trigger a page reload or store refresh here
           window.location.reload();
         }
       } else {
-        toast.error(`Migration failed: ${result.error}`);
+        toast.error(`Migration failed: ${result.message}`);
       }
     } catch (error) {
       console.error('[AuthFlowWithMigration] Migration error:', error);
-      toast.error('An unexpected error occurred during migration');
+      toast.error('Migration failed. Please try again.');
     } finally {
       setIsMigrating(false);
     }
@@ -214,22 +217,26 @@ export const useAuthFlowWithMigration = (): UseAuthFlowWithMigrationReturn => {
     
     try {
       if (importData) {
-        // Import guest data logic here
-        toast.success('Guest data imported successfully!');
+        const result = await executeDataMigration('merge-as-new', user.id);
+        
+        if (result.success) {
+          toast.success('Your local projects have been saved to the cloud!');
+        } else {
+          toast.error(`Import failed: ${result.message}`);
+        }
       } else {
-        // Mark that user dismissed this dialog
-        localStorage.setItem('kanvas-guest-import-dismissed', 'true');
-        toast.info('Guest data skipped');
+        // User chose to start fresh
+        toast.info('Starting fresh. Your local data is still available on this device.');
       }
       
       setShowGuestImportDialog(false);
     } catch (error) {
       console.error('[AuthFlowWithMigration] Guest import error:', error);
-      toast.error('An unexpected error occurred during guest import');
+      toast.error('Import failed. Please try again.');
     } finally {
       setIsMigrating(false);
     }
-  }, [user]);
+  }, [user, executeDataMigration]);
 
   const closeMigrationDialog = useCallback(() => {
     setShowMigrationDialog(false);

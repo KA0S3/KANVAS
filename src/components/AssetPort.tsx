@@ -1,6 +1,6 @@
  import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Sparkles, ArrowLeft, Plus, PanelRight, BookOpen, User } from "lucide-react";
+import { Sparkles, ArrowLeft, Plus, PanelRight, BookOpen, User, AlertTriangle } from "lucide-react";
 import { AssetItem, type Asset } from "./AssetItem";
 import { AssetCreationModalImproved } from "./asset/AssetCreationModalImproved";
 import { AssetEditModalImproved } from "./asset/AssetEditModalImproved";
@@ -10,11 +10,12 @@ import { useAssetStore } from "@/stores/assetStore";
 import { useBookStore } from "@/stores/bookStoreSimple";
 import { useBackgroundStoreClean } from "@/stores/backgroundStoreClean";
 import { useAuthStore } from "@/stores/authStore";
+import { useCloudStore } from "@/stores/cloudStore";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
 import { BackgroundControls } from "@/components/asset/BackgroundControls";
 import { BackgroundMigrationDialog } from "@/components/BackgroundMigrationDialog";
 import { BackgroundMigration } from "@/utils/backgroundMigration";
-import { AccountModal } from "@/components/account/AccountModal";
+import { EnhancedAccountModal } from "@/components/account/EnhancedAccountModal";
 import { LocalStorageWarning } from "@/components/LocalStorageWarning";
 import { Button } from "@/components/ui/button";
 import { useSampleData } from "@/hooks/useSampleData";
@@ -130,7 +131,8 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
   const { currentActiveId, setCurrentViewportId, currentViewportId, isEditingBackground, updateAsset } = useAssetStore();
   const { getCurrentBook, getWorldData, updateWorldData } = useBookStore();
   const { getBackground, setBackground, migrateLegacyConfig } = useBackgroundStoreClean();
-  const { user, plan, isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user, plan, effectiveLimits } = useAuthStore();
+  const { quota } = useCloudStore();
   const navigate = useNavigate();
   
   // Calculate effective viewport size based on current context
@@ -727,12 +729,15 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
           {/* Account Button */}
           <Button
             id="account-sync-button"
-            variant="outline"
+            variant={effectiveLimits && quota && quota.used >= effectiveLimits.quotaBytes ? "destructive" : "outline"}
             size="sm"
             onClick={() => setShowAccountModal(true)}
-            className="gap-1 md:gap-2 self-center text-xs md:text-sm"
+            className="gap-1 md:gap-2 self-center text-xs md:text-sm relative"
             title={isAuthenticated ? "Account" : "Sign In"}
           >
+            {effectiveLimits && quota && quota.used >= effectiveLimits.quotaBytes && (
+              <AlertTriangle className="w-3 h-3 md:w-4 md:h-4 absolute -top-1 -right-1 animate-pulse" />
+            )}
             <User className="w-3 h-3 md:w-4 md:h-4" />
             <span className="hidden sm:inline">{isAuthenticated ? 'Account' : 'Sign In'}</span>
           </Button>
@@ -970,7 +975,7 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
       />
 
       {/* Account Modal */}
-      <AccountModal
+      <EnhancedAccountModal
         isOpen={showAccountModal}
         onClose={() => setShowAccountModal(false)}
       />

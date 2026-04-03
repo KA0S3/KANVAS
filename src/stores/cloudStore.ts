@@ -48,7 +48,7 @@ const QUOTA_LIMITS = {
   free: 100 * 1024 * 1024,    // 100MB
   pro: 10 * 1024 * 1024 * 1024,  // 10GB
   lifetime: 15 * 1024 * 1024 * 1024, // 15GB
-  owner: -1, // Unlimited storage
+  owner: 10 * 1024 * 1024 * 1024, // 10GB
 } as const;
 
 export const useCloudStore = create<CloudStore>()(

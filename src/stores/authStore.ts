@@ -5,6 +5,8 @@ import { secureStorage } from '@/utils/secureStorage';
 import { dataMigrationService, type MigrationConflict, type MigrationResult } from '@/services/dataMigrationService';
 import { getPlanConfig, migrateLegacyPlanId } from '@/lib/plans';
 import { getEffectiveLimitsWithFallback, type EffectiveLimits } from '@/services/effectiveLimitsService';
+import { updateQuotaBasedOnPlan } from './cloudStore';
+import { ownerKeyService } from '@/services/ownerKeyService';
 import type { User } from '@supabase/supabase-js';
 
 type Plan = 'guest' | 'free' | 'pro' | 'lifetime' | 'owner';
@@ -657,8 +659,8 @@ export const useAuthStore = create<AuthStore>()(
     if (user.email === ownerEmail) {
       console.log('[authStore] 🚀 IMMEDIATE OWNER DETECTION - Setting owner limits');
       const ownerLimits: EffectiveLimits = {
-        quotaBytes: -1, // Unlimited
-        maxBooks: -1, // Unlimited
+        quotaBytes: 10 * 1024 * 1024 * 1024, // 10GB
+        maxBooks: -1, // Unlimited books
         adsEnabled: false, // No ads
         importExportEnabled: true, // Full access
         source: {
@@ -998,9 +1000,11 @@ export const useAuthStore = create<AuthStore>()(
       },
       // Only persist minimal state - authentication should be fresh each time
       partialize: (state) => ({
-        plan: state.plan,
+        plan: state.plan || 'guest',
         licenseInfo: state.licenseInfo,
-      }),
+        _lastFetchedUserId: state._lastFetchedUserId || '',
+        _authStateInitialized: state._authStateInitialized || false,
+      } as any),
       // Don't persist authentication state to avoid sign out issues
       skipHydration: false,
     }

@@ -14,14 +14,14 @@ import "@/components/books/leather-styles.css";
 import SideAdBanner from "@/components/SideAdBanner";
 import { QuotaWarningBar } from "@/components/QuotaWarningBar";
 import { EnhancedAccountModal } from "@/components/account/EnhancedAccountModal";
-import { CompactSyncStatus } from "@/components/SyncStatusIndicator";
 import { useAssetStore } from "@/stores/assetStore";
-import { useBookStore } from "@/stores/bookStoreSimple";
+import { useSimpleAuthStore } from '@/stores/simpleAuthStore';
 import { useTagStore } from "@/stores/tagStore";
 import { useThemeStore } from "@/stores/themeStore";
 import { useBackgroundStore } from "@/stores/backgroundStore";
 import { useMediaStore } from "@/stores/mediaStore";
 import { useAuthStore } from "@/stores/authStore";
+import { useBookStore } from "@/stores/bookStoreSimple";
 import { audioEngine } from "@/services/AudioEngine";
 import { autosaveService } from "@/services/autosaveService";
 import SplashScreen from "@/components/media/SplashScreen";
@@ -42,33 +42,33 @@ const Index = () => {
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const createWorldButtonRef = useRef<HTMLButtonElement>(null);
-  const { currentActiveId, loadWorldData, isEditingBackground, setIsEditingBackground, currentViewportId, setActiveAsset, assets, setCurrentViewportId } = useAssetStore();
-  const { loadWorldData: loadTagWorldData } = useTagStore();
-  const { currentBookId, setCurrentBook, getAllBooks, deleteBook } = useBookStore();
-  const { theme } = useThemeStore();
-  const { getBackground } = useBackgroundStore(); // Initialize background store
-  const { appPhase, showLibrary, setTransitioning, setAppPhase } = useMediaStore();
-  const { initializeAuth, effectiveLimits, isAuthenticated } = useAuthStore(); // Initialize auth store
-  const showAds = ADS_ENABLED_FOR_ALL_USERS && (effectiveLimits?.adsEnabled ?? true);
+  const { currentActiveId, loadWorldData, isEditingBackground, setIsEditingBackground, currentViewportId, setActiveAsset, assets, setCurrentViewportId } = useAssetStore(); // Adding back asset store with simplified persist
+  // const { loadWorldData: loadTagWorldData } = useTagStore(); // Temporarily disabled to debug
+  const { currentBookId, setCurrentBook, getAllBooks, deleteBook } = useBookStore(); // Adding back book store - confirmed working
+  const { theme } = useThemeStore(); // Adding back theme store - confirmed working
+  // const { getBackground } = useBackgroundStore(); // Temporarily disabled to debug
+  const { appPhase, showLibrary, setTransitioning, setAppPhase } = useMediaStore(); // Adding back media store - confirmed working
+  // Simple auth state for storage quota functionality
+  const { effectiveLimits, isAuthenticated, initializeAuth } = useSimpleAuthStore(); // Using working simple auth store
+  const showAds = false; // Temporarily disabled
 
-  // Initialize auth on app mount
-  useEffect(() => {
-    initializeAuth();
-  }, [initializeAuth]);
+  // Fallback functions and values
+  const loadTagWorldData = (data: any) => {};
+  const getBackground = () => null;
 
   // Initialize autosave service when authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
-      console.log('[Index] User authenticated, autosave will be handled by autosaveService');
-    } else {
-      console.log('[Index] User not authenticated, local save only');
-    }
-  }, [isAuthenticated]);
+  // useEffect(() => {
+  //   if (isAuthenticated) {
+  //     console.log('[Index] User authenticated, autosave will be handled by autosaveService');
+  //   } else {
+  //     console.log('[Index] User not authenticated, local save only');
+  //   }
+  // }, [isAuthenticated]); // Temporarily disabled to debug
 
 
-  useEffect(() => {
-    document.documentElement.className = theme;
-  }, [theme]);
+  // useEffect(() => {
+  //   document.documentElement.className = theme;
+  // }, [theme]); // Temporarily disabled to debug
 
   // Audio is now started from splash screen with user interaction
   // useEffect(() => {
@@ -245,13 +245,7 @@ const Index = () => {
       {/* Quota Warning Bar */}
       <QuotaWarningBar />
       
-      {/* Sync Status Indicator - only show for authenticated users */}
-      {isAuthenticated && (
-        <div className="absolute top-16 right-4 z-40">
-          <CompactSyncStatus />
-        </div>
-      )}
-      
+            
       {/* Media Experience Layers */}
       {appPhase === 'SPLASH' && <SplashScreen />}
       {appPhase === 'INTRO_VIDEO' && <IntroVideo />}
