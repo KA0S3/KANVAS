@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { useSimpleAuthStore } from '@/stores/simpleAuthStore';
+import { useAuthStore } from '@/stores/authStore';
 import { dataMigrationService, type MigrationConflict, type MigrationResult, type MigrationStrategy } from '@/services/dataMigrationService';
 import { toast } from 'sonner';
 
@@ -36,7 +36,7 @@ export const useAuthFlowWithMigration = (): UseAuthFlowWithMigrationReturn => {
     checkForMigrationConflicts,
     shouldShowGuestImport,
     executeDataMigration,
-  } = useSimpleAuthStore();
+  } = useAuthStore();
 
   // Check for guest import on component mount
   useEffect(() => {
@@ -197,7 +197,7 @@ export const useAuthFlowWithMigration = (): UseAuthFlowWithMigrationReturn => {
           window.location.reload();
         }
       } else {
-        toast.error(`Migration failed: ${result.error}`);
+        toast.error(`Migration failed: ${result.message}`);
       }
     } catch (error) {
       console.error('[AuthFlowWithMigration] Migration error:', error);

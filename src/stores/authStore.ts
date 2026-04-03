@@ -91,7 +91,7 @@ export const useAuthStore = create<AuthStore>()(
       // Initialize auth listener
       initializeAuth: () => {
         // Prevent multiple initializations
-        if (get().loading === false || get()._authStateInitialized) {
+        if (get()._authStateInitialized) {
           console.log('[authStore] Auth store already initialized');
           return;
         }

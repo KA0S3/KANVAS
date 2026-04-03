@@ -31,7 +31,7 @@ import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
 import { DataMigrationDialog } from '@/components/DataMigrationDialog';
 import { GuestImportDialog } from '@/components/GuestImportDialog';
 import { useAuthFlowWithMigration } from '@/hooks/useAuthFlowWithMigration';
-import { useSimpleAuthStore } from '@/stores/simpleAuthStore';
+import { useAuthStore } from '@/stores/authStore';
 import { useCloudStore } from '@/stores/cloudStore';
 import { formatBytes } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -102,6 +102,7 @@ export function EnhancedAccountModal({ isOpen, onClose }: EnhancedAccountModalPr
     loading: authLoading, 
     signOut,
     refreshUserData,
+    initializeAuth,
     isVerificationPending,
     verificationEmail,
     setVerificationPending,
@@ -109,9 +110,16 @@ export function EnhancedAccountModal({ isOpen, onClose }: EnhancedAccountModalPr
     detectAuthProvider,
     linkPasswordToGoogleUser,
     createPasswordForGoogleUser
-  } = useSimpleAuthStore();
+  } = useAuthStore();
 
   const { quota } = useCloudStore();
+
+  // Initialize auth on mount if not already done
+  useEffect(() => {
+    if (authLoading) {
+      initializeAuth();
+    }
+  }, [authLoading, initializeAuth]);
 
   // Check if storage quota is exceeded - use effectiveLimits for consistency
   const isQuotaExceeded = effectiveLimits && quota && quota.used >= effectiveLimits.quotaBytes;
@@ -136,20 +144,15 @@ export function EnhancedAccountModal({ isOpen, onClose }: EnhancedAccountModalPr
 
   // Enhanced login handler with migration
   const onLoginSubmit = async (data: LoginFormData) => {
-    console.log('[EnhancedAccountModal] Login form submitted:', { email: data.email, isSubmitting, isMigrating });
     setIsSubmitting(true);
     setAuthError(null);
     
     try {
-      console.log('[EnhancedAccountModal] Calling handleSignIn...');
       const result = await handleSignIn(data.email, data.password);
-      console.log('[EnhancedAccountModal] handleSignIn result:', result);
       
       if (!result.success) {
-        console.log('[EnhancedAccountModal] Login failed:', result.error);
         setAuthError(result.error || 'Login failed');
       } else {
-        console.log('[EnhancedAccountModal] Login successful, closing modal');
         // Success! Migration dialog will show if needed
         loginForm.reset();
         onClose();
@@ -158,7 +161,6 @@ export function EnhancedAccountModal({ isOpen, onClose }: EnhancedAccountModalPr
       console.error('[EnhancedAccountModal] Login error:', error);
       setAuthError('An unexpected error occurred');
     } finally {
-      console.log('[EnhancedAccountModal] Setting isSubmitting to false');
       setIsSubmitting(false);
     }
   };

@@ -15,12 +15,11 @@ import SideAdBanner from "@/components/SideAdBanner";
 import { QuotaWarningBar } from "@/components/QuotaWarningBar";
 import { EnhancedAccountModal } from "@/components/account/EnhancedAccountModal";
 import { useAssetStore } from "@/stores/assetStore";
-import { useSimpleAuthStore } from '@/stores/simpleAuthStore';
+import { useAuthStore } from '@/stores/authStore';
 import { useTagStore } from "@/stores/tagStore";
 import { useThemeStore } from "@/stores/themeStore";
 import { useBackgroundStore } from "@/stores/backgroundStore";
 import { useMediaStore } from "@/stores/mediaStore";
-import { useAuthStore } from "@/stores/authStore";
 import { useBookStore } from "@/stores/bookStoreSimple";
 import { audioEngine } from "@/services/AudioEngine";
 import { autosaveService } from "@/services/autosaveService";
@@ -49,12 +48,17 @@ const Index = () => {
   // const { getBackground } = useBackgroundStore(); // Temporarily disabled to debug
   const { appPhase, showLibrary, setTransitioning, setAppPhase } = useMediaStore(); // Adding back media store - confirmed working
   // Simple auth state for storage quota functionality
-  const { effectiveLimits, isAuthenticated, initializeAuth } = useSimpleAuthStore(); // Using working simple auth store
+  const { effectiveLimits, isAuthenticated, initializeAuth } = useAuthStore(); // Using working auth store
   const showAds = false; // Temporarily disabled
 
   // Fallback functions and values
   const loadTagWorldData = (data: any) => {};
   const getBackground = () => null;
+
+  // Initialize auth on mount
+  useEffect(() => {
+    initializeAuth();
+  }, [initializeAuth]);
 
   // Initialize autosave service when authenticated
   // useEffect(() => {
