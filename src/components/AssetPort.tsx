@@ -128,7 +128,7 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
     getAssetPath,
   } = useAssetTree();
   
-  const { currentActiveId, setCurrentViewportId, currentViewportId, isEditingBackground, updateAsset } = useAssetStore();
+  const { currentActiveId, setCurrentViewportId, currentViewportId, isEditingBackground, setIsEditingBackground, updateAsset } = useAssetStore();
   const { getCurrentBook, getWorldData, updateWorldData } = useBookStore();
   const { getBackground, setBackground, migrateLegacyConfig } = useBackgroundStoreClean();
   const { isAuthenticated, user, plan, effectiveLimits } = useAuthStore();
@@ -304,6 +304,13 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
 
   const handleMouseDown = useCallback((e: React.MouseEvent, asset: Asset) => {
     e.preventDefault();
+    
+    // Debug log to check if background editing is interfering
+    if (isEditingBackground) {
+      console.log('🐛 AssetPort: Mouse down on asset while isEditingBackground is true - forcing exit');
+      setIsEditingBackground(false);
+    }
+    
     setSelectedAsset(asset.id);
     setActiveAsset(asset.id);
     setIsDragging(true);
@@ -315,7 +322,7 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
         y: e.clientY - rect.top,
       });
     }
-  }, [setActiveAsset]);
+  }, [setActiveAsset, isEditingBackground, setIsEditingBackground]);
 
   const handleTouchStart = useCallback((e: React.TouchEvent, asset: Asset) => {
     e.preventDefault();

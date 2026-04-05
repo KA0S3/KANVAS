@@ -15,7 +15,7 @@ import { useCanCreateBook } from '@/lib/limits';
 import { BookCarousel } from './BookCarousel';
 import { BookEditor } from './BookEditor';
 import { DeleteBookModal } from '@/components/books/DeleteBookModal';
-import { AccountModal } from '@/components/account/AccountModal';
+import { EnhancedAccountModal } from '@/components/account/EnhancedAccountModal';
 import { UpgradePromptModal } from '@/components/UpgradePromptModal';
 import { FeatureTeaserCard } from '@/components/upgrade/FeatureTeaserCard';
 import { AutosaveIndicator } from '@/components/autosave/AutosaveIndicator';
@@ -381,7 +381,7 @@ export function BookLibrary({ isOpen, onClose, onBookSelect }: BookLibraryProps)
       />
 
       {/* Account Modal */}
-      <AccountModal
+      <EnhancedAccountModal
         isOpen={showAccountModal}
         onClose={() => setShowAccountModal(false)}
       />
