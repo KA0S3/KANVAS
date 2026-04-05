@@ -323,10 +323,14 @@ class HybridSyncService {
   }
 
   private async syncBackgroundData(userId: string, bookId: string, configs: any): Promise<void> {
+    // Generate a valid UUID for the background config record
+    // Use a deterministic UUID based on bookId to avoid duplicates
+    const backgroundId = this.generateDeterministicUUID(`${bookId}-backgrounds`);
+    
     const { error } = await supabase
       .from('assets')
       .upsert({
-        id: `${bookId}-backgrounds`,
+        id: backgroundId,
         user_id: userId,
         project_id: bookId,
         name: 'Background Configurations',
@@ -334,7 +338,7 @@ class HybridSyncService {
         file_type: 'application/json',
         file_size_bytes: JSON.stringify(configs).length,
         mime_type: 'application/json',
-        metadata: { configs, type: 'background_configurations' },
+        metadata: { configs, type: 'background_configurations', bookId },
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'id'
@@ -343,6 +347,21 @@ class HybridSyncService {
     if (error) {
       throw new Error(`Failed to sync background data: ${error.message}`);
     }
+  }
+
+  // Generate deterministic UUID for consistent background record IDs
+  private generateDeterministicUUID(input: string): string {
+    // Simple hash function to generate consistent UUID from input
+    let hash = 0;
+    for (let i = 0; i < input.length; i++) {
+      const char = input.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    
+    // Convert to UUID format (simplified approach)
+    const hex = Math.abs(hash).toString(16).padStart(8, '0');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}0000`;
   }
 
   // Load from cloud if available (for recovery/initialization)
@@ -369,11 +388,12 @@ class HybridSyncService {
         assetStore.loadWorldData(worldData);
       }
 
-      // Load background configs
+      // Load background configs using the same deterministic UUID
+      const backgroundId = this.generateDeterministicUUID(`${bookId}-backgrounds`);
       const { data: backgroundData } = await supabase
         .from('assets')
         .select('metadata')
-        .eq('id', `${bookId}-backgrounds`)
+        .eq('id', backgroundId)
         .eq('user_id', user.id)
         .single();
 

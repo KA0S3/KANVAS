@@ -4,6 +4,7 @@ import type { Asset } from '@/components/AssetItem';
 import type { CustomField, CustomFieldValue, GlobalCustomField, ViewportDisplaySettings } from '@/types/extendedAsset';
 import { DEFAULT_VIEWPORT_DISPLAY_SETTINGS } from '@/types/extendedAsset';
 import { useBookStore } from './bookStoreSimple';
+import { StorageCleanup } from '@/utils/storageCleanup';
 
 interface AssetStore {
   // Registry for O(1) lookups
@@ -72,51 +73,59 @@ export const useAssetStore = create<AssetStore>()(
 
   // Create a new asset
   createAsset: (assetData: Omit<Asset, 'id' | 'children'>, parentId?: string) => {
-    const id = crypto.randomUUID();
-    const now = Date.now();
-    const newAsset: Asset = {
-      ...assetData,
-      id,
-      children: [],
-      parentId,
-      width: assetData.width || 200,
-      height: assetData.height || 150,
-      customFields: assetData.customFields || [],
-      customFieldValues: assetData.customFieldValues || [],
-      tags: assetData.tags || [],
-      viewportConfig: assetData.viewportConfig || {
-        zoom: 1,
-        panX: 0,
-        panY: 0,
-      },
-      backgroundConfig: assetData.backgroundConfig || {
-        gridSize: 40,
-      },
-      viewportDisplaySettings: assetData.viewportDisplaySettings || { ...DEFAULT_VIEWPORT_DISPLAY_SETTINGS },
-      createdAt: now,
-      updatedAt: now,
-    };
+    try {
+      const id = crypto.randomUUID();
+      const now = Date.now();
+      const newAsset: Asset = {
+        ...assetData,
+        id,
+        children: [],
+        parentId,
+        width: assetData.width || 200,
+        height: assetData.height || 150,
+        customFields: assetData.customFields || [],
+        customFieldValues: assetData.customFieldValues || [],
+        tags: assetData.tags || [],
+        viewportConfig: assetData.viewportConfig || {
+          zoom: 1,
+          panX: 0,
+          panY: 0,
+        },
+        backgroundConfig: assetData.backgroundConfig || {
+          gridSize: 40,
+        },
+        viewportDisplaySettings: assetData.viewportDisplaySettings || { ...DEFAULT_VIEWPORT_DISPLAY_SETTINGS },
+        createdAt: now,
+        updatedAt: now,
+      };
 
-    set((state) => {
-      const newAssets = { ...state.assets };
+      set((state) => {
+        const newAssets = { ...state.assets };
+        
+        // Atomic operation: Add the new asset to registry
+        newAssets[id] = newAsset;
+        
+        // If it has a parent, add this asset to parent's children array and expand the parent
+        if (parentId && newAssets[parentId]) {
+          newAssets[parentId] = {
+            ...newAssets[parentId],
+            children: [...newAssets[parentId].children, id],
+            isExpanded: true, // Auto-expand parent to show new asset
+            updatedAt: now,
+          };
+        }
+        
+        return { assets: newAssets };
+      });
       
-      // Atomic operation: Add the new asset to registry
-      newAssets[id] = newAsset;
-      
-      // If it has a parent, add this asset to parent's children array and expand the parent
-      if (parentId && newAssets[parentId]) {
-        newAssets[parentId] = {
-          ...newAssets[parentId],
-          children: [...newAssets[parentId].children, id],
-          isExpanded: true, // Auto-expand parent to show new asset
-          updatedAt: now,
-        };
-      }
-      
-      return { assets: newAssets };
-    });
-    
-    return id;
+      return id;
+    } catch (error) {
+      console.error('[AssetStore] Failed to create asset:', error);
+      // Return a fallback ID or throw a more descriptive error
+      const fallbackId = `fallback-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      console.warn('[AssetStore] Using fallback asset ID:', fallbackId);
+      return fallbackId;
+    }
   },
 
   // Reparent an asset (move from one parent to another)
@@ -176,21 +185,26 @@ export const useAssetStore = create<AssetStore>()(
 
   // Update asset size
   updateAssetSize: (assetId: string, width: number, height: number) => {
-    set((state) => {
-      const asset = state.assets[assetId];
-      if (!asset) return state;
+    try {
+      set((state) => {
+        const asset = state.assets[assetId];
+        if (!asset) return state;
 
-      return {
-        assets: {
-          ...state.assets,
-          [assetId]: {
-            ...asset,
-            width: Math.max(100, width), // Minimum width of 100px
-            height: Math.max(80, height), // Minimum height of 80px
+        return {
+          assets: {
+            ...state.assets,
+            [assetId]: {
+              ...asset,
+              width: Math.max(100, width), // Minimum width of 100px
+              height: Math.max(80, height), // Minimum height of 80px
+            },
           },
-        },
-      };
-    });
+        };
+      });
+    } catch (error) {
+      console.error('[AssetStore] Failed to update asset size:', error);
+      // Continue without updating size to prevent crashes
+    }
   },
 
   // Update asset properties
@@ -262,7 +276,13 @@ export const useAssetStore = create<AssetStore>()(
 
   // Set the active asset
   setActiveAsset: (assetId: string | null) => {
-    set({ currentActiveId: assetId });
+    try {
+      set({ currentActiveId: assetId });
+    } catch (error) {
+      console.error('[AssetStore] Failed to set active asset:', error);
+      // Continue with null active asset to prevent crashes
+      set({ currentActiveId: null });
+    }
   },
 
   // Set the current viewport context
@@ -571,7 +591,48 @@ export const useAssetStore = create<AssetStore>()(
 })),
       {
         name: 'kanvas-assets',
-        storage: createJSONStorage(() => localStorage),
+        storage: createJSONStorage(() => ({
+          getItem: (name) => {
+            try {
+              return localStorage.getItem(name);
+            } catch (error) {
+              console.warn('[AssetStore] Failed to get item from localStorage:', error);
+              return null;
+            }
+          },
+          setItem: (name, value) => {
+            try {
+              // Check storage quota before setting
+              StorageCleanup.checkAndCleanup();
+              localStorage.setItem(name, value);
+            } catch (error) {
+              if (error instanceof Error && error.name === 'QuotaExceededError') {
+                console.error('[AssetStore] Storage quota exceeded, attempting cleanup...');
+                // Emergency cleanup
+                StorageCleanup.cleanupOldBackgrounds();
+                StorageCleanup.cleanupExpiredData();
+                
+                try {
+                  localStorage.setItem(name, value);
+                } catch (retryError) {
+                  console.error('[AssetStore] Still unable to save after cleanup:', retryError);
+                  // Could implement cloud-only mode here
+                  throw retryError;
+                }
+              } else {
+                console.error('[AssetStore] Failed to set item in localStorage:', error);
+                throw error;
+              }
+            }
+          },
+          removeItem: (name) => {
+            try {
+              localStorage.removeItem(name);
+            } catch (error) {
+              console.warn('[AssetStore] Failed to remove item from localStorage:', error);
+            }
+          },
+        })),
         // Simplified persist - avoid custom serialization issues
         partialize: (state) => ({
           assets: state.assets,
