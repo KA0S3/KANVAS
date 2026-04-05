@@ -11,6 +11,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
 import {
@@ -284,6 +285,12 @@ export function AssetEditModal({ isOpen, onClose, assetId, isNewAsset = false, v
           <DialogTitle className="text-xl font-bold">
             {isNewAsset ? 'Create New Asset' : 'Edit Asset'}
           </DialogTitle>
+          <DialogDescription>
+            {isNewAsset 
+              ? 'Create a new asset for your world. Fill in the details below to customize your asset.'
+              : 'Edit your asset details. Make changes to the properties and settings below.'
+            }
+          </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-6 py-4">

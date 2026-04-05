@@ -577,7 +577,7 @@ export const useAuthStore = create<AuthStore>()(
             .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString())
             .order('created_at', { ascending: false })
             .limit(1)
-            .single();
+            .maybeSingle();
 
           if (error) {
             console.warn('Failed to fetch user license:', error);

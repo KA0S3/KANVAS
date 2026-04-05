@@ -14,6 +14,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
 import {
@@ -279,6 +280,9 @@ export function AssetCreationModal({ isOpen, onClose, initialData, parentId, gen
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto glass cosmic-glow border-glass-border/40">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold">Create New Asset</DialogTitle>
+            <DialogDescription>
+              Create a new asset for your world. Fill in the details below to customize your asset.
+            </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-6 py-4 relative">

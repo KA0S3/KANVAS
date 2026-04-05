@@ -131,7 +131,7 @@ const Index = () => {
       // Restore UI states
       setSidebarOpen(cachedState.sidebarOpen);
       setBookLibraryOpen(cachedState.bookLibraryOpen);
-      setIsEditingBackground(cachedState.isEditingBackground);
+      setIsEditingBackground(cachedState.isEditingBackground ?? false);
     }
   }, []); // Empty dependency array - only run once on mount
 

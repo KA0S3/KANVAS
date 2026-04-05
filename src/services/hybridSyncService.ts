@@ -314,7 +314,7 @@ class HybridSyncService {
         description: JSON.stringify(worldData),
         updated_at: new Date().toISOString(),
       }, {
-        onConflict: 'id,user_id'
+        onConflict: 'id'
       });
 
     if (error) {
@@ -337,7 +337,7 @@ class HybridSyncService {
         metadata: { configs, type: 'background_configurations' },
         updated_at: new Date().toISOString(),
       }, {
-        onConflict: 'id,user_id'
+        onConflict: 'id'
       });
 
     if (error) {

@@ -60,8 +60,8 @@ interface AssetStore {
 }
 
 export const useAssetStore = create<AssetStore>()(
-  subscribeWithSelector(
-    persist(
+  persist(
+    subscribeWithSelector(
       (set, get) => ({
     // Initial state
     assets: {},
@@ -490,7 +490,7 @@ export const useAssetStore = create<AssetStore>()(
 
   // Background editing actions
   setIsEditingBackground: (editing: boolean) => {
-    set({ isEditingBackground: editing });
+    set({ isEditingBackground: Boolean(editing) });
   },
 
   // Expansion state management
@@ -565,6 +565,7 @@ export const useAssetStore = create<AssetStore>()(
       currentActiveId: null,
       currentViewportId: null,
       globalCustomFields: [],
+      isEditingBackground: false,
     });
   },
 })),
