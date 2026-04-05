@@ -22,7 +22,8 @@ import { useBackgroundStore } from "@/stores/backgroundStore";
 import { useMediaStore } from "@/stores/mediaStore";
 import { useBookStore } from "@/stores/bookStoreSimple";
 import { audioEngine } from "@/services/AudioEngine";
-import { autosaveService } from "@/services/autosaveService";
+import { autosaveService } from '@/services/autosaveService';
+import { hybridSyncService } from '@/services/hybridSyncService';
 import SplashScreen from "@/components/media/SplashScreen";
 import IntroVideo from "@/components/media/IntroVideo";
 import BookEntryAnimation from "@/components/media/BookEntryAnimation";
@@ -59,6 +60,23 @@ const Index = () => {
   useEffect(() => {
     initializeAuth();
   }, [initializeAuth]);
+
+  // Load data from cloud when user authenticates
+  useEffect(() => {
+    if (isAuthenticated) {
+      console.log('[Index] User authenticated, loading data from cloud...');
+      
+      // Load data from cloud for each book
+      const allBooks = getAllBooks();
+      allBooks.forEach(book => {
+        hybridSyncService.loadFromCloud(book.id).then(success => {
+          if (success) {
+            console.log(`[Index] Loaded cloud data for book: ${book.title}`);
+          }
+        });
+      });
+    }
+  }, [isAuthenticated]);
 
   // Initialize autosave service when authenticated
   // useEffect(() => {
