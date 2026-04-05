@@ -64,15 +64,20 @@ const Index = () => {
   // Load data from cloud when user authenticates
   useEffect(() => {
     if (isAuthenticated) {
-      console.log('[Index] User authenticated, loading data from cloud...');
+      console.log('[Index] User authenticated, loading books from cloud...');
       
-      // Load data from cloud for each book
-      const allBooks = getAllBooks();
-      allBooks.forEach(book => {
-        hybridSyncService.loadFromCloud(book.id).then(success => {
-          if (success) {
-            console.log(`[Index] Loaded cloud data for book: ${book.title}`);
-          }
+      // First restore books from cloud (in case localStorage was cleared)
+      hybridSyncService.loadAllBooksFromCloud().then(() => {
+        console.log('[Index] Books restored from cloud');
+        
+        // Then load world data for each book
+        const allBooks = getAllBooks();
+        allBooks.forEach(book => {
+          hybridSyncService.loadFromCloud(book.id).then(success => {
+            if (success) {
+              console.log(`[Index] Loaded world data for book: ${book.title}`);
+            }
+          });
         });
       });
     }

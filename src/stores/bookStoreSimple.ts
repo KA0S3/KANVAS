@@ -50,7 +50,7 @@ const defaultSettings: BookLibrarySettings = {
   showBookDescriptions: true,
 };
 
-const createDefaultWorldData = (): WorldData => ({
+export const createDefaultWorldData = (): WorldData => ({
   assets: {},
   tags: {},
   globalCustomFields: [],

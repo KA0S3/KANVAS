@@ -5,6 +5,8 @@ import { useBackgroundStore } from '@/stores/backgroundStore';
 import { useAssetStore } from '@/stores/assetStore';
 import { useBookStore } from '@/stores/bookStoreSimple';
 import { connectivityService } from '@/services/connectivityService';
+import type { Book } from '@/types/book';
+import { createDefaultWorldData } from '@/stores/bookStoreSimple';
 
 export interface SyncStatus {
   lastSyncTime: Date | null;
@@ -385,6 +387,80 @@ class HybridSyncService {
       result += hex;
     }
     return result;
+  }
+
+  // Load ALL books from cloud (for initial recovery)
+  async loadAllBooksFromCloud(): Promise<boolean> {
+    const { isAuthenticated, user } = useAuthStore.getState();
+    
+    if (!isAuthenticated || !user) {
+      return false;
+    }
+
+    try {
+      console.log('[HybridSync] Loading all books from cloud...');
+      
+      // Load all projects (books) for this user from Supabase
+      const { data: projects, error } = await supabase
+        .from('projects')
+        .select('id, name, description, updated_at')
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('[HybridSync] Failed to load books from cloud:', error);
+        return false;
+      }
+
+      if (!projects || projects.length === 0) {
+        console.log('[HybridSync] No books found in cloud');
+        return false;
+      }
+
+      const bookStore = useBookStore.getState();
+      
+      // Convert each project to a book and add to store
+      for (const project of projects) {
+        const existingBook = bookStore.books[project.id];
+        
+        // Only create if book doesn't exist locally or cloud is newer
+        if (!existingBook) {
+          let worldData = createDefaultWorldData();
+          
+          // Try to parse world data from description
+          if (project.description) {
+            try {
+              const parsed = JSON.parse(project.description);
+              if (parsed.assets) {
+                worldData = parsed;
+              }
+            } catch (e) {
+              console.warn('[HybridSync] Failed to parse world data for book:', project.id);
+            }
+          }
+          
+          // Create the book
+          const newBook: Book = {
+            id: project.id,
+            title: project.name || 'Untitled Book',
+            description: '',
+            createdAt: new Date(project.updated_at).getTime() - 86400000,
+            updatedAt: new Date(project.updated_at).getTime(),
+            worldData,
+            color: '#3b82f6',
+          };
+          
+          // Add directly to store
+          bookStore.books[project.id] = newBook;
+          console.log(`[HybridSync] Restored book from cloud: ${newBook.title}`);
+        }
+      }
+
+      console.log(`[HybridSync] Restored ${projects.length} books from cloud`);
+      return true;
+    } catch (error) {
+      console.error('[HybridSync] Failed to load books from cloud:', error);
+      return false;
+    }
   }
 
   // Load from cloud if available (for recovery/initialization)
