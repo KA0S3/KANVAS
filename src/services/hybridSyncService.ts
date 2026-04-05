@@ -307,13 +307,30 @@ class HybridSyncService {
   }
 
   private async syncWorldData(userId: string, bookId: string, worldData: any): Promise<void> {
+    // Get book metadata from book store
+    const bookStore = useBookStore.getState();
+    const book = bookStore.books[bookId];
+    
+    // Prepare metadata to save
+    const metadata = {
+      ...worldData,
+      bookTitle: book?.title,
+      bookDescription: book?.description,
+      bookColor: book?.color,
+      bookGradient: book?.gradient,
+      bookCoverImage: book?.coverImage,
+      bookIsLeatherMode: book?.isLeatherMode,
+      bookLeatherColor: book?.leatherColor,
+      bookCoverPageSettings: book?.coverPageSettings,
+    };
+
     const { error } = await supabase
       .from('projects')
       .upsert({
         id: bookId,
         user_id: userId,
-        name: worldData.bookTitle || 'Untitled Project',
-        description: JSON.stringify(worldData),
+        name: book?.title || worldData.bookTitle || 'Untitled Project',
+        description: JSON.stringify(metadata),
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'id'
@@ -425,11 +442,12 @@ class HybridSyncService {
         // Only create if book doesn't exist locally or cloud is newer
         if (!existingBook) {
           let worldData = createDefaultWorldData();
+          let parsed: any = {};
           
           // Try to parse world data from description
           if (project.description) {
             try {
-              const parsed = JSON.parse(project.description);
+              parsed = JSON.parse(project.description);
               if (parsed.assets) {
                 worldData = parsed;
               }
@@ -438,15 +456,20 @@ class HybridSyncService {
             }
           }
           
-          // Create the book
+          // Create the book with full metadata
           const newBook: Book = {
             id: project.id,
             title: project.name || 'Untitled Book',
-            description: '',
+            description: parsed.bookDescription || '',
             createdAt: new Date(project.updated_at).getTime() - 86400000,
             updatedAt: new Date(project.updated_at).getTime(),
             worldData,
-            color: '#3b82f6',
+            color: parsed.bookColor || '#3b82f6',
+            gradient: parsed.bookGradient,
+            coverImage: parsed.bookCoverImage,
+            isLeatherMode: parsed.bookIsLeatherMode,
+            leatherColor: parsed.bookLeatherColor,
+            coverPageSettings: parsed.bookCoverPageSettings,
           };
           
           // Add directly to store

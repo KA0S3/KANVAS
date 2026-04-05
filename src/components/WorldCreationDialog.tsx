@@ -34,6 +34,7 @@ const WorldCreationDialog = ({ children, onWorldCreated }: WorldCreationDialogPr
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   const [activeTab, setActiveTab] = useState('cover');
   const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const { createBook, leatherPresets } = useBookStore();
   const { canCreate: canCreateNewBook, reason, upgradePrompt } = useCanCreateBook();
   
@@ -86,13 +87,15 @@ const WorldCreationDialog = ({ children, onWorldCreated }: WorldCreationDialogPr
   };
 
   const handleCreateWorld = async () => {
-    if (!title.trim()) return;
+    if (!title.trim() || isCreating) return;
 
     // Check if user can create more worlds
     if (!canCreateNewBook) {
       setShowUpgradePrompt(true);
       return;
     }
+
+    setIsCreating(true);
 
     try {
       const worldId = createBook({
@@ -151,32 +154,11 @@ const WorldCreationDialog = ({ children, onWorldCreated }: WorldCreationDialogPr
       if (onWorldCreated) {
         onWorldCreated(worldId);
       }
-      
-      // Reset form
-      setTitle('');
-      setSubheading('');
-      setDescription('');
-      setSelectedColor('#00D9FF');
-      setIsLeatherMode(true);
-      setSelectedLeatherColor(null);
-      setCustomCoverImage(null);
-      setTitlePosition({ x: 50, y: 40 });
-      setSubheadingPosition({ x: 50, y: 60 });
-      setTitleTextColor('#ffffff');
-      setSubheadingTextColor('#ffffff');
-      setTitleFontFamily('serif');
-      setSubheadingFontFamily('serif');
-      setTitleFontSize([24]);
-      setSubheadingFontSize([16]);
-      setTitleOutlineColor('#000000');
-      setSubheadingOutlineColor('#000000');
-      setTitleOutlineThickness([0]);
-      setSubheadingOutlineThickness([0]);
-      setTitleShadowEnabled(false);
-      setSubheadingShadowEnabled(false);
     } catch (error) {
       console.error('Error creating world:', error);
       toast.error('Failed to create world. Please try again.');
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -778,10 +760,10 @@ const WorldCreationDialog = ({ children, onWorldCreated }: WorldCreationDialogPr
           </Button>
           <Button
             onClick={handleCreateWorld}
-            disabled={!title.trim()}
+            disabled={!title.trim() || isCreating}
             className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
           >
-            Create World
+            {isCreating ? 'Creating...' : 'Create World'}
           </Button>
         </DialogFooter>
       </DialogContent>
