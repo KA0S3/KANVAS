@@ -130,7 +130,7 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
   
   const { currentActiveId, setCurrentViewportId, currentViewportId, isEditingBackground, setIsEditingBackground, updateAsset } = useAssetStore();
   const { getCurrentBook, getWorldData, updateWorldData } = useBookStore();
-  const { getBackground, setBackground, migrateLegacyConfig } = useBackgroundStoreClean();
+  const { getBackground, setBackground, migrateLegacyConfig } = useBackgroundStore();
   const { isAuthenticated, user, plan, effectiveLimits } = useAuthStore();
   const { quota } = useCloudStore();
   const navigate = useNavigate();

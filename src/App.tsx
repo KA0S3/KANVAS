@@ -11,7 +11,6 @@ import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import RefundPolicy from "./pages/RefundPolicy";
 import NotFound from "./pages/NotFound";
-import "@/utils/debugAuth"; // Import debug utilities
 
 const queryClient = new QueryClient();
 
