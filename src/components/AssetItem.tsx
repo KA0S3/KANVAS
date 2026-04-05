@@ -296,7 +296,7 @@ export function AssetItem({ asset, onDelete, onMouseDown, onTouchStart, onDouble
               <img
                 src={portraitImage}
                 alt={`${asset.name} portrait`}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover pointer-events-none"
                 style={{
                   filter: `blur(${displaySettings.portraitBlur * 8}px)`,
                 }}
@@ -496,7 +496,7 @@ export function AssetItem({ asset, onDelete, onMouseDown, onTouchStart, onDouble
                 <img
                   src={portraitImage}
                   alt={`${asset.name} portrait`}
-                  className="absolute top-8 left-0 w-full h-[calc(100%-2rem)] object-cover"
+                  className="absolute top-8 left-0 w-full h-[calc(100%-2rem)] object-cover pointer-events-none"
                   style={{
                     filter: `blur(${displaySettings.portraitBlur * 8}px)`,
                   }}

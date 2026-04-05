@@ -161,7 +161,26 @@ export const useAuthStore = create<AuthStore>()(
         );
 
         // Simple session check without timeout
+        const sessionTimeout = setTimeout(() => {
+          // Safety timeout: if session check takes too long, force loading to false
+          if (get().loading) {
+            console.warn('[authStore] Session check timed out, forcing loading to false');
+            set({
+              user: null,
+              plan: 'guest',
+              isAuthenticated: false,
+              loading: false,
+              planLoading: false,
+              ownerKeyInfo: null,
+              licenseInfo: null,
+              effectiveLimits: null,
+              _lastFetchedUserId: undefined,
+            });
+          }
+        }, 5000); // 5 second safety timeout
+        
         supabase.auth.getSession().then(async ({ data: { session } }) => {
+          clearTimeout(sessionTimeout);
           console.log('[authStore] Initial session:', session?.user?.email);
           if (session?.user) {
             set({
@@ -189,6 +208,21 @@ export const useAuthStore = create<AuthStore>()(
               _lastFetchedUserId: undefined,
             });
           }
+        }).catch((error) => {
+          clearTimeout(sessionTimeout);
+          console.error('[authStore] Session check failed:', error);
+          // Ensure loading is set to false even on error
+          set({
+            user: null,
+            plan: 'guest',
+            isAuthenticated: false,
+            loading: false,
+            planLoading: false,
+            ownerKeyInfo: null,
+            licenseInfo: null,
+            effectiveLimits: null,
+            _lastFetchedUserId: undefined,
+          });
         });
 
         // Return cleanup function
