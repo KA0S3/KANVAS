@@ -45,6 +45,11 @@ export const useAuthFlowWithMigration = (): UseAuthFlowWithMigrationReturn => {
     }
   }, [isAuthenticated, user]);
 
+  // Reset isMigrating on mount to prevent stuck loading state
+  useEffect(() => {
+    setIsMigrating(false);
+  }, []);
+
   const checkGuestImportFlow = async () => {
     if (!user) return;
     
