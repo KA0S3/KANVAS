@@ -61,27 +61,29 @@ const Index = () => {
     initializeAuth();
   }, [initializeAuth]);
 
-  // Load data from cloud when user authenticates
-  useEffect(() => {
-    if (isAuthenticated) {
-      console.log('[Index] User authenticated, loading books from cloud...');
-      
-      // First restore books from cloud (in case localStorage was cleared)
-      hybridSyncService.loadAllBooksFromCloud().then(() => {
-        console.log('[Index] Books restored from cloud');
-        
-        // Then load world data for each book
-        const allBooks = getAllBooks();
-        allBooks.forEach(book => {
-          hybridSyncService.loadFromCloud(book.id).then(success => {
-            if (success) {
-              console.log(`[Index] Loaded world data for book: ${book.title}`);
-            }
-          });
-        });
-      });
-    }
-  }, [isAuthenticated]);
+  // Load data from cloud when user authenticates - TEMPORARILY DISABLED
+  // useEffect(() => {
+  //   if (isAuthenticated) {
+  //     console.log('[Index] User authenticated, loading books from cloud...');
+  //     
+  //     // First restore books from cloud (in case localStorage was cleared)
+  //     hybridSyncService.loadAllBooksFromCloud().then(() => {
+  //       console.log('[Index] Books restored from cloud');
+  //       
+  //       // Then load world data for each book
+  //       const allBooks = getAllBooks();
+  //       allBooks.forEach(book => {
+  //         hybridSyncService.loadFromCloud(book.id).then(success => {
+  //           if (success) {
+  //             console.log(`[Index] Loaded world data for book: ${book.title}`);
+  //           }
+  //         });
+  //       });
+  //     }).catch(err => {
+  //       console.error('[Index] Cloud loading failed:', err);
+  //     });
+  //   }
+  // }, [isAuthenticated]);
 
   // Initialize autosave service when authenticated
   // useEffect(() => {
