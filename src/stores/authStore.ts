@@ -177,7 +177,7 @@ export const useAuthStore = create<AuthStore>()(
               _lastFetchedUserId: undefined,
             });
           }
-        }, 5000); // 5 second safety timeout
+        }, 3000); // 3 second safety timeout
         
         supabase.auth.getSession().then(async ({ data: { session } }) => {
           clearTimeout(sessionTimeout);

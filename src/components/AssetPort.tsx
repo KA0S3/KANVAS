@@ -260,10 +260,16 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
 
   const handleAssetDoubleClick = useCallback((asset: Asset) => {
     // Enter the asset by setting it as the active asset
+    console.log('[DEBUG] Double-click handler called for asset:', asset?.id, asset?.name);
+    if (!asset?.id) {
+      console.error('[DEBUG] Invalid asset passed to handleAssetDoubleClick');
+      return;
+    }
     setActiveAsset(asset.id);
     setEnteredAssetId(asset.id);
-    setCurrentViewportId(asset.id); // Update current viewport context in store
-  }, [setActiveAsset, setCurrentViewportId]);
+    setCurrentViewportId(asset.id);
+    console.log('[DEBUG] Set enteredAssetId to:', asset.id);
+  }, [setActiveAsset, setCurrentViewportId, setEnteredAssetId]);
 
   // Listen for navigation events from sidebar
   useEffect(() => {
@@ -303,11 +309,12 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
   }, [setActiveAsset, setCurrentViewportId]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent, asset: Asset) => {
+    console.log('[DEBUG] handleMouseDown called for asset:', asset?.id);
     e.preventDefault();
     
     // Debug log to check if background editing is interfering
     if (isEditingBackground) {
-      console.log('🐛 AssetPort: Mouse down on asset while isEditingBackground is true - forcing exit');
+      console.log('[DEBUG] Mouse down on asset while isEditingBackground is true - forcing exit');
       setIsEditingBackground(false);
     }
     
@@ -322,7 +329,8 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
         y: e.clientY - rect.top,
       });
     }
-  }, [setActiveAsset, isEditingBackground, setIsEditingBackground]);
+    console.log('[DEBUG] Drag initiated for asset:', asset.id, 'isDragging set to true');
+  }, [setActiveAsset, isEditingBackground, setIsEditingBackground, setSelectedAsset, setIsDragging, setDragOffset]);
 
   const handleTouchStart = useCallback((e: React.TouchEvent, asset: Asset) => {
     e.preventDefault();
@@ -465,9 +473,11 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
   }, [isTouchDragging, handleTouchMove, handleTouchEnd]);
 
   // Get assets to display based on current context
+  console.log('[DEBUG] Computing displayAssets. enteredAssetId:', enteredAssetId, 'assets:', Object.keys(assets || {}));
   const displayAssets = enteredAssetId && assets && assets[enteredAssetId]
     ? assets[enteredAssetId].children.map(childId => assets[childId]).filter(Boolean) || []
     : getRootAssets();
+  console.log('[DEBUG] displayAssets count:', displayAssets.length, 'assets:', displayAssets.map(a => a?.id));
 
   // Build breadcrumb path with asset IDs
   const getBreadcrumbPath = () => {
