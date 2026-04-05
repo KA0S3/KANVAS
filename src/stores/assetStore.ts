@@ -615,13 +615,13 @@ export const useAssetStore = create<AssetStore>()(
                 try {
                   localStorage.setItem(name, value);
                 } catch (retryError) {
-                  console.error('[AssetStore] Still unable to save after cleanup:', retryError);
-                  // Could implement cloud-only mode here
-                  throw retryError;
+                  console.error('[AssetStore] Still unable to save after cleanup - continuing with in-memory state only:', retryError);
+                  // CRITICAL FIX: Don't throw - let state update continue in memory
+                  // The app will work without persistence for this session
                 }
               } else {
-                console.error('[AssetStore] Failed to set item in localStorage:', error);
-                throw error;
+                console.error('[AssetStore] Failed to set item in localStorage - continuing in memory:', error);
+                // CRITICAL FIX: Don't throw - let state update continue
               }
             }
           },

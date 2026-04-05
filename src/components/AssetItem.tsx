@@ -240,7 +240,6 @@ export function AssetItem({ asset, onDelete, onMouseDown, onTouchStart, onDouble
       onMouseDown={!isEditingBackground ? (e) => onMouseDown(e, asset) : undefined}
       onTouchStart={!isEditingBackground ? (e) => onTouchStart?.(e, asset) : undefined}
       onDoubleClick={!isEditingBackground ? () => {
-        console.log('[DEBUG] AssetItem onDoubleClick triggered for:', asset?.id);
         onDoubleClick?.(asset);
       } : undefined}
       onContextMenu={!isEditingBackground ? handleContextMenu : undefined}

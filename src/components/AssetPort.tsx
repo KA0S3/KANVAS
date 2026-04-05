@@ -8,7 +8,7 @@ import { EmptySpaceContextMenu } from "./EmptySpaceContextMenu";
 import { useAssetTree } from "@/hooks/useAssetTree";
 import { useAssetStore } from "@/stores/assetStore";
 import { useBookStore } from "@/stores/bookStoreSimple";
-import { useBackgroundStoreClean } from "@/stores/backgroundStoreClean";
+import { useBackgroundStore } from "@/stores/backgroundStore";
 import { useAuthStore } from "@/stores/authStore";
 import { useCloudStore } from "@/stores/cloudStore";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
@@ -30,7 +30,7 @@ import {
   type ViewportConfig 
 } from "@/utils/coordinateUtils";
 import { getBackgroundColor, shouldShowParchmentOverlay, shouldShowGlassEffect } from "@/utils/backgroundUtils";
-import { getAssetKeyWithBookClean } from "@/stores/backgroundStoreClean";
+import { getAssetKeyWithBook } from "@/stores/backgroundStore";
 import type { BackgroundConfig } from "@/types/background";
 
 const initialAssets: Omit<Asset, 'id' | 'children'>[] = [];
@@ -260,15 +260,12 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
 
   const handleAssetDoubleClick = useCallback((asset: Asset) => {
     // Enter the asset by setting it as the active asset
-    console.log('[DEBUG] Double-click handler called for asset:', asset?.id, asset?.name);
     if (!asset?.id) {
-      console.error('[DEBUG] Invalid asset passed to handleAssetDoubleClick');
       return;
     }
     setActiveAsset(asset.id);
     setEnteredAssetId(asset.id);
     setCurrentViewportId(asset.id);
-    console.log('[DEBUG] Set enteredAssetId to:', asset.id);
   }, [setActiveAsset, setCurrentViewportId, setEnteredAssetId]);
 
   // Listen for navigation events from sidebar
@@ -309,12 +306,10 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
   }, [setActiveAsset, setCurrentViewportId]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent, asset: Asset) => {
-    console.log('[DEBUG] handleMouseDown called for asset:', asset?.id);
     e.preventDefault();
     
-    // Debug log to check if background editing is interfering
+    // Exit background editing if active
     if (isEditingBackground) {
-      console.log('[DEBUG] Mouse down on asset while isEditingBackground is true - forcing exit');
       setIsEditingBackground(false);
     }
     
@@ -329,7 +324,6 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
         y: e.clientY - rect.top,
       });
     }
-    console.log('[DEBUG] Drag initiated for asset:', asset.id, 'isDragging set to true');
   }, [setActiveAsset, isEditingBackground, setIsEditingBackground, setSelectedAsset, setIsDragging, setDragOffset]);
 
   const handleTouchStart = useCallback((e: React.TouchEvent, asset: Asset) => {
@@ -473,11 +467,9 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
   }, [isTouchDragging, handleTouchMove, handleTouchEnd]);
 
   // Get assets to display based on current context
-  console.log('[DEBUG] Computing displayAssets. enteredAssetId:', enteredAssetId, 'assets:', Object.keys(assets || {}));
   const displayAssets = enteredAssetId && assets && assets[enteredAssetId]
     ? assets[enteredAssetId].children.map(childId => assets[childId]).filter(Boolean) || []
     : getRootAssets();
-  console.log('[DEBUG] displayAssets count:', displayAssets.length, 'assets:', displayAssets.map(a => a?.id));
 
   // Build breadcrumb path with asset IDs
   const getBreadcrumbPath = () => {
@@ -504,7 +496,7 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
   const breadcrumbPath = getBreadcrumbPath();
 
   // Get current background config from new store
-  const backgroundConfig = getBackground(getAssetKeyWithBookClean(enteredAssetId || 'root', currentBook?.id));
+  const backgroundConfig = getBackground(getAssetKeyWithBook(enteredAssetId || 'root', currentBook?.id));
   
   // State for tracking image natural size
   const [imageNaturalSize, setImageNaturalSize] = useState<{ width: number; height: number } | null>(null);
@@ -525,7 +517,7 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
       if (!backgroundConfig.imageSize || 
           backgroundConfig.imageSize.width !== newSize.width || 
           backgroundConfig.imageSize.height !== newSize.height) {
-        const assetKey = getAssetKeyWithBookClean(enteredAssetId || 'root', currentBook?.id);
+        const assetKey = getAssetKeyWithBook(enteredAssetId || 'root', currentBook?.id);
         const updatedConfig = { ...backgroundConfig, imageSize: newSize };
         setBackground(assetKey, updatedConfig);
       }
@@ -568,13 +560,13 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
   }, []);
 
   const updateBackgroundPosition = useCallback((x: number, y: number) => {
-    const assetKey = getAssetKeyWithBookClean(enteredAssetId || 'root', currentBook?.id);
+    const assetKey = getAssetKeyWithBook(enteredAssetId || 'root', currentBook?.id);
     const updatedConfig = { ...backgroundConfig, position: { x, y } };
     setBackground(assetKey, updatedConfig);
   }, [enteredAssetId, currentBook, backgroundConfig]);
 
   const updateBackgroundScale = useCallback((scale: number) => {
-    const assetKey = getAssetKeyWithBookClean(enteredAssetId || 'root', currentBook?.id);
+    const assetKey = getAssetKeyWithBook(enteredAssetId || 'root', currentBook?.id);
     const updatedConfig = { ...backgroundConfig, scale };
     setBackground(assetKey, updatedConfig);
   }, [enteredAssetId, currentBook, backgroundConfig]);

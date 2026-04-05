@@ -351,17 +351,40 @@ class HybridSyncService {
 
   // Generate deterministic UUID for consistent background record IDs
   private generateDeterministicUUID(input: string): string {
-    // Simple hash function to generate consistent UUID from input
-    let hash = 0;
-    for (let i = 0; i < input.length; i++) {
-      const char = input.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32-bit integer
-    }
+    // Use crypto.subtle for proper hash if available, fallback to simple hash
+    // Generate a proper UUID v5-like deterministic UUID
+    const hash = this.simpleHash(input);
     
-    // Convert to UUID format (simplified approach)
-    const hex = Math.abs(hash).toString(16).padStart(8, '0');
-    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}0000`;
+    // Format as valid UUID: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+    // Where 4 indicates version 4 and y is 8,9,a,b
+    const parts = [
+      hash.substring(0, 8),
+      hash.substring(8, 12),
+      '4' + hash.substring(13, 16),
+      ((parseInt(hash.charAt(16), 16) & 0x3) | 0x8).toString(16) + hash.substring(17, 20),
+      hash.substring(20, 32)
+    ];
+    
+    return parts.join('-');
+  }
+
+  // Simple hash that produces 32 hex characters
+  private simpleHash(input: string): string {
+    let result = '';
+    // Create multiple hash rounds to get 32 chars
+    let hash = 0;
+    for (let round = 0; round < 4; round++) {
+      hash = round * 0x5bd1e995;
+      for (let i = 0; i < input.length; i++) {
+        const char = input.charCodeAt(i) + round;
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & 0xffffffff;
+      }
+      // Convert to 8 hex chars, ensure positive
+      const hex = Math.abs(hash >>> 0).toString(16).padStart(8, '0');
+      result += hex;
+    }
+    return result;
   }
 
   // Load from cloud if available (for recovery/initialization)

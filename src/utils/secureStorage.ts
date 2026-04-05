@@ -1,7 +1,7 @@
 // Lightweight encryption using built-in Web Crypto API
 // Fallback to simple obfuscation for older browsers
 
-const ENCRYPTION_KEY = 'kanvas-secure-key-2024'; // In production, use environment variable
+const ENCRYPTION_KEY = import.meta.env.VITE_ENCRYPTION_KEY || 'kanvas-secure-key-2024';
 
 interface SecureStorageOptions {
   encrypt?: boolean;
