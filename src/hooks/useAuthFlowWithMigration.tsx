@@ -98,8 +98,8 @@ export const useAuthFlowWithMigration = (): UseAuthFlowWithMigrationReturn => {
         return { success: false, error: signInResult.error };
       }
 
-      // Wait a moment for auth state to update
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // OPTIMIZED: Reduced wait time and deferred migration checks
+      await new Promise(resolve => setTimeout(resolve, 200)); // Reduced from 500ms
       
       // Check if user is now authenticated
       const { isAuthenticated: nowAuthenticated, user: nowUser } = useAuthStore.getState();
@@ -110,28 +110,43 @@ export const useAuthFlowWithMigration = (): UseAuthFlowWithMigrationReturn => {
         return { success: false, error: 'Authentication failed' };
       }
 
-      // Check for migration conflicts
-      const conflict = await checkForMigrationConflicts(nowUser.id);
-      
-      if (conflict) {
-        console.log('[AuthFlowWithMigration] Migration conflict found, setting isMigrating to false');
-        setMigrationConflict(conflict);
-        setShowMigrationDialog(true);
-        setIsMigrating(false);
-        return { success: true }; // Sign in successful, but migration needed
-      }
-
-      // No conflicts, check for guest import with timeout
-      const guestImportPromise = Promise.race([
-        checkGuestImportFlow(),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Guest import check timeout')), 3000)
-        )
-      ]);
-      
-      await guestImportPromise.catch(error => {
-        console.warn('[AuthFlowWithMigration] Guest import check failed or timed out:', error);
-      });
+      // OPTIMIZED: Defer migration checks to background and reduce timeout
+      setTimeout(async () => {
+        try {
+          // Check for migration conflicts with shorter timeout
+          const conflictPromise = checkForMigrationConflicts(nowUser.id);
+          const timeoutPromise = new Promise<null>((_, reject) => 
+            setTimeout(() => reject(new Error('Migration check timeout')), 2000) // Reduced from 3000ms
+          );
+          
+          const conflict = await Promise.race([conflictPromise, timeoutPromise]);
+          
+          if (conflict) {
+            setMigrationConflict(conflict);
+            setShowMigrationDialog(true);
+          } else {
+            // Only check guest import if no conflicts
+            const guestImportPromise = shouldShowGuestImport();
+            const guestTimeoutPromise = new Promise<boolean>((_, reject) => 
+              setTimeout(() => reject(new Error('Guest import timeout')), 2000) // Reduced from 3000ms
+            );
+            
+            try {
+              const shouldShow = await Promise.race([guestImportPromise, guestTimeoutPromise]);
+              if (shouldShow) {
+                const dismissed = localStorage.getItem('kanvas-guest-import-dismissed');
+                if (!dismissed) {
+                  setShowGuestImportDialog(true);
+                }
+              }
+            } catch (error) {
+              console.warn('[AuthFlowWithMigration] Guest import check failed or timed out:', error);
+            }
+          }
+        } catch (error) {
+          console.warn('[AuthFlowWithMigration] Background migration checks failed:', error);
+        }
+      }, 100); // Defer to background with 100ms delay
       
       console.log('[AuthFlowWithMigration] Sign in complete, setting isMigrating to false');
       setIsMigrating(false);
@@ -181,8 +196,8 @@ export const useAuthFlowWithMigration = (): UseAuthFlowWithMigrationReturn => {
         return { success: false, error: signInResult.error };
       }
 
-      // Wait a moment for auth state to update
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // OPTIMIZED: Reduced wait time
+      await new Promise(resolve => setTimeout(resolve, 200)); // Reduced from 500ms
       
       // Check if user is now authenticated
       const { isAuthenticated: nowAuthenticated, user: nowUser } = useAuthStore.getState();
@@ -192,27 +207,43 @@ export const useAuthFlowWithMigration = (): UseAuthFlowWithMigrationReturn => {
         return { success: false, error: 'Authentication failed' };
       }
 
-      // Check for migration conflicts
-      const conflict = await checkForMigrationConflicts(nowUser.id);
-      
-      if (conflict) {
-        setMigrationConflict(conflict);
-        setShowMigrationDialog(true);
-        setIsMigrating(false);
-        return { success: true }; // Sign in successful, but migration needed
-      }
-
-      // No conflicts, check for guest import with timeout
-      const guestImportPromise = Promise.race([
-        checkGuestImportFlow(),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Guest import check timeout')), 3000)
-        )
-      ]);
-      
-      await guestImportPromise.catch(error => {
-        console.warn('[AuthFlowWithMigration] Guest import check failed or timed out:', error);
-      });
+      // OPTIMIZED: Defer migration checks to background (same as email sign-in)
+      setTimeout(async () => {
+        try {
+          // Check for migration conflicts with shorter timeout
+          const conflictPromise = checkForMigrationConflicts(nowUser.id);
+          const timeoutPromise = new Promise<null>((_, reject) => 
+            setTimeout(() => reject(new Error('Migration check timeout')), 2000) // Reduced from 3000ms
+          );
+          
+          const conflict = await Promise.race([conflictPromise, timeoutPromise]);
+          
+          if (conflict) {
+            setMigrationConflict(conflict);
+            setShowMigrationDialog(true);
+          } else {
+            // Only check guest import if no conflicts
+            const guestImportPromise = shouldShowGuestImport();
+            const guestTimeoutPromise = new Promise<boolean>((_, reject) => 
+              setTimeout(() => reject(new Error('Guest import timeout')), 2000) // Reduced from 3000ms
+            );
+            
+            try {
+              const shouldShow = await Promise.race([guestImportPromise, guestTimeoutPromise]);
+              if (shouldShow) {
+                const dismissed = localStorage.getItem('kanvas-guest-import-dismissed');
+                if (!dismissed) {
+                  setShowGuestImportDialog(true);
+                }
+              }
+            } catch (error) {
+              console.warn('[AuthFlowWithMigration] Guest import check failed or timed out:', error);
+            }
+          }
+        } catch (error) {
+          console.warn('[AuthFlowWithMigration] Background migration checks failed:', error);
+        }
+      }, 100); // Defer to background with 100ms delay
       
       setIsMigrating(false);
       return { success: true };

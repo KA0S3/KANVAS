@@ -52,7 +52,27 @@ export const useBackgroundStore = create<BackgroundStore>()(
           },
 
           cloneConfig: (config: BackgroundConfig): BackgroundConfig => {
-            return JSON.parse(JSON.stringify(config));
+            try {
+              // Use safe serialization to prevent circular reference issues
+              const jsonString = JSON.stringify(config, (key, val) => {
+                if (typeof val === 'object' && val !== null) {
+                  // Check for circular references
+                  if (val.constructor && val.constructor.name === 'Object') {
+                    return val;
+                  }
+                  // Handle potential circular references in complex objects
+                  if (key === 'parent' || key === 'children') {
+                    return undefined;
+                  }
+                }
+                return val;
+              });
+              return JSON.parse(jsonString);
+            } catch (error) {
+              console.error('[BackgroundStore] Failed to clone config:', error);
+              // Fallback to shallow clone
+              return { ...config };
+            }
           },
 
           migrateLegacyConfig: (legacyConfig: any): BackgroundConfig => {

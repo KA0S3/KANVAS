@@ -160,7 +160,7 @@ export const useAuthStore = create<AuthStore>()(
           }
         );
 
-        // Simple session check without timeout
+        // Optimized session check with reduced timeout
         const sessionTimeout = setTimeout(() => {
           // Safety timeout: if session check takes too long, force loading to false
           if (get().loading) {
@@ -177,7 +177,7 @@ export const useAuthStore = create<AuthStore>()(
               _lastFetchedUserId: undefined,
             });
           }
-        }, 3000); // 3 second safety timeout
+        }, 2000); // Reduced from 3000ms to 2000ms
         
         supabase.auth.getSession().then(async ({ data: { session } }) => {
           clearTimeout(sessionTimeout);
@@ -231,31 +231,12 @@ export const useAuthStore = create<AuthStore>()(
         };
       },
 
-      // Sign in method
+      // Sign in method - OPTIMIZED
       signIn: async (email: string, password: string) => {
         try {
           console.log('[authStore] Starting sign in process for:', email);
           
-          // First detect if user exists and their preferred provider
-          const providerDetection = await get().detectAuthProvider(email);
-          
-          if (providerDetection.provider && !providerDetection.canUseEmail) {
-            console.log('[authStore] User exists but cannot use email login, provider:', providerDetection.provider);
-            
-            if (providerDetection.provider === 'google') {
-              return { 
-                error: 'This email is registered with Google. Please sign in with Google instead.',
-                provider: 'google'
-              };
-            } else {
-              return { 
-                error: `This email is registered with ${providerDetection.provider}. Please use the correct sign-in method.`,
-                provider: providerDetection.provider
-              };
-            }
-          }
-          
-          // Attempt email sign in
+          // OPTIMIZED: Skip provider detection for initial attempt, only check on failure
           const { data, error } = await supabase.auth.signInWithPassword({
             email,
             password,
@@ -264,10 +245,11 @@ export const useAuthStore = create<AuthStore>()(
           if (error) {
             console.error('Sign in error:', error);
             
-            // Check if this might be a provider conflict
+            // Only check for provider conflicts if it's likely to be a provider issue
             if (error.message === 'Invalid login credentials') {
+              // Quick provider check without full detection flow
               const userCheck = await get().checkUserExists(email);
-              if (userCheck.exists && userCheck.providers.includes('google')) {
+              if (userCheck.exists && userCheck.providers.includes('google') && !userCheck.providers.includes('email')) {
                 return { 
                   error: 'This email is registered with Google. Please sign in with Google instead.',
                   provider: 'google'
@@ -471,12 +453,12 @@ export const useAuthStore = create<AuthStore>()(
         set({ plan });
       },
 
-      // Fetch user plan from Supabase
+      // Fetch user plan from Supabase - OPTIMIZED
       fetchUserPlan: async (userId: string) => {
         // Prevent duplicate fetches for same user
         const lastFetched = get()._lastFetchedUserId;
         if (lastFetched === userId && get().planLoading) {
-          console.log(`[authStore] ⏭️ Skipping duplicate fetch for user: ${userId}`);
+          console.log(`[authStore] Skipping duplicate fetch for user: ${userId}`);
           return;
         }
 
@@ -488,84 +470,109 @@ export const useAuthStore = create<AuthStore>()(
           const ownerEmail = import.meta.env?.VITE_OWNER_EMAIL;
           const currentUser = get().user;
           if (currentUser?.email === ownerEmail) {
-            console.log('[authStore] 🚀 IMMEDIATE OWNER FALLBACK - Setting owner plan');
+            console.log('[authStore] IMMEDIATE OWNER FALLBACK - Setting owner plan');
             set({ plan: 'owner', planLoading: false });
             await get().updateEffectiveLimits();
             return;
           }
           
-          // Try multiple approaches with shorter timeouts
-          const fetchWithTimeout = async (query: any, timeoutMs: number) => {
-            const timeoutPromise = new Promise((_, reject) => {
+          // OPTIMIZED: Parallel plan detection with single timeout
+          const fetchWithTimeout = async (timeoutMs: number) => {
+            const timeoutPromise = new Promise<never>((_, reject) => {
               setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms`)), timeoutMs);
             });
-            return Promise.race([query, timeoutPromise]);
+            return timeoutPromise;
           };
 
-          // Method 1: Direct query to users table
           try {
-            console.log('[authStore] Trying direct users table query...');
-            const { data, error } = await fetchWithTimeout(
-              supabase
-                .from('users')
-                .select('plan_type')
-                .eq('id', userId)
-                .single(),
-              3000 // 3 second timeout
-            ) as any;
+            // Run all detection methods in parallel and return the first successful result
+            const planPromise = (async () => {
+              // Method 1: Direct query to users table
+              try {
+                const { data, error } = await supabase
+                  .from('users')
+                  .select('plan_type')
+                  .eq('id', userId)
+                  .single();
 
-            if (!error && data) {
-              let userPlan = data?.plan_type as Plan || 'free';
-              console.log(`[authStore] Raw plan from DB: ${data?.plan_type}, after migration: ${userPlan}`);
-              userPlan = migrateLegacyPlanId(userPlan) as Plan;
-              
-              console.log(`[authStore] ✅ Successfully fetched plan: ${userPlan} for user: ${userId}`);
-              set({ plan: userPlan, planLoading: false });
-              await get().updateEffectiveLimits();
-              return;
-            } else {
-              console.log('[authStore] Direct query failed, trying auth.user()...');
-            }
-          } catch (err) {
-            console.log('[authStore] Direct query error:', err);
-          }
+                if (!error && data) {
+                  const userPlan = migrateLegacyPlanId(data?.plan_type as Plan || 'free') as Plan;
+                  console.log(`[authStore] Direct query success: ${userPlan}`);
+                  return userPlan;
+                }
+              } catch (err) {
+                console.log('[authStore] Direct query failed:', err);
+              }
 
-          // Method 2: Try using auth metadata (fallback)
-          try {
-            console.log('[authStore] Trying auth metadata fallback...');
-            const { data: { user } } = await supabase.auth.getUser();
+              // Method 2: Auth metadata fallback
+              try {
+                const { data: { user } } = await supabase.auth.getUser();
+                const metadataPlan = user?.user_metadata?.plan_type || user?.app_metadata?.plan_type;
+                if (metadataPlan) {
+                  const userPlan = migrateLegacyPlanId(metadataPlan as Plan) as Plan;
+                  console.log(`[authStore] Metadata fallback success: ${userPlan}`);
+                  return userPlan;
+                }
+              } catch (err) {
+                console.log('[authStore] Metadata fallback failed:', err);
+              }
+
+              // Method 3: Check if user has active licenses as fallback
+              try {
+                const { data: licenseData } = await supabase
+                  .from('licenses')
+                  .select('license_type')
+                  .eq('user_id', userId)
+                  .eq('status', 'active')
+                  .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString())
+                  .limit(1)
+                  .maybeSingle();
+
+                if (licenseData) {
+                  // Map license types to plans
+                  const licenseToPlanMap: Record<string, Plan> = {
+                    'trial': 'free',
+                    'basic': 'free',
+                    'premium': 'pro',
+                    'enterprise': 'lifetime',
+                    'custom': 'lifetime'
+                  };
+                  const userPlan = licenseToPlanMap[licenseData.license_type] || 'free';
+                  console.log(`[authStore] License fallback success: ${userPlan}`);
+                  return userPlan;
+                }
+              } catch (err) {
+                console.log('[authStore] License fallback failed:', err);
+              }
+
+              return null;
+            })();
+
+            // Race between plan detection and timeout (reduced from 3000ms to 1500ms)
+            const result = await Promise.race([planPromise, fetchWithTimeout(1500)]);
             
-            // Check if plan is in user metadata
-            const metadataPlan = user?.user_metadata?.plan_type || user?.app_metadata?.plan_type;
-            if (metadataPlan) {
-              let userPlan = metadataPlan as Plan;
-              userPlan = migrateLegacyPlanId(userPlan) as Plan;
-              
-              console.log(`[authStore] ✅ Found plan in metadata: ${userPlan} for user: ${userId}`);
-              set({ plan: userPlan, planLoading: false });
+            if (result) {
+              set({ plan: result, planLoading: false });
               await get().updateEffectiveLimits();
               return;
-            } else {
-              console.log('[authStore] No plan in metadata, trying owner fallback...');
             }
           } catch (err) {
-            console.log('[authStore] Metadata fallback failed:', err);
+            console.log('[authStore] All plan detection methods failed or timed out');
           }
 
           // Final fallback
-          console.log('[authStore] ⚠️ All methods failed, using default plan: guest');
+          console.log('[authStore] Using default plan: guest');
           set({ plan: 'guest', planLoading: false });
           await get().updateEffectiveLimits();
           
         } catch (error) {
           console.error('[authStore] Unexpected error fetching user plan:', error);
-          console.log('[authStore] Falling back to default plan: guest');
-          // Never block the app if auth fails
           set({ plan: 'guest', planLoading: false });
           await get().updateEffectiveLimits();
         }
       },
 
+// ... (rest of the code remains the same)
       // Validate owner key token
       validateOwnerKey: async (token: string) => {
         try {

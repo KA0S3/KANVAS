@@ -53,3 +53,6 @@ server/
 *.p12
 *.pfx
 debug-localstorage.js
+
+# Project documentation and notes (keep local)
+project notes/

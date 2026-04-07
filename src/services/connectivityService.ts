@@ -16,6 +16,7 @@ class ConnectivityService {
   private state: ConnectivityState;
   private heartbeatInterval: number | null = null;
   private subscribers: Set<(state: ConnectivityState) => void> = new Set();
+  private syncTriggerTimeout: number | null = null; // Debounce timer for sync triggers
   
   // Configuration
   private readonly HEARTBEAT_INTERVAL = 30000; // 30 seconds
@@ -100,10 +101,10 @@ class ConnectivityService {
   }
 
   private async checkConnectivityNow(): Promise<boolean> {
-    // Use multiple methods for reliable connectivity detection
+    // Use multiple methods for reliable connectivity detection with early success
     
     try {
-      // Method 1: Try to reach our own health endpoint
+      // Method 1: Try to reach our own health endpoint first (fastest)
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.HEARTBEAT_TIMEOUT);
 
@@ -124,7 +125,18 @@ class ConnectivityService {
     }
 
     try {
-      // Method 2: Try to reach a reliable external service
+      // Method 2: DNS resolution check (faster than external fetch)
+      const dnsCheck = await this.checkDNSResolution();
+      if (dnsCheck) {
+        console.log('[Connectivity] DNS resolution successful');
+        return true;
+      }
+    } catch (error) {
+      console.log('[Connectivity] DNS check failed:', error);
+    }
+
+    try {
+      // Method 3: Try to reach a reliable external service
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.HEARTBEAT_TIMEOUT);
 
@@ -142,17 +154,6 @@ class ConnectivityService {
       }
     } catch (error) {
       console.log('[Connectivity] External endpoint failed:', error);
-    }
-
-    try {
-      // Method 3: DNS resolution check (more reliable than simple fetch)
-      const dnsCheck = await this.checkDNSResolution();
-      if (dnsCheck) {
-        console.log('[Connectivity] DNS resolution successful');
-        return true;
-      }
-    } catch (error) {
-      console.log('[Connectivity] DNS check failed:', error);
     }
 
     // Method 4: Last resort - check if we can reach Supabase
@@ -201,8 +202,8 @@ class ConnectivityService {
       // Trigger online/offline events for other services
       if (this.state.isOnline && !previousState.isOnline) {
         this.notifySubscribers('online');
-        // Trigger sync queue processing when coming back online
-        this.processSyncQueueOnReconnect();
+        // Trigger sync queue processing when coming back online with debounce
+        this.debouncedSyncQueueTrigger();
       } else if (!this.state.isOnline && previousState.isOnline) {
         this.notifySubscribers('offline');
       }
@@ -210,6 +211,17 @@ class ConnectivityService {
 
     // Notify all subscribers of state change
     this.notifySubscribers(this.state);
+  }
+
+  // Debounced sync queue trigger to prevent multiple rapid calls
+  private debouncedSyncQueueTrigger(): void {
+    if (this.syncTriggerTimeout) {
+      clearTimeout(this.syncTriggerTimeout as number);
+    }
+    
+    this.syncTriggerTimeout = setTimeout(() => {
+      this.processSyncQueueOnReconnect();
+    }, 2000) as unknown as number; // 2 second debounce
   }
 
   private processSyncQueueOnReconnect(): void {
@@ -231,7 +243,14 @@ class ConnectivityService {
   private notifySubscribers(event: ConnectivityEvent): void {
     this.subscribers.forEach(callback => {
       try {
-        callback(event);
+        // Handle both string events and state objects
+        if (typeof event === 'string') {
+          // For 'online'/'offline' events, send current state
+          callback(this.state);
+        } else {
+          // For state objects, send the state directly
+          callback(event as ConnectivityState);
+        }
       } catch (error) {
         console.error('[Connectivity] Subscriber callback error:', error);
       }

@@ -27,6 +27,8 @@ class HybridSyncService {
   private readonly SYNC_INTERVAL = 30000; // 30 seconds
   private readonly MANUAL_SYNC_INTERVAL = 10000; // 10 seconds for manual saves
   private isManualSync = false;
+  private isProcessingQueue = false; // Prevent concurrent queue processing
+  private syncMutex = false; // Prevent concurrent sync operations
 
   static getInstance(): HybridSyncService {
     if (!HybridSyncService.instance) {
@@ -57,22 +59,30 @@ class HybridSyncService {
 
   // Cloud-first sync: always try to sync to cloud first
   async syncToCloud(): Promise<boolean> {
-    const { isAuthenticated, user } = useAuthStore.getState();
-    const { syncEnabled } = useCloudStore.getState();
-    const isOnline = connectivityService.isOnline();
+    // Prevent concurrent sync operations
+    if (this.syncMutex) {
+      console.log('[HybridSync] Sync already in progress, skipping');
+      return false;
+    }
+
+    this.syncMutex = true;
     
-    if (!isAuthenticated || !user || !syncEnabled) {
-      console.log('[HybridSync] Cloud sync disabled - user not authenticated or sync disabled');
-      return false;
-    }
-
-    if (!isOnline) {
-      console.log('[HybridSync] Offline - adding to sync queue');
-      this.addToSyncQueue();
-      return false;
-    }
-
     try {
+      const { isAuthenticated, user } = useAuthStore.getState();
+      const { syncEnabled } = useCloudStore.getState();
+      const isOnline = connectivityService.isOnline();
+      
+      if (!isAuthenticated || !user || !syncEnabled) {
+        console.log('[HybridSync] Cloud sync disabled - user not authenticated or sync disabled');
+        return false;
+      }
+
+      if (!isOnline) {
+        console.log('[HybridSync] Offline - adding to sync queue');
+        this.addToSyncQueue();
+        return false;
+      }
+
       const { currentBookId } = useBookStore.getState();
       if (!currentBookId) {
         console.log('[HybridSync] No current book to sync');
@@ -103,18 +113,12 @@ class HybridSyncService {
         return false;
       }
 
-      // Sync assets/world data
-      const assetStore = useAssetStore.getState();
-      const worldData = {
-        assets: assetStore.assets,
-        globalCustomFields: assetStore.globalCustomFields,
-      };
+      // Serialize data safely to prevent circular reference issues
+      const worldData = this.safelySerializeWorldData();
+      const backgroundConfigs = this.safelySerializeBackgrounds();
 
       await this.syncWorldData(user.id, currentBookId, worldData);
-
-      // Sync background configs
-      const backgroundStore = useBackgroundStore.getState();
-      await this.syncBackgroundData(user.id, currentBookId, backgroundStore.configs);
+      await this.syncBackgroundData(user.id, currentBookId, backgroundConfigs);
 
       // Update quota usage
       cloudStore.updateQuotaUsage(dataSize);
@@ -142,6 +146,8 @@ class HybridSyncService {
       });
       
       return false;
+    } finally {
+      this.syncMutex = false;
     }
   }
 
@@ -184,8 +190,8 @@ class HybridSyncService {
     useCloudStore.getState().addToSyncQueue({
       type: 'asset',
       data: {
-        assets: assetStore.assets,
-        globalCustomFields: assetStore.globalCustomFields,
+        assets: assetStore.getCurrentBookAssets(),
+        globalCustomFields: assetStore.getCurrentBookGlobalCustomFields(),
       }
     });
 
@@ -207,64 +213,130 @@ class HybridSyncService {
       return;
     }
 
-    console.log(`[HybridSync] Processing ${syncQueue.length} items in sync queue`);
-
-    const { user } = useAuthStore.getState();
-    const { currentBookId } = useBookStore.getState();
-    
-    if (!user || !currentBookId) {
+    // Prevent concurrent queue processing
+    if (this.isProcessingQueue) {
+      console.log('[HybridSync] Queue already processing, skipping');
       return;
     }
 
-    // Process queue items in order with exponential backoff
-    for (const item of syncQueue) {
-      try {
-        // Check if item should be retried based on backoff
-        if (item.retryCount > 0) {
-          const backoffDelay = this.calculateBackoffDelay(item.retryCount);
-          const timeSinceLastRetry = Date.now() - (item.lastRetryTime || 0);
+    this.isProcessingQueue = true;
+    console.log(`[HybridSync] Processing ${syncQueue.length} items in sync queue`);
+
+    try {
+      const { user } = useAuthStore.getState();
+      const { currentBookId } = useBookStore.getState();
+      
+      if (!user || !currentBookId) {
+        return;
+      }
+
+      // Process queue items with improved error handling
+      const itemsToProcess = [...syncQueue];
+      for (const item of itemsToProcess) {
+        try {
+          // Check if item should be retried based on backoff
+          if (item.retryCount > 0) {
+            const backoffDelay = this.calculateBackoffDelay(item.retryCount);
+            const timeSinceLastRetry = Date.now() - (item.lastRetryTime || 0);
+            
+            if (timeSinceLastRetry < backoffDelay) {
+              console.log(`[HybridSync] Item ${item.id} waiting for backoff: ${backoffDelay}ms`);
+              continue; // Skip this item for now, but continue processing others
+            }
+          }
+
+          switch (item.type) {
+            case 'asset':
+              await this.syncWorldData(user.id, currentBookId, item.data);
+              break;
+            case 'background':
+              await this.syncBackgroundData(user.id, currentBookId, item.data);
+              break;
+            case 'project':
+              // Handle project-level sync if needed
+              break;
+          }
           
-          if (timeSinceLastRetry < backoffDelay) {
-            console.log(`[HybridSync] Item ${item.id} waiting for backoff: ${backoffDelay}ms`);
-            continue; // Skip this item for now
+          // Remove from queue on success
+          cloudStore.removeFromSyncQueue(item.id);
+          console.log(`[HybridSync] Successfully synced item ${item.id}`);
+          
+        } catch (error) {
+          console.error(`[HybridSync] Failed to sync queue item ${item.id}:`, error);
+          
+          // Increment retry count and update last retry time
+          item.retryCount++;
+          item.lastRetryTime = Date.now();
+          
+          // Remove if too many retries
+          if (item.retryCount >= 5) {
+            cloudStore.removeFromSyncQueue(item.id);
+            console.warn(`[HybridSync] Removed item ${item.id} from queue after 5 failed attempts`);
+            // Continue processing other items instead of breaking
+          } else {
+            const nextRetryIn = this.calculateBackoffDelay(item.retryCount);
+            console.log(`[HybridSync] Item ${item.id} will retry in ${nextRetryIn}ms (attempt ${item.retryCount}/5)`);
+            // Continue processing other items
           }
         }
-
-        switch (item.type) {
-          case 'asset':
-            await this.syncWorldData(user.id, currentBookId, item.data);
-            break;
-          case 'background':
-            await this.syncBackgroundData(user.id, currentBookId, item.data);
-            break;
-          case 'project':
-            // Handle project-level sync if needed
-            break;
-        }
-        
-        // Remove from queue on success
-        cloudStore.removeFromSyncQueue(item.id);
-        console.log(`[HybridSync] Successfully synced item ${item.id}`);
-        
-      } catch (error) {
-        console.error(`[HybridSync] Failed to sync queue item ${item.id}:`, error);
-        
-        // Increment retry count and update last retry time
-        item.retryCount++;
-        item.lastRetryTime = Date.now();
-        
-        // Remove if too many retries
-        if (item.retryCount >= 5) {
-          cloudStore.removeFromSyncQueue(item.id);
-          console.warn(`[HybridSync] Removed item ${item.id} from queue after 5 failed attempts`);
-          break; // Stop processing on permanent failure
-        } else {
-          const nextRetryIn = this.calculateBackoffDelay(item.retryCount);
-          console.log(`[HybridSync] Item ${item.id} will retry in ${nextRetryIn}ms (attempt ${item.retryCount}/5)`);
-          break; // Wait for next retry cycle
-        }
       }
+    } finally {
+      this.isProcessingQueue = false;
     }
+  }
+
+  // Safe serialization methods to prevent circular reference issues
+  private safelySerializeWorldData(): any {
+    try {
+      const assetStore = useAssetStore.getState();
+      const worldData = {
+        assets: assetStore.getCurrentBookAssets(),
+        globalCustomFields: assetStore.getCurrentBookGlobalCustomFields(),
+      };
+      
+      // Use safe JSON serialization with circular reference handling
+      return this.safeStringify(worldData);
+    } catch (error) {
+      console.error('[HybridSync] Failed to serialize world data:', error);
+      // Return minimal safe data structure
+      return {
+        assets: {},
+        globalCustomFields: [],
+        serializationError: true
+      };
+    }
+  }
+
+  private safelySerializeBackgrounds(): any {
+    try {
+      const backgroundStore = useBackgroundStore.getState();
+      
+      // Use safe JSON serialization with circular reference handling
+      return this.safeStringify(backgroundStore.configs);
+    } catch (error) {
+      console.error('[HybridSync] Failed to serialize background configs:', error);
+      // Return minimal safe data structure
+      return {
+        serializationError: true
+      };
+    }
+  }
+
+  // Safe stringify that handles circular references
+  private safeStringify(obj: any): any {
+    const seen = new WeakSet();
+    const jsonString = JSON.stringify(obj, (key, val) => {
+      if (val != null && typeof val === 'object') {
+        if (seen.has(val)) {
+          // Circular reference detected, replace with reference marker
+          return '[Circular Reference]';
+        }
+        seen.add(val);
+      }
+      return val;
+    });
+    
+    return JSON.parse(jsonString);
   }
 
   // Calculate exponential backoff delay with jitter
@@ -294,8 +366,8 @@ class HybridSyncService {
     
     // Estimate world data size (assets + custom fields)
     const worldData = {
-      assets: assetStore.assets,
-      globalCustomFields: assetStore.globalCustomFields,
+      assets: assetStore.getCurrentBookAssets(),
+      globalCustomFields: assetStore.getCurrentBookGlobalCustomFields(),
     };
     const worldDataSize = new Blob([JSON.stringify(worldData)]).size;
     
@@ -368,11 +440,15 @@ class HybridSyncService {
     }
   }
 
-  // Generate deterministic UUID for consistent background record IDs
+  // Generate book-specific deterministic UUID for consistent background record IDs
   private generateDeterministicUUID(input: string): string {
+    // Get current book context to ensure book-specific UUIDs
+    const { currentBookId } = useBookStore.getState();
+    const bookSpecificInput = currentBookId ? `${currentBookId}-${input}` : input;
+    
     // Use crypto.subtle for proper hash if available, fallback to simple hash
     // Generate a proper UUID v5-like deterministic UUID
-    const hash = this.simpleHash(input);
+    const hash = this.simpleHash(bookSpecificInput);
     
     // Format as valid UUID: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
     // Where 4 indicates version 4 and y is 8,9,a,b

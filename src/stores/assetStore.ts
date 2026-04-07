@@ -7,23 +7,31 @@ import { useBookStore } from './bookStoreSimple';
 import { StorageCleanup } from '@/utils/storageCleanup';
 
 interface AssetStore {
-  // Registry for O(1) lookups
-  assets: Record<string, Asset>;
+  // Book-scoped asset registry for isolation
+  bookAssets: Record<string, Record<string, Asset>>;
   
   // Active asset state
   currentActiveId: string | null;
   currentViewportId: string | null; // Current viewport context (enteredAssetId)
   
-  // Global custom fields
-  globalCustomFields: GlobalCustomField[];
+  // Global custom fields (book-scoped)
+  bookGlobalCustomFields: Record<string, GlobalCustomField[]>;
   
   // Background editing state
   isEditingBackground: boolean;
+  
+  // Helper methods
+  getCurrentBookId: () => string | null;
+  
+  // Get current book's assets
+  getCurrentBookAssets: () => Record<string, Asset>;
+  getCurrentBookGlobalCustomFields: () => GlobalCustomField[];
   
   // World-aware actions
   loadWorldData: (worldData: any) => void;
   getWorldData: () => any;
   clearWorldData: () => void;
+  clearBookData: (bookId: string) => void;
   
   // Actions
   createAsset: (assetData: Omit<Asset, 'id' | 'children'>, parentId?: string) => string;
@@ -65,11 +73,31 @@ export const useAssetStore = create<AssetStore>()(
     subscribeWithSelector(
       (set, get) => ({
     // Initial state
-    assets: {},
+    bookAssets: {},
     currentActiveId: null,
     currentViewportId: null,
-    globalCustomFields: [],
+    bookGlobalCustomFields: {},
     isEditingBackground: false,
+
+  // Helper to get current book ID
+  getCurrentBookId: () => {
+    const bookStore = useBookStore.getState();
+    return bookStore.currentBookId;
+  },
+
+  // Get current book's assets
+  getCurrentBookAssets: () => {
+    const state = get();
+    const bookId = state.getCurrentBookId();
+    return state.bookAssets[bookId] || {};
+  },
+
+  // Get current book's global custom fields
+  getCurrentBookGlobalCustomFields: () => {
+    const state = get();
+    const bookId = state.getCurrentBookId();
+    return state.bookGlobalCustomFields[bookId] || [];
+  },
 
   // Create a new asset
   createAsset: (assetData: Omit<Asset, 'id' | 'children'>, parentId?: string) => {
@@ -100,22 +128,31 @@ export const useAssetStore = create<AssetStore>()(
       };
 
       set((state) => {
-        const newAssets = { ...state.assets };
+        const bookId = state.getCurrentBookId();
+        if (!bookId) {
+          console.warn('[AssetStore] Cannot create asset - no current book');
+          return state;
+        }
         
-        // Atomic operation: Add the new asset to registry
-        newAssets[id] = newAsset;
+        const newBookAssets = { ...state.bookAssets };
+        if (!newBookAssets[bookId]) {
+          newBookAssets[bookId] = {};
+        }
+        
+        // Atomic operation: Add the new asset to book-specific registry
+        newBookAssets[bookId][id] = newAsset;
         
         // If it has a parent, add this asset to parent's children array and expand the parent
-        if (parentId && newAssets[parentId]) {
-          newAssets[parentId] = {
-            ...newAssets[parentId],
-            children: [...newAssets[parentId].children, id],
+        if (parentId && newBookAssets[bookId][parentId]) {
+          newBookAssets[bookId][parentId] = {
+            ...newBookAssets[bookId][parentId],
+            children: [...newBookAssets[bookId][parentId].children, id],
             isExpanded: true, // Auto-expand parent to show new asset
             updatedAt: now,
           };
         }
         
-        return { assets: newAssets };
+        return { bookAssets: newBookAssets };
       });
       
       return id;
@@ -131,55 +168,64 @@ export const useAssetStore = create<AssetStore>()(
   // Reparent an asset (move from one parent to another)
   reparentAsset: (assetId: string, newParentId?: string) => {
     set((state) => {
-      const newAssets = { ...state.assets };
-      const asset = newAssets[assetId];
+      const bookId = state.getCurrentBookId();
+      if (!bookId) return state;
+      
+      const newBookAssets = { ...state.bookAssets };
+      const bookAssets = newBookAssets[bookId] || {};
+      const asset = bookAssets[assetId];
       
       if (!asset) return state;
 
       const oldParentId = asset.parentId;
 
       // Remove from old parent's children array
-      if (oldParentId && newAssets[oldParentId]) {
-        newAssets[oldParentId] = {
-          ...newAssets[oldParentId],
-          children: newAssets[oldParentId].children.filter(id => id !== assetId),
+      if (oldParentId && bookAssets[oldParentId]) {
+        newBookAssets[bookId][oldParentId] = {
+          ...bookAssets[oldParentId],
+          children: bookAssets[oldParentId].children.filter(id => id !== assetId),
         };
       }
 
       // Add to new parent's children array
-      if (newParentId && newAssets[newParentId]) {
-        newAssets[newParentId] = {
-          ...newAssets[newParentId],
-          children: [...newAssets[newParentId].children, assetId],
+      if (newParentId && bookAssets[newParentId]) {
+        newBookAssets[bookId][newParentId] = {
+          ...bookAssets[newParentId],
+          children: [...bookAssets[newParentId].children, assetId],
         };
       }
 
       // Update the asset's parent reference
-      newAssets[assetId] = {
+      newBookAssets[bookId][assetId] = {
         ...asset,
         parentId: newParentId,
       };
 
-      return { assets: newAssets };
+      return { bookAssets: newBookAssets };
     });
   },
 
   // Update asset position
   updateAssetPosition: (assetId: string, x: number, y: number) => {
     set((state) => {
-      const asset = state.assets[assetId];
+      const bookId = state.getCurrentBookId();
+      if (!bookId) return state;
+      
+      const bookAssets = state.bookAssets[bookId] || {};
+      const asset = bookAssets[assetId];
       if (!asset) return state;
 
-      return {
-        assets: {
-          ...state.assets,
-          [assetId]: {
-            ...asset,
-            x,
-            y,
-          },
+      const newBookAssets = { ...state.bookAssets };
+      newBookAssets[bookId] = {
+        ...bookAssets,
+        [assetId]: {
+          ...asset,
+          x,
+          y,
         },
       };
+
+      return { bookAssets: newBookAssets };
     });
   },
 
@@ -187,19 +233,24 @@ export const useAssetStore = create<AssetStore>()(
   updateAssetSize: (assetId: string, width: number, height: number) => {
     try {
       set((state) => {
-        const asset = state.assets[assetId];
+        const bookId = state.getCurrentBookId();
+        if (!bookId) return state;
+        
+        const bookAssets = state.bookAssets[bookId] || {};
+        const asset = bookAssets[assetId];
         if (!asset) return state;
 
-        return {
-          assets: {
-            ...state.assets,
-            [assetId]: {
-              ...asset,
-              width: Math.max(100, width), // Minimum width of 100px
-              height: Math.max(80, height), // Minimum height of 80px
-            },
+        const newBookAssets = { ...state.bookAssets };
+        newBookAssets[bookId] = {
+          ...bookAssets,
+          [assetId]: {
+            ...asset,
+            width: Math.max(100, width), // Minimum width of 100px
+            height: Math.max(80, height), // Minimum height of 80px
           },
         };
+
+        return { bookAssets: newBookAssets };
       });
     } catch (error) {
       console.error('[AssetStore] Failed to update asset size:', error);
@@ -210,32 +261,41 @@ export const useAssetStore = create<AssetStore>()(
   // Update asset properties
   updateAsset: (assetId: string, updates: Partial<Omit<Asset, 'id' | 'children' | 'parentId'>>) => {
     set((state) => {
-      const asset = state.assets[assetId];
+      const bookId = state.getCurrentBookId();
+      if (!bookId) return state;
+      
+      const bookAssets = state.bookAssets[bookId] || {};
+      const asset = bookAssets[assetId];
       if (!asset) return state;
 
-      return {
-        assets: {
-          ...state.assets,
-          [assetId]: {
-            ...asset,
-            ...updates,
-          },
+      const newBookAssets = { ...state.bookAssets };
+      newBookAssets[bookId] = {
+        ...bookAssets,
+        [assetId]: {
+          ...asset,
+          ...updates,
         },
       };
+
+      return { bookAssets: newBookAssets };
     });
   },
 
   // Delete an asset and all its descendants recursively
   deleteAsset: (assetId: string) => {
     set((state) => {
-      const newAssets = { ...state.assets };
-      const asset = newAssets[assetId];
+      const bookId = state.getCurrentBookId();
+      if (!bookId) return state;
+      
+      const newBookAssets = { ...state.bookAssets };
+      const bookAssets = newBookAssets[bookId] || {};
+      const asset = bookAssets[assetId];
       
       if (!asset) return state;
 
       // Recursive function to collect all descendant IDs
       const collectDescendants = (id: string): string[] => {
-        const currentAsset = newAssets[id];
+        const currentAsset = bookAssets[id];
         if (!currentAsset || currentAsset.children.length === 0) return [];
         
         let descendants: string[] = [];
@@ -250,16 +310,16 @@ export const useAssetStore = create<AssetStore>()(
       const idsToDelete = [assetId, ...collectDescendants(assetId)];
 
       // Remove from parent's children array if it has a parent
-      if (asset.parentId && newAssets[asset.parentId]) {
-        newAssets[asset.parentId] = {
-          ...newAssets[asset.parentId],
-          children: newAssets[asset.parentId].children.filter(id => !idsToDelete.includes(id)),
+      if (asset.parentId && bookAssets[asset.parentId]) {
+        newBookAssets[bookId][asset.parentId] = {
+          ...bookAssets[asset.parentId],
+          children: bookAssets[asset.parentId].children.filter(id => !idsToDelete.includes(id)),
         };
       }
 
       // Delete all assets from registry
       idsToDelete.forEach(id => {
-        delete newAssets[id];
+        delete newBookAssets[bookId][id];
       });
 
       // Clear active asset if it was deleted
@@ -268,7 +328,7 @@ export const useAssetStore = create<AssetStore>()(
         : state.currentActiveId;
 
       return { 
-        assets: newAssets,
+        bookAssets: newBookAssets,
         currentActiveId: newActiveId,
       };
     });
@@ -293,33 +353,49 @@ export const useAssetStore = create<AssetStore>()(
   // Get the active asset object
   getActiveAsset: () => {
     const state = get();
-    return state.currentActiveId ? state.assets[state.currentActiveId] || null : null;
+    const bookId = state.getCurrentBookId();
+    if (!bookId || !state.currentActiveId) return null;
+    
+    const bookAssets = state.bookAssets[bookId] || {};
+    return bookAssets[state.currentActiveId] || null;
   },
 
   // Get all root-level assets (no parent)
   getRootAssets: () => {
     const state = get();
-    return Object.values(state.assets).filter(asset => !asset.parentId);
+    const bookId = state.getCurrentBookId();
+    if (!bookId) return [];
+    
+    const bookAssets = state.bookAssets[bookId] || {};
+    return Object.values(bookAssets).filter(asset => !asset.parentId);
   },
 
   // Get direct children of a specific asset
   getAssetChildren: (parentId: string) => {
     const state = get();
-    const parent = state.assets[parentId];
+    const bookId = state.getCurrentBookId();
+    if (!bookId) return [];
+    
+    const bookAssets = state.bookAssets[bookId] || {};
+    const parent = bookAssets[parentId];
     if (!parent) return [];
     
     return parent.children
-      .map(childId => state.assets[childId])
-      .filter(Boolean);
+      .map(childId => bookAssets[childId])
+      .filter(Boolean) as Asset[];
   },
 
   // Get entire tree starting from root or specific asset
   getAssetTree: (rootId?: string) => {
     const state = get();
+    const bookId = state.getCurrentBookId();
+    if (!bookId) return [];
+    
+    const bookAssets = state.bookAssets[bookId] || {};
     const result: Asset[] = [];
     
     const traverse = (assetId: string) => {
-      const asset = state.assets[assetId];
+      const asset = bookAssets[assetId];
       if (!asset) return;
       
       result.push(asset);
@@ -330,7 +406,7 @@ export const useAssetStore = create<AssetStore>()(
       traverse(rootId);
     } else {
       // Start from all root assets
-      state.getRootAssets().forEach(asset => traverse(asset.id));
+      Object.values(bookAssets).filter(asset => !asset.parentId).forEach(asset => traverse(asset.id));
     }
     
     return result;
@@ -343,50 +419,86 @@ export const useAssetStore = create<AssetStore>()(
       id: `field-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
     };
     
-    set((state) => ({
-      assets: {
-        ...state.assets,
+    set((state) => {
+      const bookId = state.getCurrentBookId();
+      if (!bookId) return state;
+      
+      const bookAssets = state.bookAssets[bookId] || {};
+      const asset = bookAssets[assetId];
+      if (!asset) return state;
+      
+      const newBookAssets = { ...state.bookAssets };
+      newBookAssets[bookId] = {
+        ...bookAssets,
         [assetId]: {
-          ...state.assets[assetId],
-          customFields: [...(state.assets[assetId].customFields || []), newField],
+          ...asset,
+          customFields: [...(asset.customFields || []), newField],
           updatedAt: Date.now(),
         },
-      },
-    }));
+      };
+      
+      return { bookAssets: newBookAssets };
+    });
   },
 
   updateCustomField: (assetId: string, fieldId: string, updates: Partial<CustomField>) => {
-    set((state) => ({
-      assets: {
-        ...state.assets,
+    set((state) => {
+      const bookId = state.getCurrentBookId();
+      if (!bookId) return state;
+      
+      const bookAssets = state.bookAssets[bookId] || {};
+      const asset = bookAssets[assetId];
+      if (!asset) return state;
+      
+      const newBookAssets = { ...state.bookAssets };
+      newBookAssets[bookId] = {
+        ...bookAssets,
         [assetId]: {
-          ...state.assets[assetId],
-          customFields: (state.assets[assetId].customFields || []).map((field) =>
+          ...asset,
+          customFields: (asset.customFields || []).map((field) =>
             field.id === fieldId ? { ...field, ...updates } : field
           ),
           updatedAt: Date.now(),
         },
-      },
-    }));
+      };
+      
+      return { bookAssets: newBookAssets };
+    });
   },
 
   removeCustomField: (assetId: string, fieldId: string) => {
-    set((state) => ({
-      assets: {
-        ...state.assets,
+    set((state) => {
+      const bookId = state.getCurrentBookId();
+      if (!bookId) return state;
+      
+      const bookAssets = state.bookAssets[bookId] || {};
+      const asset = bookAssets[assetId];
+      if (!asset) return state;
+      
+      const newBookAssets = { ...state.bookAssets };
+      newBookAssets[bookId] = {
+        ...bookAssets,
         [assetId]: {
-          ...state.assets[assetId],
-          customFields: (state.assets[assetId].customFields || []).filter((field) => field.id !== fieldId),
-          customFieldValues: (state.assets[assetId].customFieldValues || []).filter((value) => value.fieldId !== fieldId),
+          ...asset,
+          customFields: (asset.customFields || []).filter((field) => field.id !== fieldId),
+          customFieldValues: (asset.customFieldValues || []).filter((value) => value.fieldId !== fieldId),
           updatedAt: Date.now(),
         },
-      },
-    }));
+      };
+      
+      return { bookAssets: newBookAssets };
+    });
   },
 
   updateCustomFieldValue: (assetId: string, fieldId: string, value: string) => {
     set((state) => {
-      const asset = state.assets[assetId];
+      const bookId = state.getCurrentBookId();
+      if (!bookId) return state;
+      
+      const bookAssets = state.bookAssets[bookId] || {};
+      const asset = bookAssets[assetId];
+      if (!asset) return state;
+      
       const existingValues = asset.customFieldValues || [];
       const existingValueIndex = existingValues.findIndex((v) => v.fieldId === fieldId);
       
@@ -400,16 +512,17 @@ export const useAssetStore = create<AssetStore>()(
         newValues = [...existingValues, { fieldId, value }];
       }
       
-      return {
-        assets: {
-          ...state.assets,
-          [assetId]: {
-            ...asset,
-            customFieldValues: newValues,
-            updatedAt: Date.now(),
-          },
+      const newBookAssets = { ...state.bookAssets };
+      newBookAssets[bookId] = {
+        ...bookAssets,
+        [assetId]: {
+          ...asset,
+          customFieldValues: newValues,
+          updatedAt: Date.now(),
         },
       };
+      
+      return { bookAssets: newBookAssets };
     });
   },
 
@@ -422,28 +535,49 @@ export const useAssetStore = create<AssetStore>()(
       updatedAt: Date.now(),
     };
     
-    set((state) => ({
-      globalCustomFields: [...state.globalCustomFields, newField],
-    }));
+    set((state) => {
+      const bookId = state.getCurrentBookId();
+      if (!bookId) return state;
+      
+      const newBookGlobalCustomFields = { ...state.bookGlobalCustomFields };
+      const currentFields = newBookGlobalCustomFields[bookId] || [];
+      newBookGlobalCustomFields[bookId] = [...currentFields, newField];
+      
+      return { bookGlobalCustomFields: newBookGlobalCustomFields };
+    });
   },
 
   updateGlobalCustomField: (fieldId: string, updates: Partial<GlobalCustomField>) => {
-    set((state) => ({
-      globalCustomFields: state.globalCustomFields.map((field) =>
+    set((state) => {
+      const bookId = state.getCurrentBookId();
+      if (!bookId) return state;
+      
+      const newBookGlobalCustomFields = { ...state.bookGlobalCustomFields };
+      const currentFields = newBookGlobalCustomFields[bookId] || [];
+      newBookGlobalCustomFields[bookId] = currentFields.map((field) =>
         field.id === fieldId ? { ...field, ...updates, updatedAt: Date.now() } : field
-      ),
-    }));
+      );
+      
+      return { bookGlobalCustomFields: newBookGlobalCustomFields };
+    });
   },
 
   removeGlobalCustomField: (fieldId: string) => {
     set((state) => {
-      const newGlobalFields = state.globalCustomFields.filter((field) => field.id !== fieldId);
-      const newAssets = { ...state.assets };
+      const bookId = state.getCurrentBookId();
+      if (!bookId) return state;
       
-      // Remove this field from all assets
-      Object.keys(newAssets).forEach((assetId) => {
-        const asset = newAssets[assetId];
-        newAssets[assetId] = {
+      const newBookGlobalCustomFields = { ...state.bookGlobalCustomFields };
+      const currentFields = newBookGlobalCustomFields[bookId] || [];
+      newBookGlobalCustomFields[bookId] = currentFields.filter((field) => field.id !== fieldId);
+      
+      // Remove this field from all assets in the current book
+      const newBookAssets = { ...state.bookAssets };
+      const bookAssets = newBookAssets[bookId] || {};
+      
+      Object.keys(bookAssets).forEach((assetId) => {
+        const asset = bookAssets[assetId];
+        newBookAssets[bookId][assetId] = {
           ...asset,
           customFields: (asset.customFields || []).filter((field) => field.id !== fieldId),
           customFieldValues: (asset.customFieldValues || []).filter((value) => value.fieldId !== fieldId),
@@ -452,19 +586,24 @@ export const useAssetStore = create<AssetStore>()(
       });
       
       return {
-        globalCustomFields: newGlobalFields,
-        assets: newAssets,
+        bookGlobalCustomFields: newBookGlobalCustomFields,
+        bookAssets: newBookAssets,
       };
     });
   },
 
   applyGlobalFieldsToAsset: (assetId: string) => {
     const state = get();
-    const asset = state.assets[assetId];
+    const bookId = state.getCurrentBookId();
+    if (!bookId) return;
+    
+    const bookAssets = state.bookAssets[bookId] || {};
+    const asset = bookAssets[assetId];
     if (!asset) return;
     
+    const globalFields = state.bookGlobalCustomFields[bookId] || [];
     const existingFieldIds = new Set((asset.customFields || []).map((field) => field.id));
-    const newGlobalFields = state.globalCustomFields.filter(
+    const newGlobalFields = globalFields.filter(
       (globalField) => !existingFieldIds.has(globalField.id)
     );
     
@@ -478,33 +617,46 @@ export const useAssetStore = create<AssetStore>()(
       isGlobal: true,
     }));
     
-    set((state) => ({
-      assets: {
-        ...state.assets,
+    set((state) => {
+      const newBookAssets = { ...state.bookAssets };
+      newBookAssets[bookId] = {
+        ...bookAssets,
         [assetId]: {
           ...asset,
           customFields: [...(asset.customFields || []), ...newCustomFields],
           updatedAt: Date.now(),
         },
-      },
-    }));
+      };
+      
+      return { bookAssets: newBookAssets };
+    });
   },
 
   // Viewport Display Settings
   updateViewportDisplaySettings: (assetId: string, settings: Partial<ViewportDisplaySettings>) => {
-    set((state) => ({
-      assets: {
-        ...state.assets,
+    set((state) => {
+      const bookId = state.getCurrentBookId();
+      if (!bookId) return state;
+      
+      const bookAssets = state.bookAssets[bookId] || {};
+      const asset = bookAssets[assetId];
+      if (!asset) return state;
+      
+      const newBookAssets = { ...state.bookAssets };
+      newBookAssets[bookId] = {
+        ...bookAssets,
         [assetId]: {
-          ...state.assets[assetId],
+          ...asset,
           viewportDisplaySettings: {
-            ...(state.assets[assetId].viewportDisplaySettings || { ...DEFAULT_VIEWPORT_DISPLAY_SETTINGS }),
+            ...(asset.viewportDisplaySettings || { ...DEFAULT_VIEWPORT_DISPLAY_SETTINGS }),
             ...settings,
           },
           updatedAt: Date.now(),
         },
-      },
-    }));
+      };
+      
+      return { bookAssets: newBookAssets };
+    });
   },
 
 
@@ -516,76 +668,148 @@ export const useAssetStore = create<AssetStore>()(
   // Expansion state management
   expandAll: () => {
     set((state) => {
-      const newAssets = { ...state.assets };
+      const bookId = state.getCurrentBookId();
+      if (!bookId) return state;
+      
+      const newBookAssets = { ...state.bookAssets };
+      const bookAssets = newBookAssets[bookId] || {};
+      
       // Set all assets with children to expanded
-      Object.keys(newAssets).forEach(assetId => {
-        const asset = newAssets[assetId];
+      Object.keys(bookAssets).forEach(assetId => {
+        const asset = bookAssets[assetId];
         if (asset.children && asset.children.length > 0) {
-          newAssets[assetId] = { ...asset, isExpanded: true };
+          newBookAssets[bookId][assetId] = { ...asset, isExpanded: true };
         }
       });
-      return { assets: newAssets };
+      
+      return { bookAssets: newBookAssets };
     });
   },
 
   collapseAll: () => {
     set((state) => {
-      const newAssets = { ...state.assets };
+      const bookId = state.getCurrentBookId();
+      if (!bookId) return state;
+      
+      const newBookAssets = { ...state.bookAssets };
+      const bookAssets = newBookAssets[bookId] || {};
+      
       // Set all assets with children to collapsed
-      Object.keys(newAssets).forEach(assetId => {
-        const asset = newAssets[assetId];
+      Object.keys(bookAssets).forEach(assetId => {
+        const asset = bookAssets[assetId];
         if (asset.children && asset.children.length > 0) {
-          newAssets[assetId] = { ...asset, isExpanded: false };
+          newBookAssets[bookId][assetId] = { ...asset, isExpanded: false };
         }
       });
-      return { assets: newAssets };
+      
+      return { bookAssets: newBookAssets };
     });
   },
 
   toggleAssetExpansion: (assetId: string) => {
     set((state) => {
-      const asset = state.assets[assetId];
+      const bookId = state.getCurrentBookId();
+      if (!bookId) return state;
+      
+      const bookAssets = state.bookAssets[bookId] || {};
+      const asset = bookAssets[assetId];
       if (!asset || !asset.children || asset.children.length === 0) return state;
       
-      return {
-        assets: {
-          ...state.assets,
-          [assetId]: {
-            ...asset,
-            isExpanded: !asset.isExpanded,
-          },
+      const newBookAssets = { ...state.bookAssets };
+      newBookAssets[bookId] = {
+        ...bookAssets,
+        [assetId]: {
+          ...asset,
+          isExpanded: !asset.isExpanded,
         },
       };
+      
+      return { bookAssets: newBookAssets };
     });
   },
 
   // World-aware methods
   loadWorldData: (worldData) => {
     if (worldData) {
-      set({
-        assets: worldData.assets || {},
-        currentActiveId: null,
-        currentViewportId: null,
-        globalCustomFields: worldData.globalCustomFields || [],
+      const bookId = get().getCurrentBookId();
+      if (!bookId) {
+        console.warn('[AssetStore] Cannot load world data - no current book');
+        return;
+      }
+      
+      set((state) => {
+        const newBookAssets = { ...state.bookAssets };
+        const newBookGlobalCustomFields = { ...state.bookGlobalCustomFields };
+        
+        newBookAssets[bookId] = worldData.assets || {};
+        newBookGlobalCustomFields[bookId] = worldData.globalCustomFields || [];
+        
+        return {
+          bookAssets: newBookAssets,
+          currentActiveId: null,
+          currentViewportId: null,
+          bookGlobalCustomFields: newBookGlobalCustomFields,
+        };
       });
     }
   },
 
   getWorldData: () => {
     const state = get();
+    const bookId = state.getCurrentBookId();
+    if (!bookId) {
+      return { assets: {}, globalCustomFields: [] };
+    }
+    
     return {
-      assets: state.assets,
-      globalCustomFields: state.globalCustomFields,
+      assets: state.bookAssets[bookId] || {},
+      globalCustomFields: state.bookGlobalCustomFields[bookId] || [],
     };
   },
 
   clearWorldData: () => {
-    set({
-      assets: {},
-      currentActiveId: null,
-      currentViewportId: null,
-      globalCustomFields: [],
-      isEditingBackground: false,
+    const bookId = get().getCurrentBookId();
+    if (!bookId) {
+      console.warn('[AssetStore] Cannot clear world data - no current book');
+      return;
+    }
+    
+    set((state) => {
+      const newBookAssets = { ...state.bookAssets };
+      const newBookGlobalCustomFields = { ...state.bookGlobalCustomFields };
+      
+      newBookAssets[bookId] = {};
+      newBookGlobalCustomFields[bookId] = [];
+      
+      return {
+        bookAssets: newBookAssets,
+        currentActiveId: null,
+        currentViewportId: null,
+        bookGlobalCustomFields: newBookGlobalCustomFields,
+        isEditingBackground: false,
+      };
+    });
+  },
+
+  clearBookData: (bookId: string) => {
+    set((state) => {
+      const newBookAssets = { ...state.bookAssets };
+      const newBookGlobalCustomFields = { ...state.bookGlobalCustomFields };
+      
+      delete newBookAssets[bookId];
+      delete newBookGlobalCustomFields[bookId];
+      
+      // Clear active state if it was this book
+      const currentBookId = state.getCurrentBookId();
+      const newActiveId = (currentBookId === bookId) ? null : state.currentActiveId;
+      const newViewportId = (currentBookId === bookId) ? null : state.currentViewportId;
+      
+      return {
+        bookAssets: newBookAssets,
+        bookGlobalCustomFields: newBookGlobalCustomFields,
+        currentActiveId: newActiveId,
+        currentViewportId: newViewportId,
+      };
     });
   },
 })),
@@ -635,10 +859,10 @@ export const useAssetStore = create<AssetStore>()(
         })),
         // Simplified persist - avoid custom serialization issues
         partialize: (state) => ({
-          assets: state.assets,
+          bookAssets: state.bookAssets,
           currentActiveId: state.currentActiveId,
           currentViewportId: state.currentViewportId,
-          globalCustomFields: state.globalCustomFields,
+          bookGlobalCustomFields: state.bookGlobalCustomFields,
           isEditingBackground: state.isEditingBackground,
         }),
       }
@@ -653,8 +877,8 @@ useAssetStore.subscribe(
     const bookStore = useBookStore.getState();
     if (bookStore.currentBookId) {
       const worldData = {
-        assets: state.assets,
-        globalCustomFields: state.globalCustomFields,
+        assets: state.bookAssets[bookStore.currentBookId] || {},
+        globalCustomFields: state.bookGlobalCustomFields[bookStore.currentBookId] || [],
       };
       // Update local book store immediately for UI consistency
       // Cloud sync is handled by autosaveService
@@ -665,8 +889,8 @@ useAssetStore.subscribe(
     equalityFn: (a, b) => {
       // Only trigger auto-save for relevant changes
       return (
-        a.assets === b.assets &&
-        a.globalCustomFields === b.globalCustomFields
+        a.bookAssets === b.bookAssets &&
+        a.bookGlobalCustomFields === b.bookGlobalCustomFields
       );
     },
   }
