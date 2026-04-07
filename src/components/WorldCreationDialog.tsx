@@ -148,6 +148,9 @@ const WorldCreationDialog = ({ children, onWorldCreated }: WorldCreationDialogPr
         },
       });
 
+      // Wait a moment for the state to update
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       setOpen(false);
       toast.success('World created successfully!');
       
@@ -163,7 +166,11 @@ const WorldCreationDialog = ({ children, onWorldCreated }: WorldCreationDialogPr
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(newOpen) => {
+      if (!newOpen || !isCreating) {
+        setOpen(newOpen);
+      }
+    }}>
       <DialogTrigger asChild>
         {children}
       </DialogTrigger>

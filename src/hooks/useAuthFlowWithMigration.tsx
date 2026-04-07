@@ -38,12 +38,16 @@ export const useAuthFlowWithMigration = (): UseAuthFlowWithMigrationReturn => {
     executeDataMigration,
   } = useAuthStore();
 
-  // Check for guest import on component mount - DISABLED TO PREVENT HANGING
-  // useEffect(() => {
-  //   if (isAuthenticated && user) {
-  //     checkGuestImportFlow();
-  //   }
-  // }, [isAuthenticated, user]);
+  // Check for guest import on component mount with timeout
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      const timeout = setTimeout(() => {
+        checkGuestImportFlow();
+      }, 1000); // Delay 1 second to let auth fully initialize
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [isAuthenticated, user]);
 
   // Reset isMigrating on mount to prevent stuck loading state
   useEffect(() => {
@@ -76,6 +80,7 @@ export const useAuthFlowWithMigration = (): UseAuthFlowWithMigrationReturn => {
       }
     } catch (error) {
       console.error('[AuthFlowWithMigration] Error checking guest import:', error);
+      // Don't throw the error, just log it and continue
     }
   };
 
@@ -116,8 +121,17 @@ export const useAuthFlowWithMigration = (): UseAuthFlowWithMigrationReturn => {
         return { success: true }; // Sign in successful, but migration needed
       }
 
-      // Skip guest import check for now to avoid hanging
-      // await checkGuestImportFlow();
+      // No conflicts, check for guest import with timeout
+      const guestImportPromise = Promise.race([
+        checkGuestImportFlow(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Guest import check timeout')), 3000)
+        )
+      ]);
+      
+      await guestImportPromise.catch(error => {
+        console.warn('[AuthFlowWithMigration] Guest import check failed or timed out:', error);
+      });
       
       console.log('[AuthFlowWithMigration] Sign in complete, setting isMigrating to false');
       setIsMigrating(false);
@@ -188,8 +202,17 @@ export const useAuthFlowWithMigration = (): UseAuthFlowWithMigrationReturn => {
         return { success: true }; // Sign in successful, but migration needed
       }
 
-      // No conflicts, check for guest import
-      await checkGuestImportFlow();
+      // No conflicts, check for guest import with timeout
+      const guestImportPromise = Promise.race([
+        checkGuestImportFlow(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Guest import check timeout')), 3000)
+        )
+      ]);
+      
+      await guestImportPromise.catch(error => {
+        console.warn('[AuthFlowWithMigration] Guest import check failed or timed out:', error);
+      });
       
       setIsMigrating(false);
       return { success: true };
