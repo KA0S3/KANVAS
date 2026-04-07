@@ -61,44 +61,57 @@ const Index = () => {
     initializeAuth();
   }, [initializeAuth]);
 
-  // Load data from cloud when user authenticates - IMPROVED
+  // Load data from cloud when user authenticates - FIXED
   useEffect(() => {
     if (isAuthenticated) {
       console.log('[Index] User authenticated, loading books from cloud...');
       
       // Add a small delay to ensure auth state is fully settled
       const loadTimeout = setTimeout(() => {
+        // Get current books to check for duplicates
+        const currentBooks = getAllBooks();
+        const existingBookIds = new Set(Object.keys(currentBooks));
+        
         // First restore books from cloud (in case localStorage was cleared)
         hybridSyncService.loadAllBooksFromCloud().then((success) => {
           if (success) {
             console.log('[Index] Books restored from cloud successfully');
             
-            // Then load world data for each book with better error handling
-            const allBooks = getAllBooks();
-            console.log(`[Index] Loading world data for ${allBooks.length} books`);
+            // Get updated books after cloud restore
+            const updatedBooks = getAllBooks();
+            console.log(`[Index] Loading world data for ${updatedBooks.length} books`);
             
-            // Load books sequentially to avoid overwhelming the system
-            const loadBookPromises = allBooks.map((book, index) => {
-              return new Promise<void>((resolve) => {
-                setTimeout(() => {
-                  hybridSyncService.loadFromCloud(book.id).then(bookSuccess => {
-                    if (bookSuccess) {
-                      console.log(`[Index] Loaded world data for book: ${book.title}`);
-                    } else {
-                      console.warn(`[Index] Failed to load world data for book: ${book.title}`);
-                    }
-                    resolve();
-                  }).catch(err => {
-                    console.error(`[Index] Error loading book ${book.title}:`, err);
-                    resolve();
-                  });
-                }, index * 100); // Stagger loads by 100ms
+            // Only load world data for new books to prevent duplicates
+            const newBooks = updatedBooks.filter(book => !existingBookIds.has(book.id));
+            
+            if (newBooks.length > 0) {
+              console.log(`[Index] Found ${newBooks.length} new books to load`);
+              
+              // Load new books sequentially to avoid overwhelming the system
+              const loadBookPromises = newBooks.map((book, index) => {
+                return new Promise<void>((resolve) => {
+                  setTimeout(() => {
+                    hybridSyncService.loadFromCloud(book.id).then(bookSuccess => {
+                      if (bookSuccess) {
+                        console.log(`[Index] Loaded world data for new book: ${book.title}`);
+                      } else {
+                        console.warn(`[Index] Failed to load world data for new book: ${book.title}`);
+                      }
+                      resolve();
+                    }).catch(err => {
+                      console.error(`[Index] Error loading new book ${book.title}:`, err);
+                      resolve();
+                    });
+                  }, index * 100); // Stagger loads by 100ms
+                });
               });
-            });
-            
-            Promise.all(loadBookPromises).then(() => {
-              console.log('[Index] All book data loading completed');
-            });
+              
+              Promise.all(loadBookPromises).then(() => {
+                console.log('[Index] All new book data loading completed');
+              });
+            } else {
+              console.log('[Index] No new books to load, all books already exist locally');
+            }
           } else {
             console.warn('[Index] Failed to restore books from cloud');
           }
@@ -109,7 +122,7 @@ const Index = () => {
       
       return () => clearTimeout(loadTimeout);
     }
-  }, [isAuthenticated, getAllBooks]); // Added getAllBooks to dependencies
+  }, [isAuthenticated]); // Only depend on authentication state
 
   // Initialize autosave service when authenticated
   // useEffect(() => {
