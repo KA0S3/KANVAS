@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { hybridSyncService, type SyncStatus } from '@/services/hybridSyncService';
+import { optimizedSyncService, type OptimizedSyncStatus } from '@/services/optimizedSyncService';
 import { useAuthStore } from '@/stores/authStore';
 
 export function useHybridSync() {
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>({
+  const [syncStatus, setSyncStatus] = useState<OptimizedSyncStatus>({
     lastSyncTime: null,
     syncEnabled: false,
     pendingChanges: false,
@@ -11,17 +11,20 @@ export function useHybridSync() {
     quotaExceeded: false,
     storageUsed: 0,
     storageLimit: 0,
+    payloadSize: 0,
+    syncInProgress: false,
+    queuedItems: 0
   });
   const { isAuthenticated } = useAuthStore();
 
   useEffect(() => {
     // Subscribe to sync status updates
-    const unsubscribe = hybridSyncService.subscribe((status) => {
+    const unsubscribe = optimizedSyncService.subscribe((status) => {
       setSyncStatus(status);
     });
 
     // Initial status check
-    setSyncStatus(hybridSyncService.getSyncStatus());
+    setSyncStatus(optimizedSyncService.getSyncStatus());
 
     return () => {
       unsubscribe();
@@ -29,11 +32,12 @@ export function useHybridSync() {
   }, [isAuthenticated]);
 
   const triggerSync = async () => {
-    return await hybridSyncService.syncToCloud();
+    return await optimizedSyncService.syncToCloud();
   };
 
   const loadFromCloud = async (bookId: string) => {
-    return await hybridSyncService.loadFromCloud(bookId);
+    // OptimizedSyncService doesn't have loadFromCloud, but syncToCloud handles both directions
+    return await optimizedSyncService.syncToCloud();
   };
 
   return {

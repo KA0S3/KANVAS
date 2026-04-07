@@ -4,7 +4,7 @@ import { useBookStore } from '@/stores/bookStoreSimple';
 import { useBackgroundStore } from '@/stores/backgroundStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useCloudStore } from '@/stores/cloudStore';
-import { hybridSyncService } from './hybridSyncService';
+import { optimizedSyncService } from './optimizedSyncService';
 
 export type AutosaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -63,7 +63,7 @@ class AutosaveService {
     const unsubscribeAssets = useAssetStore.subscribe(
       (state) => state,
       (state, prevState) => {
-        if (state.assets !== prevState.assets) {
+        if (state.bookAssets !== prevState.bookAssets) {
           this.queue.assets = true;
           this.queue.worldData = true;
           this.updateState({ pendingChanges: true });
@@ -118,7 +118,7 @@ class AutosaveService {
       if (isAuthenticated) {
         if (isOnline) {
           console.log('[AutosaveService] User authenticated and online, syncing to cloud');
-          const cloudSyncSuccess = await hybridSyncService.syncToCloud();
+          const cloudSyncSuccess = await optimizedSyncService.syncToCloud();
           
           if (cloudSyncSuccess) {
             console.log('[AutosaveService] Cloud sync successful');

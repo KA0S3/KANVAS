@@ -42,7 +42,7 @@ const Index = () => {
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const createWorldButtonRef = useRef<HTMLButtonElement>(null);
-  const { currentActiveId, loadWorldData, isEditingBackground, setIsEditingBackground, currentViewportId, setActiveAsset, assets, setCurrentViewportId } = useAssetStore(); // Adding back asset store with simplified persist
+  const { currentActiveId, loadWorldData, isEditingBackground, setIsEditingBackground, currentViewportId, setActiveAsset, getCurrentBookAssets, setCurrentViewportId } = useAssetStore(); // Using getCurrentBookAssets method
   // const { loadWorldData: loadTagWorldData } = useTagStore(); // Temporarily disabled to debug
   const { currentBookId, setCurrentBook, getAllBooks, deleteBook } = useBookStore(); // Adding back book store - confirmed working
   const { theme } = useThemeStore(); // Adding back theme store - confirmed working
@@ -61,29 +61,55 @@ const Index = () => {
     initializeAuth();
   }, [initializeAuth]);
 
-  // Load data from cloud when user authenticates
+  // Load data from cloud when user authenticates - IMPROVED
   useEffect(() => {
     if (isAuthenticated) {
       console.log('[Index] User authenticated, loading books from cloud...');
       
-      // First restore books from cloud (in case localStorage was cleared)
-      hybridSyncService.loadAllBooksFromCloud().then(() => {
-        console.log('[Index] Books restored from cloud');
-        
-        // Then load world data for each book
-        const allBooks = getAllBooks();
-        allBooks.forEach(book => {
-          hybridSyncService.loadFromCloud(book.id).then(success => {
-            if (success) {
-              console.log(`[Index] Loaded world data for book: ${book.title}`);
-            }
-          });
+      // Add a small delay to ensure auth state is fully settled
+      const loadTimeout = setTimeout(() => {
+        // First restore books from cloud (in case localStorage was cleared)
+        hybridSyncService.loadAllBooksFromCloud().then((success) => {
+          if (success) {
+            console.log('[Index] Books restored from cloud successfully');
+            
+            // Then load world data for each book with better error handling
+            const allBooks = getAllBooks();
+            console.log(`[Index] Loading world data for ${allBooks.length} books`);
+            
+            // Load books sequentially to avoid overwhelming the system
+            const loadBookPromises = allBooks.map((book, index) => {
+              return new Promise<void>((resolve) => {
+                setTimeout(() => {
+                  hybridSyncService.loadFromCloud(book.id).then(bookSuccess => {
+                    if (bookSuccess) {
+                      console.log(`[Index] Loaded world data for book: ${book.title}`);
+                    } else {
+                      console.warn(`[Index] Failed to load world data for book: ${book.title}`);
+                    }
+                    resolve();
+                  }).catch(err => {
+                    console.error(`[Index] Error loading book ${book.title}:`, err);
+                    resolve();
+                  });
+                }, index * 100); // Stagger loads by 100ms
+              });
+            });
+            
+            Promise.all(loadBookPromises).then(() => {
+              console.log('[Index] All book data loading completed');
+            });
+          } else {
+            console.warn('[Index] Failed to restore books from cloud');
+          }
+        }).catch(err => {
+          console.error('[Index] Cloud loading failed:', err);
         });
-      }).catch(err => {
-        console.error('[Index] Cloud loading failed:', err);
-      });
+      }, 500); // 500ms delay for auth state settlement
+      
+      return () => clearTimeout(loadTimeout);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, getAllBooks]); // Added getAllBooks to dependencies
 
   // Initialize autosave service when authenticated
   // useEffect(() => {
@@ -184,15 +210,20 @@ const Index = () => {
     };
 
     // Add viewport asset data if we're in a viewport
-    if (currentViewportId && assets[currentViewportId]) {
-      const viewportAsset = assets[currentViewportId];
+    const currentBookAssets = getCurrentBookAssets();
+    if (currentViewportId && currentBookAssets[currentViewportId]) {
+      const viewportAsset = currentBookAssets[currentViewportId];
       currentState.viewportAsset = {
         id: viewportAsset.id,
-        x: viewportAsset.x,
-        y: viewportAsset.y,
-        width: viewportAsset.width,
-        height: viewportAsset.height,
-        viewportConfig: viewportAsset.viewportConfig,
+        x: viewportAsset.x ?? 0,
+        y: viewportAsset.y ?? 0,
+        width: viewportAsset.width ?? 100,
+        height: viewportAsset.height ?? 100,
+        viewportConfig: viewportAsset.viewportConfig ?? {
+          zoom: 1,
+          panX: 0,
+          panY: 0
+        },
       };
     }
 
@@ -205,7 +236,7 @@ const Index = () => {
     bookLibraryOpen,
     sidebarOpen,
     isEditingBackground,
-    assets, // Include assets to capture viewport changes
+    getCurrentBookAssets, // Include getCurrentBookAssets to capture viewport changes
   ]);
 
   const handleBackgroundSave = () => {

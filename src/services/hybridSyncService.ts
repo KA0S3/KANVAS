@@ -57,15 +57,27 @@ class HybridSyncService {
     });
   }
 
-  // Cloud-first sync: always try to sync to cloud first
+  // Cloud-first sync: always try to sync to cloud first - IMPROVED
   async syncToCloud(): Promise<boolean> {
-    // Prevent concurrent sync operations
+    // Prevent concurrent sync operations with timeout
     if (this.syncMutex) {
-      console.log('[HybridSync] Sync already in progress, skipping');
-      return false;
+      console.log('[HybridSync] Sync already in progress, waiting...');
+      // Wait for current sync to complete with timeout
+      const waitStart = Date.now();
+      const maxWait = 30000; // 30 seconds max wait
+      
+      while (this.syncMutex && (Date.now() - waitStart) < maxWait) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      if (this.syncMutex) {
+        console.warn('[HybridSync] Sync mutex stuck, forcing reset');
+        this.syncMutex = false;
+      }
     }
 
     this.syncMutex = true;
+    const syncStartTime = Date.now();
     
     try {
       const { isAuthenticated, user } = useAuthStore.getState();
@@ -117,13 +129,25 @@ class HybridSyncService {
       const worldData = this.safelySerializeWorldData();
       const backgroundConfigs = this.safelySerializeBackgrounds();
 
-      await this.syncWorldData(user.id, currentBookId, worldData);
-      await this.syncBackgroundData(user.id, currentBookId, backgroundConfigs);
+      // Sync with better error handling
+      const syncPromises = [
+        this.syncWorldData(user.id, currentBookId, worldData),
+        this.syncBackgroundData(user.id, currentBookId, backgroundConfigs)
+      ];
+
+      const results = await Promise.allSettled(syncPromises);
+      const failures = results.filter(result => result.status === 'rejected');
+      
+      if (failures.length > 0) {
+        console.error('[HybridSync] Some sync operations failed:', failures);
+        throw new Error(`${failures.length} sync operations failed`);
+      }
 
       // Update quota usage
       cloudStore.updateQuotaUsage(dataSize);
 
-      console.log('[HybridSync] Cloud sync completed successfully');
+      const syncDuration = Date.now() - syncStartTime;
+      console.log(`[HybridSync] Cloud sync completed successfully in ${syncDuration}ms`);
       this.updateSyncStatus({ 
         lastSyncTime: new Date(),
         syncInProgress: false,
@@ -135,9 +159,10 @@ class HybridSyncService {
 
       return true;
     } catch (error) {
-      console.error('[HybridSync] Cloud sync failed:', error);
+      const syncDuration = Date.now() - syncStartTime;
+      console.error(`[HybridSync] Cloud sync failed after ${syncDuration}ms:`, error);
       
-      // Add to queue for retry
+      // Add to queue for retry with exponential backoff
       this.addToSyncQueue();
       
       this.updateSyncStatus({ 
@@ -500,7 +525,7 @@ class HybridSyncService {
     try {
       console.log('[HybridSync] Loading all books from cloud...');
       
-      // Load all projects (books) for this user from Supabase
+      // Load all projects (books) for this user from Supabase with specific columns
       const { data: projects, error } = await supabase
         .from('projects')
         .select('id, name, description, updated_at')
@@ -578,7 +603,7 @@ class HybridSyncService {
     }
 
     try {
-      // Load world data
+      // Load world data with specific column selection
       const { data: projectData } = await supabase
         .from('projects')
         .select('description')
@@ -593,7 +618,7 @@ class HybridSyncService {
         assetStore.loadWorldData(worldData);
       }
 
-      // Load background configs using the same deterministic UUID
+      // Load background configs with specific column selection
       const backgroundId = this.generateDeterministicUUID(`${bookId}-backgrounds`);
       const { data: backgroundData } = await supabase
         .from('assets')

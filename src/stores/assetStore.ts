@@ -43,9 +43,16 @@ interface AssetStore {
   setActiveAsset: (assetId: string | null) => void;
   setCurrentViewportId: (assetId: string | null) => void;
   getActiveAsset: () => Asset | null;
+  getAssetById: (assetId: string) => Asset | null;
+  getCurrentViewportAsset: () => Asset | null;
   getRootAssets: () => Asset[];
   getAssetChildren: (parentId: string) => Asset[];
   getAssetTree: (rootId?: string) => Asset[];
+  
+  // Viewport navigation methods
+  enterViewport: (assetId: string) => boolean;
+  exitViewport: () => boolean;
+  getViewportPath: () => string[];
   
   // Custom Fields
   addCustomField: (assetId: string, field: Omit<CustomField, 'id'>) => void;
@@ -345,9 +352,119 @@ export const useAssetStore = create<AssetStore>()(
     }
   },
 
-  // Set the current viewport context
+  // Set the current viewport context - IMPROVED
   setCurrentViewportId: (assetId: string | null) => {
+    const state = get();
+    const bookId = state.getCurrentBookId();
+    if (!bookId) return;
+    
+    const bookAssets = state.bookAssets[bookId] || {};
+    
+    // Validate that the asset exists and is a viewport type
+    if (assetId && !bookAssets[assetId]) {
+      console.warn(`[AssetStore] Cannot set viewport to non-existent asset: ${assetId}`);
+      return;
+    }
+    
+    if (assetId) {
+      const asset = bookAssets[assetId];
+      if (asset && asset.type !== 'other') {
+        console.log(`[AssetStore] Setting viewport to asset: ${asset.name} (${assetId})`);
+      }
+    } else {
+      console.log('[AssetStore] Clearing viewport context');
+    }
+    
     set({ currentViewportId: assetId });
+  },
+
+  // Get asset by ID from current book
+  getAssetById: (assetId: string) => {
+    const state = get();
+    const bookId = state.getCurrentBookId();
+    if (!bookId) return null;
+    
+    const bookAssets = state.bookAssets[bookId] || {};
+    return bookAssets[assetId] || null;
+  },
+
+  // Get the current viewport asset
+  getCurrentViewportAsset: () => {
+    const state = get();
+    const bookId = state.getCurrentBookId();
+    if (!bookId || !state.currentViewportId) return null;
+    
+    const bookAssets = state.bookAssets[bookId] || {};
+    return bookAssets[state.currentViewportId] || null;
+  },
+
+  // Enter a nested viewport (for navigation)
+  enterViewport: (assetId: string) => {
+    const state = get();
+    const bookId = state.getCurrentBookId();
+    if (!bookId) return false;
+    
+    const bookAssets = state.bookAssets[bookId] || {};
+    const asset = bookAssets[assetId];
+    
+    if (!asset) {
+      console.warn(`[AssetStore] Cannot enter non-existent viewport: ${assetId}`);
+      return false;
+    }
+    
+    console.log(`[AssetStore] Entering viewport: ${asset.name}`);
+    set({ 
+      currentViewportId: assetId,
+      currentActiveId: assetId 
+    });
+    return true;
+  },
+
+  // Exit current viewport (go up one level)
+  exitViewport: () => {
+    const state = get();
+    const currentAsset = state.getCurrentViewportAsset();
+    
+    if (!currentAsset) {
+      console.warn('[AssetStore] No viewport to exit');
+      return false;
+    }
+    
+    const parentAsset = currentAsset.parentId 
+      ? state.getAssetById(currentAsset.parentId)
+      : null;
+    
+    if (parentAsset) {
+      console.log(`[AssetStore] Exiting to parent viewport: ${parentAsset.name}`);
+      set({ 
+        currentViewportId: parentAsset.id,
+        currentActiveId: parentAsset.id 
+      });
+    } else {
+      console.log('[AssetStore] Exiting to root level');
+      set({ 
+        currentViewportId: null,
+        currentActiveId: null 
+      });
+    }
+    return true;
+  },
+
+  // Get viewport hierarchy path
+  getViewportPath: () => {
+    const state = get();
+    const path: string[] = [];
+    let currentId = state.currentViewportId;
+    
+    while (currentId) {
+      const asset = state.getAssetById(currentId);
+      if (!asset) break;
+      
+      path.unshift(asset.name);
+      currentId = asset.parentId;
+    }
+    
+    return path;
   },
 
   // Get the active asset object

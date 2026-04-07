@@ -160,28 +160,11 @@ export const useAuthStore = create<AuthStore>()(
           }
         );
 
-        // Optimized session check with reduced timeout
-        const sessionTimeout = setTimeout(() => {
-          // Safety timeout: if session check takes too long, force loading to false
-          if (get().loading) {
-            console.warn('[authStore] Session check timed out, forcing loading to false');
-            set({
-              user: null,
-              plan: 'guest',
-              isAuthenticated: false,
-              loading: false,
-              planLoading: false,
-              ownerKeyInfo: null,
-              licenseInfo: null,
-              effectiveLimits: null,
-              _lastFetchedUserId: undefined,
-            });
-          }
-        }, 2000); // Reduced from 3000ms to 2000ms
+        // Improved session check without conflicting timeout
+        const sessionPromise = supabase.auth.getSession();
         
-        supabase.auth.getSession().then(async ({ data: { session } }) => {
-          clearTimeout(sessionTimeout);
-          console.log('[authStore] Initial session:', session?.user?.email);
+        sessionPromise.then(async ({ data: { session } }) => {
+          console.log('[authStore] Initial session resolved:', session?.user?.email);
           if (session?.user) {
             set({
               user: session.user,
@@ -189,6 +172,7 @@ export const useAuthStore = create<AuthStore>()(
               loading: false,
               planLoading: true,
               ownerKeyInfo: null,
+              _lastFetchedUserId: session.user.id,
             });
             await Promise.all([
               get().fetchUserPlan(session.user.id),
@@ -209,7 +193,6 @@ export const useAuthStore = create<AuthStore>()(
             });
           }
         }).catch((error) => {
-          clearTimeout(sessionTimeout);
           console.error('[authStore] Session check failed:', error);
           // Ensure loading is set to false even on error
           set({
@@ -391,14 +374,21 @@ export const useAuthStore = create<AuthStore>()(
         }
       },
 
-      // Sign out method
+      // Sign out method - IMPROVED
       signOut: async () => {
         try {
           console.log('[authStore] Starting sign out process');
           
-          // Clear all Supabase session storage first
+          // Sign out from Supabase first - this will trigger the auth state change listener
+          const { error } = await supabase.auth.signOut();
+          
+          if (error) {
+            console.error('Supabase sign out error:', error);
+            // Continue with cleanup even if Supabase sign out fails
+          }
+          
+          // Clear all session storage after Supabase sign out
           try {
-            // Clear any remaining Supabase session data
             const storageKeys = [
               'supabase.auth.token',
               'supabase.auth.refreshToken',
@@ -419,18 +409,10 @@ export const useAuthStore = create<AuthStore>()(
             console.warn('[authStore] Error clearing session storage:', clearError);
           }
           
-          // Now sign out from Supabase - the auth state change listener will handle the rest
-          const { error } = await supabase.auth.signOut();
-          
-          if (error) {
-            console.error('Sign out error:', error);
-            throw error;
-          }
-          
-          console.log('[authStore] Sign out initiated successfully');
+          console.log('[authStore] Sign out completed successfully');
         } catch (error) {
           console.error('Unexpected sign out error:', error);
-          // If Supabase sign out fails, manually clear state
+          // Ensure state is cleared even on unexpected errors
           set({
             user: null,
             plan: 'guest',
@@ -441,6 +423,7 @@ export const useAuthStore = create<AuthStore>()(
             licenseInfo: null,
             effectiveLimits: null,
             _lastFetchedUserId: undefined,
+            _authStateInitialized: false,
           });
           localStorage.removeItem('kanvas-auth');
           updateQuotaBasedOnPlan();
