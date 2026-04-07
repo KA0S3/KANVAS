@@ -9,7 +9,7 @@ export const useBackgroundStore = create<BackgroundStore>()(
     persist(
       (set, get) => {
         // Initialize configs from localStorage on store creation
-        const initialConfigs = loadAllBackgrounds();
+        const initialConfigs = loadAllBackgrounds() || {};
 
         return {
           configs: initialConfigs,

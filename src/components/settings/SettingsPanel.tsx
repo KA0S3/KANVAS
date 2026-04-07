@@ -77,10 +77,7 @@ interface SettingsPanelProps {
 
 export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   const navigate = useNavigate();
-  const {
-    assets,
-    globalCustomFields,
-  } = useAssetStore();
+  const assetStore = useAssetStore();
   const { tags } = useTagStore();
   const { theme, toggleTheme } = useThemeStore();
   const { 
@@ -90,6 +87,10 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     updateWorldData
   } = useBookStore();
   const { videosEnabled, setVideosEnabled, audioEnabled, setAudioEnabled, videoSoundsEnabled, setVideoSoundsEnabled, audioVolume, setAudioVolume } = useMediaStore();
+  
+  // Get current book's assets and global custom fields
+  const assets = assetStore.getCurrentBookAssets();
+  const globalCustomFields = assetStore.getCurrentBookGlobalCustomFields();
   
   // Get book-specific viewport settings
   const currentBook = getCurrentBook();
@@ -151,15 +152,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   const handleConfirmDeleteAllData = async () => {
     // Show browser confirmation dialog
     const confirmed = window.confirm(
-      '⚠️ FINAL WARNING ⚠️\n\n' +
-      'This action will PERMANENTLY delete ALL data including:\n' +
-      '• All books and their contents\n' +
-      '• All assets and tags\n' +
-      '• All settings and preferences\n' +
-      '• All cloud data (if authenticated)\n' +
-      '• All local storage data\n\n' +
-      'THIS ACTION CANNOT BE UNDONE!\n\n' +
-      'Click "OK" to permanently delete everything, or "Cancel" to abort.'
+      'Are you sure you want to delete all data? This action cannot be undone.'
     );
 
     if (!confirmed) {
@@ -167,18 +160,19 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     }
 
     try {
-      // Clear all stores
-      const { clearWorldData: clearAssetWorldData } = useAssetStore.getState();
-      const { clearWorldData: clearTagWorldData } = useTagStore.getState();
-      const { books, currentBookId } = useBookStore.getState();
+      // Clear asset store data
+      const assetStore = useAssetStore.getState();
+      const tagStore = useTagStore.getState();
+      const bookStore = useBookStore.getState();
       
-      // Clear asset and tag data
-      clearAssetWorldData();
-      clearTagWorldData();
+      // Clear current book's data
+      assetStore.clearWorldData();
+      tagStore.clearWorldData();
       
       // Clear all books
-      Object.keys(books).forEach(bookId => {
-        useBookStore.getState().deleteBook(bookId);
+      const allBooks = bookStore.getAllBooks();
+      allBooks.forEach(book => {
+        bookStore.deleteBook(book.id);
       });
       
       // Reset media store to defaults

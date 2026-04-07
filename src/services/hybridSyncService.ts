@@ -196,7 +196,7 @@ class HybridSyncService {
     });
 
     // Add backgrounds to queue
-    if (Object.keys(backgroundStore.configs).length > 0) {
+    if (backgroundStore.configs && Object.keys(backgroundStore.configs).length > 0) {
       useCloudStore.getState().addToSyncQueue({
         type: 'background',
         data: backgroundStore.configs
@@ -311,6 +311,12 @@ class HybridSyncService {
     try {
       const backgroundStore = useBackgroundStore.getState();
       
+      // Check if configs exist before serializing
+      if (!backgroundStore.configs) {
+        console.warn('[HybridSync] No background configs to serialize');
+        return {};
+      }
+      
       // Use safe JSON serialization with circular reference handling
       return this.safeStringify(backgroundStore.configs);
     } catch (error) {
@@ -371,8 +377,9 @@ class HybridSyncService {
     };
     const worldDataSize = new Blob([JSON.stringify(worldData)]).size;
     
-    // Estimate background configs size
-    const backgroundDataSize = new Blob([JSON.stringify(backgroundStore.configs)]).size;
+    // Estimate background configs size with null check
+    const backgroundConfigs = backgroundStore.configs || {};
+    const backgroundDataSize = new Blob([JSON.stringify(backgroundConfigs)]).size;
     
     console.log(`[HybridSync] Estimated sync size: ${worldDataSize + backgroundDataSize} bytes`);
     return worldDataSize + backgroundDataSize;
