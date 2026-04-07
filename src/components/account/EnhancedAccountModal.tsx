@@ -11,6 +11,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -264,6 +265,9 @@ export function EnhancedAccountModal({ isOpen, onClose }: EnhancedAccountModalPr
                 <User className="w-5 h-5" />
                 Account
               </DialogTitle>
+              <DialogDescription>
+                Manage your account settings and subscription
+              </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4">
@@ -406,6 +410,9 @@ export function EnhancedAccountModal({ isOpen, onClose }: EnhancedAccountModalPr
               <Shield className="w-5 h-5" />
               {mode === 'login' ? 'Sign In' : 'Create Account'}
             </DialogTitle>
+            <DialogDescription>
+              {mode === 'login' ? 'Sign in to your account to sync your data' : 'Create a new account to get started'}
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -456,9 +463,19 @@ export function EnhancedAccountModal({ isOpen, onClose }: EnhancedAccountModalPr
             {/* Loading State */}
             {isMigrating && (
               <div className="p-3 text-sm text-blue-600 bg-blue-50 border border-blue-200 rounded-md">
-                <div className="flex items-center">
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Processing your data...
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Processing your data...
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => window.location.reload()}
+                    className="text-xs"
+                  >
+                    Reset
+                  </Button>
                 </div>
               </div>
             )}

@@ -38,17 +38,29 @@ export const useAuthFlowWithMigration = (): UseAuthFlowWithMigrationReturn => {
     executeDataMigration,
   } = useAuthStore();
 
-  // Check for guest import on component mount
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      checkGuestImportFlow();
-    }
-  }, [isAuthenticated, user]);
+  // Check for guest import on component mount - DISABLED TO PREVENT HANGING
+  // useEffect(() => {
+  //   if (isAuthenticated && user) {
+  //     checkGuestImportFlow();
+  //   }
+  // }, [isAuthenticated, user]);
 
   // Reset isMigrating on mount to prevent stuck loading state
   useEffect(() => {
     setIsMigrating(false);
   }, []);
+
+  // Safety timeout to reset isMigrating if it gets stuck
+  useEffect(() => {
+    if (isMigrating) {
+      const timeout = setTimeout(() => {
+        console.warn('[AuthFlowWithMigration] isMigrating stuck, resetting');
+        setIsMigrating(false);
+      }, 10000); // Reset after 10 seconds
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [isMigrating]);
 
   const checkGuestImportFlow = async () => {
     if (!user) return;
@@ -68,6 +80,7 @@ export const useAuthFlowWithMigration = (): UseAuthFlowWithMigrationReturn => {
   };
 
   const handleSignIn = useCallback(async (email: string, password: string) => {
+    console.log('[AuthFlowWithMigration] handleSignIn called, setting isMigrating to true');
     setIsMigrating(true);
     
     try {
@@ -75,6 +88,7 @@ export const useAuthFlowWithMigration = (): UseAuthFlowWithMigrationReturn => {
       const signInResult = await signIn(email, password);
       
       if (!signInResult.success || signInResult.error) {
+        console.log('[AuthFlowWithMigration] Sign in failed, setting isMigrating to false');
         setIsMigrating(false);
         return { success: false, error: signInResult.error };
       }
@@ -86,6 +100,7 @@ export const useAuthFlowWithMigration = (): UseAuthFlowWithMigrationReturn => {
       const { isAuthenticated: nowAuthenticated, user: nowUser } = useAuthStore.getState();
       
       if (!nowAuthenticated || !nowUser) {
+        console.log('[AuthFlowWithMigration] User not authenticated after sign in, setting isMigrating to false');
         setIsMigrating(false);
         return { success: false, error: 'Authentication failed' };
       }
@@ -94,24 +109,27 @@ export const useAuthFlowWithMigration = (): UseAuthFlowWithMigrationReturn => {
       const conflict = await checkForMigrationConflicts(nowUser.id);
       
       if (conflict) {
+        console.log('[AuthFlowWithMigration] Migration conflict found, setting isMigrating to false');
         setMigrationConflict(conflict);
         setShowMigrationDialog(true);
         setIsMigrating(false);
         return { success: true }; // Sign in successful, but migration needed
       }
 
-      // No conflicts, check for guest import
-      await checkGuestImportFlow();
+      // Skip guest import check for now to avoid hanging
+      // await checkGuestImportFlow();
       
+      console.log('[AuthFlowWithMigration] Sign in complete, setting isMigrating to false');
       setIsMigrating(false);
       return { success: true };
       
     } catch (error) {
       console.error('[AuthFlowWithMigration] Sign in error:', error);
+      console.log('[AuthFlowWithMigration] Error caught, setting isMigrating to false');
       setIsMigrating(false);
       return { success: false, error: 'An unexpected error occurred during sign in' };
     }
-  }, [signIn, checkForMigrationConflicts, shouldShowGuestImport]);
+  }, [signIn, checkForMigrationConflicts]);
 
   const handleSignUp = useCallback(async (email: string, password: string) => {
     setIsMigrating(true);
