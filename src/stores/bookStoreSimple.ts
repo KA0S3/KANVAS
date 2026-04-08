@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { Book, BookViewMode, BookLibrarySettings, BookCoverPreset, LeatherColorPreset, WorldData } from '@/types/book';
+import { performanceMonitor } from '@/utils/performanceMonitor';
 
 const defaultCoverPresets: BookCoverPreset[] = [
   { id: 'cosmic-blue', name: 'Cosmic Blue', color: '#3b82f6', gradient: 'linear-gradient(135deg, #3b82f6, #8b5cf6)' },
@@ -27,6 +28,11 @@ interface BookStore {
   settings: BookLibrarySettings;
   coverPresets: BookCoverPreset[];
   leatherPresets: LeatherColorPreset[];
+  
+  // Creation protection
+  _isCreating: boolean;
+  _lastCreationTime: number;
+  _pendingCreationTitle?: string;
   
   createBook: (bookData: Omit<Book, 'id' | 'createdAt' | 'updatedAt'>) => string;
   updateBook: (bookId: string, updates: Partial<Book>) => void;
@@ -68,10 +74,52 @@ export const useBookStore = create<BookStore>()(
         settings: defaultSettings,
         coverPresets: defaultCoverPresets,
         leatherPresets: defaultLeatherPresets,
+        
+        // Creation protection defaults
+        _isCreating: false,
+        _lastCreationTime: 0,
+        _pendingCreationTitle: undefined,
 
         createBook: (bookData) => {
-          const id = crypto.randomUUID();
+          const state = get();
           const now = Date.now();
+          
+          // Track book creation attempts
+          performanceMonitor.incrementBookCreations();
+          
+          // Debounce check - prevent rapid successive creations
+          if (state._isCreating) {
+            console.warn('[BookStore] Book creation already in progress, ignoring duplicate request');
+            return '';
+          }
+          
+          // Check for recent creation of same title (prevent duplicates)
+          const timeSinceLastCreation = now - state._lastCreationTime;
+          const debounceTime = 1000; // 1 second debounce
+          
+          if (timeSinceLastCreation < debounceTime && state._pendingCreationTitle === bookData.title) {
+            console.warn('[BookStore] Duplicate book creation detected, ignoring request');
+            return '';
+          }
+          
+          // Check for existing book with same title
+          const existingBook = Object.values(state.books).find(book => 
+            book.title.toLowerCase() === bookData.title.toLowerCase()
+          );
+          
+          if (existingBook) {
+            console.warn('[BookStore] Book with same title already exists:', existingBook.title);
+            return existingBook.id;
+          }
+          
+          // Set creation protection
+          set({ 
+            _isCreating: true, 
+            _lastCreationTime: now,
+            _pendingCreationTitle: bookData.title
+          });
+          
+          const id = crypto.randomUUID();
           const newBook: Book = {
             ...bookData,
             id,
@@ -85,8 +133,10 @@ export const useBookStore = create<BookStore>()(
               ...state.books,
               [id]: newBook,
             },
+            _isCreating: false, // Reset creation flag
           }));
 
+          console.log('[BookStore] Created new book:', newBook.title);
           return id;
         },
 

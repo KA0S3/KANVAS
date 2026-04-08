@@ -148,6 +148,13 @@ const WorldCreationDialog = ({ children, onWorldCreated }: WorldCreationDialogPr
         },
       });
 
+      // Check if book creation was prevented (duplicate)
+      if (!worldId) {
+        toast.error('A world with this title already exists or creation is in progress.');
+        setIsCreating(false);
+        return;
+      }
+
       // Wait a moment for the state to update
       await new Promise(resolve => setTimeout(resolve, 100));
       

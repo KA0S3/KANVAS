@@ -41,6 +41,8 @@ const Index = () => {
   const [showBookEntryAnimation, setShowBookEntryAnimation] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isCloudLoading, setIsCloudLoading] = useState(false);
+  const [lastCloudLoadTime, setLastCloudLoadTime] = useState(0);
   const createWorldButtonRef = useRef<HTMLButtonElement>(null);
   const { currentActiveId, loadWorldData, isEditingBackground, setIsEditingBackground, currentViewportId, setActiveAsset, getCurrentBookAssets, setCurrentViewportId } = useAssetStore(); // Using getCurrentBookAssets method
   // const { loadWorldData: loadTagWorldData } = useTagStore(); // Temporarily disabled to debug
@@ -61,19 +63,32 @@ const Index = () => {
     initializeAuth();
   }, [initializeAuth]);
 
-  // Load data from cloud when user authenticates - FIXED
+  // Load data from cloud when user authenticates - OPTIMIZED
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !isCloudLoading) {
+      const now = Date.now();
+      const debounceTime = 2000; // 2 second debounce for cloud loading
+      
+      // Prevent rapid successive cloud loads
+      if (now - lastCloudLoadTime < debounceTime) {
+        console.log('[Index] Cloud loading debounced, too soon since last load');
+        return;
+      }
+      
       console.log('[Index] User authenticated, loading books from cloud...');
+      setIsCloudLoading(true);
+      setLastCloudLoadTime(now);
       
       // Add a small delay to ensure auth state is fully settled
-      const loadTimeout = setTimeout(() => {
-        // Get current books to check for duplicates
-        const currentBooks = getAllBooks();
-        const existingBookIds = new Set(Object.keys(currentBooks));
-        
-        // First restore books from cloud (in case localStorage was cleared)
-        hybridSyncService.loadAllBooksFromCloud().then((success) => {
+      const loadTimeout = setTimeout(async () => {
+        try {
+          // Get current books to check for duplicates
+          const currentBooks = getAllBooks();
+          const existingBookIds = new Set(Object.keys(currentBooks));
+          
+          // First restore books from cloud (in case localStorage was cleared)
+          const success = await hybridSyncService.loadAllBooksFromCloud();
+          
           if (success) {
             console.log('[Index] Books restored from cloud successfully');
             
@@ -87,42 +102,65 @@ const Index = () => {
             if (newBooks.length > 0) {
               console.log(`[Index] Found ${newBooks.length} new books to load`);
               
-              // Load new books sequentially to avoid overwhelming the system
-              const loadBookPromises = newBooks.map((book, index) => {
-                return new Promise<void>((resolve) => {
-                  setTimeout(() => {
-                    hybridSyncService.loadFromCloud(book.id).then(bookSuccess => {
-                      if (bookSuccess) {
-                        console.log(`[Index] Loaded world data for new book: ${book.title}`);
-                      } else {
-                        console.warn(`[Index] Failed to load world data for new book: ${book.title}`);
-                      }
-                      resolve();
-                    }).catch(err => {
-                      console.error(`[Index] Error loading new book ${book.title}:`, err);
-                      resolve();
-                    });
-                  }, index * 100); // Stagger loads by 100ms
-                });
-              });
+              // Load new books sequentially with longer stagger to reduce load
+              const maxConcurrentLoads = 3;
+              const batches = [];
               
-              Promise.all(loadBookPromises).then(() => {
-                console.log('[Index] All new book data loading completed');
-              });
+              for (let i = 0; i < newBooks.length; i += maxConcurrentLoads) {
+                batches.push(newBooks.slice(i, i + maxConcurrentLoads));
+              }
+              
+              // Process batches sequentially
+              for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+                const batch = batches[batchIndex];
+                
+                const batchPromises = batch.map((book, index) => {
+                  return new Promise<void>((resolve) => {
+                    setTimeout(() => {
+                      hybridSyncService.loadFromCloud(book.id).then(bookSuccess => {
+                        if (bookSuccess) {
+                          console.log(`[Index] Loaded world data for new book: ${book.title}`);
+                        } else {
+                          console.warn(`[Index] Failed to load world data for new book: ${book.title}`);
+                        }
+                        resolve();
+                      }).catch(err => {
+                        console.error(`[Index] Error loading new book ${book.title}:`, err);
+                        resolve();
+                      });
+                    }, index * 200); // Stagger loads by 200ms within batch
+                  });
+                });
+                
+                // Wait for current batch to complete before starting next
+                await Promise.all(batchPromises);
+                
+                // Add delay between batches
+                if (batchIndex < batches.length - 1) {
+                  await new Promise(resolve => setTimeout(resolve, 500));
+                }
+              }
+              
+              console.log('[Index] All new book data loading completed');
             } else {
               console.log('[Index] No new books to load, all books already exist locally');
             }
           } else {
             console.warn('[Index] Failed to restore books from cloud');
           }
-        }).catch(err => {
+        } catch (err) {
           console.error('[Index] Cloud loading failed:', err);
-        });
-      }, 500); // 500ms delay for auth state settlement
+        } finally {
+          setIsCloudLoading(false);
+        }
+      }, 1000); // Increased delay to 1 second for auth state settlement
       
-      return () => clearTimeout(loadTimeout);
+      return () => {
+        clearTimeout(loadTimeout);
+        setIsCloudLoading(false);
+      };
     }
-  }, [isAuthenticated]); // Only depend on authentication state
+  }, [isAuthenticated, isCloudLoading, lastCloudLoadTime]); // Added loading dependencies
 
   // Initialize autosave service when authenticated
   // useEffect(() => {

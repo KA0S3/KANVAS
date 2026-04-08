@@ -8,6 +8,7 @@ import { getEffectiveLimitsWithFallback, type EffectiveLimits } from '@/services
 import { updateQuotaBasedOnPlan } from './cloudStore';
 import { ownerKeyService } from '@/services/ownerKeyService';
 import type { User } from '@supabase/supabase-js';
+import { performanceMonitor } from '@/utils/performanceMonitor';
 
 type Plan = 'guest' | 'free' | 'pro' | 'lifetime' | 'owner';
 
@@ -43,6 +44,8 @@ interface AuthStore {
   verificationEmail: string | null;
   _lastFetchedUserId?: string; // Prevent duplicate fetches
   _authStateInitialized?: boolean; // Prevent multiple initializations
+  _lastAuthStateChange?: number; // Track last auth state change for debouncing
+  _authStateDebounceTime?: number; // Debounce time for auth state changes
   
   // Methods
   initializeAuth: () => void;
@@ -102,6 +105,20 @@ export const useAuthStore = create<AuthStore>()(
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (event, session) => {
             console.log('[authStore] Auth state changed:', event, session?.user?.email);
+            
+            // Debounce rapid auth state changes
+            const now = Date.now();
+            const lastChange = get()._lastAuthStateChange || 0;
+            const debounceTime = 200; // 200ms debounce
+            
+            if (now - lastChange < debounceTime) {
+              console.log('[authStore] Auth state change debounced');
+              return;
+            }
+            
+            // Track auth state changes
+            performanceMonitor.incrementAuthRequests();
+            set({ _lastAuthStateChange: now });
             
             if (session?.user) {
               // User is signed in

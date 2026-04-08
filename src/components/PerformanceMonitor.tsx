@@ -1,33 +1,38 @@
 import { useState, useEffect } from 'react';
-import { Activity, Database, Cloud, Zap } from 'lucide-react';
+import { Activity, Database, Cloud, Zap, Book, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useBackgroundStoreOptimized } from '@/stores/backgroundStoreOptimized';
+import { performanceMonitor } from '@/utils/performanceMonitor';
 
 export function PerformanceMonitor() {
-  const { getPendingUpdates, flushToCloud, lastCloudSync } = useBackgroundStoreOptimized();
   const [stats, setStats] = useState({
     pendingCount: 0,
     lastSync: 0,
     memoryUsage: 0,
-    batchProcessorActive: false
+    batchProcessorActive: false,
+    databaseRequests: 0,
+    authRequests: 0,
+    syncOperations: 0,
+    bookCreations: 0
   });
 
   useEffect(() => {
     const updateStats = () => {
-      const pending = getPendingUpdates();
-      setStats({
-        pendingCount: pending.length,
-        lastSync: lastCloudSync,
-        memoryUsage: (performance as any).memory?.usedJSHeapSize || 0,
-        batchProcessorActive: pending.length > 0
-      });
+      const metrics = performanceMonitor.getMetrics();
+      setStats(prev => ({
+        ...prev,
+        databaseRequests: metrics.databaseRequests,
+        authRequests: metrics.authRequests,
+        syncOperations: metrics.syncOperations,
+        bookCreations: metrics.bookCreations,
+        memoryUsage: (performance as any).memory?.usedJSHeapSize || 0
+      }));
     };
 
     updateStats();
     const interval = setInterval(updateStats, 2000); // Update every 2 seconds
 
     return () => clearInterval(interval);
-  }, [getPendingUpdates, lastCloudSync]);
+  }, []);
 
   const formatBytes = (bytes: number) => {
     if (bytes < 1024 * 1024) {
@@ -51,28 +56,49 @@ export function PerformanceMonitor() {
       </div>
       
       <div className="space-y-1">
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Pending Updates:</span>
-          <span className={stats.pendingCount > 0 ? "text-orange-500" : "text-green-500"}>
-            {stats.pendingCount}
+        <div className="flex justify-between items-center">
+          <span className="text-muted-foreground flex items-center gap-1">
+            <Database className="w-3 h-3" />
+            DB Requests:
+          </span>
+          <span className={stats.databaseRequests > 20 ? "text-orange-500" : "text-green-500"}>
+            {stats.databaseRequests}
           </span>
         </div>
         
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Last Sync:</span>
-          <span>{formatTime(stats.lastSync)}</span>
+        <div className="flex justify-between items-center">
+          <span className="text-muted-foreground flex items-center gap-1">
+            <User className="w-3 h-3" />
+            Auth Requests:
+          </span>
+          <span className={stats.authRequests > 10 ? "text-orange-500" : "text-green-500"}>
+            {stats.authRequests}
+          </span>
+        </div>
+        
+        <div className="flex justify-between items-center">
+          <span className="text-muted-foreground flex items-center gap-1">
+            <Cloud className="w-3 h-3" />
+            Sync Operations:
+          </span>
+          <span className={stats.syncOperations > 5 ? "text-orange-500" : "text-green-500"}>
+            {stats.syncOperations}
+          </span>
+        </div>
+        
+        <div className="flex justify-between items-center">
+          <span className="text-muted-foreground flex items-center gap-1">
+            <Book className="w-3 h-3" />
+            Book Creations:
+          </span>
+          <span className={stats.bookCreations > 5 ? "text-orange-500" : "text-green-500"}>
+            {stats.bookCreations}
+          </span>
         </div>
         
         <div className="flex justify-between">
           <span className="text-muted-foreground">Memory:</span>
           <span>{formatBytes(stats.memoryUsage)}</span>
-        </div>
-        
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Batch Status:</span>
-          <span className={stats.batchProcessorActive ? "text-blue-500" : "text-muted-foreground"}>
-            {stats.batchProcessorActive ? "Active" : "Idle"}
-          </span>
         </div>
       </div>
 
@@ -80,22 +106,11 @@ export function PerformanceMonitor() {
         <Button
           size="sm"
           variant="outline"
-          onClick={() => flushToCloud()}
-          disabled={stats.pendingCount === 0}
-          className="flex-1 gap-1"
-        >
-          <Cloud className="w-3 h-3" />
-          Sync Now
-        </Button>
-        
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => window.location.reload()}
+          onClick={() => performanceMonitor.reset()}
           className="flex-1 gap-1"
         >
           <Zap className="w-3 h-3" />
-          Reset
+          Reset Metrics
         </Button>
       </div>
     </div>

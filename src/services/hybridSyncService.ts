@@ -7,6 +7,7 @@ import { useBookStore } from '@/stores/bookStoreSimple';
 import { connectivityService } from '@/services/connectivityService';
 import type { Book } from '@/types/book';
 import { createDefaultWorldData } from '@/stores/bookStoreSimple';
+import { performanceMonitor } from '@/utils/performanceMonitor';
 
 export interface SyncStatus {
   lastSyncTime: Date | null;
@@ -24,11 +25,13 @@ class HybridSyncService {
   private static instance: HybridSyncService;
   private syncInterval: number | null = null;
   private subscribers: Set<(status: SyncStatus) => void> = new Set();
-  private readonly SYNC_INTERVAL = 30000; // 30 seconds
-  private readonly MANUAL_SYNC_INTERVAL = 10000; // 10 seconds for manual saves
+  private readonly SYNC_INTERVAL = 300000; // 5 minutes (300 seconds) - reduced from 30s to save costs
+  private readonly MANUAL_SYNC_INTERVAL = 30000; // 30 seconds for manual saves - increased from 10s
   private isManualSync = false;
   private isProcessingQueue = false; // Prevent concurrent queue processing
   private syncMutex = false; // Prevent concurrent sync operations
+  private lastManualSyncTime = 0; // Track last manual sync for debouncing
+  private readonly MANUAL_SYNC_DEBOUNCE = 1000; // 1 second debounce for manual syncs
 
   static getInstance(): HybridSyncService {
     if (!HybridSyncService.instance) {
@@ -102,6 +105,7 @@ class HybridSyncService {
       }
 
       console.log('[HybridSync] Starting cloud-first sync...');
+      performanceMonitor.incrementSyncOperations();
       this.updateSyncStatus({ syncInProgress: true });
 
       // Check storage quota before syncing
@@ -176,8 +180,16 @@ class HybridSyncService {
     }
   }
 
-  // Manual sync with shorter interval
+  // Manual sync with debouncing and shorter interval
   async triggerManualSync(): Promise<boolean> {
+    // Debounce check - prevent rapid successive manual syncs
+    const now = Date.now();
+    if (now - this.lastManualSyncTime < this.MANUAL_SYNC_DEBOUNCE) {
+      console.log('[HybridSync] Manual sync debounced, too soon since last sync');
+      return false;
+    }
+    this.lastManualSyncTime = now;
+
     this.isManualSync = true;
     
     // Temporarily use shorter interval for manual sync
@@ -428,6 +440,7 @@ class HybridSyncService {
       bookCoverPageSettings: book?.coverPageSettings,
     };
 
+    performanceMonitor.incrementDatabaseRequests();
     const { error } = await supabase
       .from('projects')
       .upsert({
@@ -450,6 +463,7 @@ class HybridSyncService {
     // Use a deterministic UUID based on bookId to avoid duplicates
     const backgroundId = this.generateDeterministicUUID(`${bookId}-backgrounds`);
     
+    performanceMonitor.incrementDatabaseRequests();
     const { error } = await supabase
       .from('assets')
       .upsert({
@@ -542,12 +556,13 @@ class HybridSyncService {
       }
 
       const bookStore = useBookStore.getState();
+      const booksToAdd: Record<string, Book> = {};
       
-      // Convert each project to a book and add to store
+      // Convert each project to a book and prepare for batch update
       for (const project of projects) {
         const existingBook = bookStore.books[project.id];
         
-        // Only create if book doesn't exist locally or cloud is newer
+        // Only create if book doesn't exist locally
         if (!existingBook) {
           let worldData = createDefaultWorldData();
           let parsed: any = {};
@@ -580,10 +595,18 @@ class HybridSyncService {
             coverPageSettings: parsed.bookCoverPageSettings,
           };
           
-          // Add directly to store
-          bookStore.books[project.id] = newBook;
-          console.log(`[HybridSync] Restored book from cloud: ${newBook.title}`);
+          booksToAdd[project.id] = newBook;
+          console.log(`[HybridSync] Prepared book for restoration: ${newBook.title}`);
         }
+      }
+      
+      // Batch update using proper Zustand setter
+      if (Object.keys(booksToAdd).length > 0) {
+        // Use the store's setState method for proper reactivity
+        useBookStore.setState((state) => ({
+          books: { ...state.books, ...booksToAdd }
+        }));
+        console.log(`[HybridSync] Restored ${Object.keys(booksToAdd).length} books from cloud`);
       }
 
       console.log(`[HybridSync] Restored ${projects.length} books from cloud`);

@@ -24,12 +24,14 @@ class OptimizedSyncService {
   private static instance: OptimizedSyncService;
   private syncInterval: number | null = null;
   private subscribers: Set<(status: OptimizedSyncStatus) => void> = new Set();
-  private readonly SYNC_INTERVAL = 60000; // Increased to 60 seconds to reduce frequency
-  private readonly MANUAL_SYNC_INTERVAL = 10000; // 10 seconds for manual saves
+  private readonly SYNC_INTERVAL = 300000; // 5 minutes (300 seconds) - increased from 60s to reduce costs
+  private readonly MANUAL_SYNC_INTERVAL = 30000; // 30 seconds for manual saves - increased from 10s
   private isManualSync = false;
   private isProcessingQueue = false;
   private syncMutex = false;
   private lastSyncPayloadSize = 0;
+  private lastManualSyncTime = 0; // Track last manual sync for debouncing
+  private readonly MANUAL_SYNC_DEBOUNCE = 1000; // 1 second debounce for manual syncs
 
   static getInstance(): OptimizedSyncService {
     if (!OptimizedSyncService.instance) {
@@ -523,6 +525,14 @@ class OptimizedSyncService {
 
   // Public methods
   async triggerManualSync(): Promise<boolean> {
+    // Debounce check - prevent rapid successive manual syncs
+    const now = Date.now();
+    if (now - this.lastManualSyncTime < this.MANUAL_SYNC_DEBOUNCE) {
+      console.log('[OptimizedSync] Manual sync debounced, too soon since last sync');
+      return false;
+    }
+    this.lastManualSyncTime = now;
+
     this.isManualSync = true;
     
     const originalInterval = this.SYNC_INTERVAL;
