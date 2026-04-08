@@ -49,18 +49,40 @@ export const useAuthFlowWithMigration = (): UseAuthFlowWithMigrationReturn => {
     }
   }, [isAuthenticated, user]);
 
-  // Reset isMigrating on mount to prevent stuck loading state
+  // Reset isMigrating on mount and when component regains focus to prevent stuck loading state
   useEffect(() => {
     setIsMigrating(false);
+    
+    // Also reset when window gains focus (user returns to tab)
+    const handleFocus = () => {
+      console.log('[AuthFlowWithMigration] Window focused, resetting migration state');
+      setIsMigrating(false);
+    };
+    
+    // Also reset when page becomes visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('[AuthFlowWithMigration] Page became visible, resetting migration state');
+        setIsMigrating(false);
+      }
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
-  // Safety timeout to reset isMigrating if it gets stuck
+  // Enhanced safety timeout to reset isMigrating if it gets stuck
   useEffect(() => {
     if (isMigrating) {
       const timeout = setTimeout(() => {
-        console.warn('[AuthFlowWithMigration] isMigrating stuck, resetting');
+        console.warn('[AuthFlowWithMigration] isMigrating stuck for 5 seconds, auto-resetting');
         setIsMigrating(false);
-      }, 10000); // Reset after 10 seconds
+      }, 5000); // Reduced from 10 seconds to 5 seconds for faster recovery
       
       return () => clearTimeout(timeout);
     }
@@ -85,80 +107,98 @@ export const useAuthFlowWithMigration = (): UseAuthFlowWithMigrationReturn => {
   };
 
   const handleSignIn = useCallback(async (email: string, password: string) => {
-    console.log('[AuthFlowWithMigration] handleSignIn called, setting isMigrating to true');
-    setIsMigrating(true);
+    console.log('[AuthFlowWithMigration] handleSignIn called');
+    
+    // Reset migration state immediately to prevent stuck loading
+    setIsMigrating(false);
     
     try {
       // First attempt sign in
       const signInResult = await signIn(email, password);
       
       if (!signInResult.success || signInResult.error) {
-        console.log('[AuthFlowWithMigration] Sign in failed, setting isMigrating to false');
-        setIsMigrating(false);
+        console.log('[AuthFlowWithMigration] Sign in failed:', signInResult.error);
         return { success: false, error: signInResult.error };
       }
 
-      // OPTIMIZED: Reduced wait time and deferred migration checks
-      await new Promise(resolve => setTimeout(resolve, 200)); // Reduced from 500ms
+      // Wait briefly for auth state to settle
+      await new Promise(resolve => setTimeout(resolve, 100));
       
       // Check if user is now authenticated
       const { isAuthenticated: nowAuthenticated, user: nowUser } = useAuthStore.getState();
       
       if (!nowAuthenticated || !nowUser) {
-        console.log('[AuthFlowWithMigration] User not authenticated after sign in, setting isMigrating to false');
-        setIsMigrating(false);
+        console.log('[AuthFlowWithMigration] User not authenticated after sign in');
         return { success: false, error: 'Authentication failed' };
       }
 
-      // OPTIMIZED: Defer migration checks to background and reduce timeout
+      console.log('[AuthFlowWithMigration] Sign in successful, checking for migration needs');
+      
+      // Run migration checks in background without blocking the UI
+      // Use a non-blocking approach that doesn't affect the sign-in flow
       setTimeout(async () => {
         try {
-          // Check for migration conflicts with shorter timeout
-          const conflictPromise = checkForMigrationConflicts(nowUser.id);
-          const timeoutPromise = new Promise<null>((_, reject) => 
-            setTimeout(() => reject(new Error('Migration check timeout')), 2000) // Reduced from 3000ms
-          );
+          // Only set migrating state if we actually need to show dialogs
+          let needsDialog = false;
           
-          const conflict = await Promise.race([conflictPromise, timeoutPromise]);
-          
-          if (conflict) {
-            setMigrationConflict(conflict);
-            setShowMigrationDialog(true);
-          } else {
-            // Only check guest import if no conflicts
-            const guestImportPromise = shouldShowGuestImport();
-            const guestTimeoutPromise = new Promise<boolean>((_, reject) => 
-              setTimeout(() => reject(new Error('Guest import timeout')), 2000) // Reduced from 3000ms
+          // Quick migration conflict check with shorter timeout
+          try {
+            const conflictPromise = checkForMigrationConflicts(nowUser.id);
+            const timeoutPromise = new Promise<null>((_, reject) => 
+              setTimeout(() => reject(new Error('Migration check timeout')), 1500)
             );
             
+            const conflict = await Promise.race([conflictPromise, timeoutPromise]);
+            
+            if (conflict) {
+              setMigrationConflict(conflict);
+              setShowMigrationDialog(true);
+              needsDialog = true;
+            }
+          } catch (error) {
+            console.warn('[AuthFlowWithMigration] Migration check failed:', error);
+          }
+          
+          // Only check guest import if no migration conflicts
+          if (!needsDialog) {
             try {
+              const guestImportPromise = shouldShowGuestImport();
+              const guestTimeoutPromise = new Promise<boolean>((_, reject) => 
+                setTimeout(() => reject(new Error('Guest import timeout')), 1500)
+              );
+              
               const shouldShow = await Promise.race([guestImportPromise, guestTimeoutPromise]);
               if (shouldShow) {
                 const dismissed = localStorage.getItem('kanvas-guest-import-dismissed');
                 if (!dismissed) {
                   setShowGuestImportDialog(true);
+                  needsDialog = true;
                 }
               }
             } catch (error) {
-              console.warn('[AuthFlowWithMigration] Guest import check failed or timed out:', error);
+              console.warn('[AuthFlowWithMigration] Guest import check failed:', error);
             }
+          }
+          
+          // Only set migrating state if we actually need to show a dialog
+          if (needsDialog) {
+            setIsMigrating(true);
+            // Auto-reset after dialog interaction
+            setTimeout(() => setIsMigrating(false), 5000);
           }
         } catch (error) {
           console.warn('[AuthFlowWithMigration] Background migration checks failed:', error);
         }
-      }, 100); // Defer to background with 100ms delay
+      }, 200); // Start background checks after 200ms
       
-      console.log('[AuthFlowWithMigration] Sign in complete, setting isMigrating to false');
-      setIsMigrating(false);
       return { success: true };
       
     } catch (error) {
       console.error('[AuthFlowWithMigration] Sign in error:', error);
-      console.log('[AuthFlowWithMigration] Error caught, setting isMigrating to false');
       setIsMigrating(false);
       return { success: false, error: 'An unexpected error occurred during sign in' };
     }
-  }, [signIn, checkForMigrationConflicts]);
+  }, [signIn, checkForMigrationConflicts, shouldShowGuestImport]);
 
   const handleSignUp = useCallback(async (email: string, password: string) => {
     setIsMigrating(true);
@@ -186,66 +226,88 @@ export const useAuthFlowWithMigration = (): UseAuthFlowWithMigrationReturn => {
   }, [signUp]);
 
   const handleGoogleSignIn = useCallback(async () => {
-    setIsMigrating(true);
+    console.log('[AuthFlowWithMigration] handleGoogleSignIn called');
+    
+    // Reset migration state immediately to prevent stuck loading
+    setIsMigrating(false);
     
     try {
       const signInResult = await signInWithGoogle();
       
       if (!signInResult.success || signInResult.error) {
-        setIsMigrating(false);
+        console.log('[AuthFlowWithMigration] Google sign in failed:', signInResult.error);
         return { success: false, error: signInResult.error };
       }
 
-      // OPTIMIZED: Reduced wait time
-      await new Promise(resolve => setTimeout(resolve, 200)); // Reduced from 500ms
+      // Wait briefly for auth state to settle
+      await new Promise(resolve => setTimeout(resolve, 100));
       
       // Check if user is now authenticated
       const { isAuthenticated: nowAuthenticated, user: nowUser } = useAuthStore.getState();
       
       if (!nowAuthenticated || !nowUser) {
-        setIsMigrating(false);
+        console.log('[AuthFlowWithMigration] User not authenticated after Google sign in');
         return { success: false, error: 'Authentication failed' };
       }
 
-      // OPTIMIZED: Defer migration checks to background (same as email sign-in)
+      console.log('[AuthFlowWithMigration] Google sign in successful, checking for migration needs');
+      
+      // Run migration checks in background without blocking the UI
       setTimeout(async () => {
         try {
-          // Check for migration conflicts with shorter timeout
-          const conflictPromise = checkForMigrationConflicts(nowUser.id);
-          const timeoutPromise = new Promise<null>((_, reject) => 
-            setTimeout(() => reject(new Error('Migration check timeout')), 2000) // Reduced from 3000ms
-          );
+          // Only set migrating state if we actually need to show dialogs
+          let needsDialog = false;
           
-          const conflict = await Promise.race([conflictPromise, timeoutPromise]);
-          
-          if (conflict) {
-            setMigrationConflict(conflict);
-            setShowMigrationDialog(true);
-          } else {
-            // Only check guest import if no conflicts
-            const guestImportPromise = shouldShowGuestImport();
-            const guestTimeoutPromise = new Promise<boolean>((_, reject) => 
-              setTimeout(() => reject(new Error('Guest import timeout')), 2000) // Reduced from 3000ms
+          // Quick migration conflict check with shorter timeout
+          try {
+            const conflictPromise = checkForMigrationConflicts(nowUser.id);
+            const timeoutPromise = new Promise<null>((_, reject) => 
+              setTimeout(() => reject(new Error('Migration check timeout')), 1500)
             );
             
+            const conflict = await Promise.race([conflictPromise, timeoutPromise]);
+            
+            if (conflict) {
+              setMigrationConflict(conflict);
+              setShowMigrationDialog(true);
+              needsDialog = true;
+            }
+          } catch (error) {
+            console.warn('[AuthFlowWithMigration] Migration check failed:', error);
+          }
+          
+          // Only check guest import if no migration conflicts
+          if (!needsDialog) {
             try {
+              const guestImportPromise = shouldShowGuestImport();
+              const guestTimeoutPromise = new Promise<boolean>((_, reject) => 
+                setTimeout(() => reject(new Error('Guest import timeout')), 1500)
+              );
+              
               const shouldShow = await Promise.race([guestImportPromise, guestTimeoutPromise]);
               if (shouldShow) {
                 const dismissed = localStorage.getItem('kanvas-guest-import-dismissed');
                 if (!dismissed) {
                   setShowGuestImportDialog(true);
+                  needsDialog = true;
                 }
               }
             } catch (error) {
-              console.warn('[AuthFlowWithMigration] Guest import check failed or timed out:', error);
+              console.warn('[AuthFlowWithMigration] Guest import check failed:', error);
             }
+          }
+          
+          // Only set migrating state if we actually need to show a dialog
+          if (needsDialog) {
+            setIsMigrating(true);
+            // Auto-reset after dialog interaction
+            setTimeout(() => setIsMigrating(false), 5000);
           }
         } catch (error) {
           console.warn('[AuthFlowWithMigration] Background migration checks failed:', error);
         }
-      }, 100); // Defer to background with 100ms delay
+      }, 200); // Start background checks after 200ms
       
-      setIsMigrating(false);
       return { success: true };
       
     } catch (error) {
