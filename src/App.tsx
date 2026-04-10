@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { ConflictResolutionProvider } from "@/components/ConflictResolutionProvider";
 import Index from "./pages/Index";
 import AuthConfirm from "./pages/AuthConfirm";
 import AuthCallback from "./pages/AuthCallback";
@@ -17,21 +18,23 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/auth/confirm" element={<AuthConfirm />} />
-          <Route path="/auth/callback" element={<AuthCallback />} />
-          <Route path="/auth/reset-password" element={<AuthResetPassword />} />
-                    <Route path="/terms-of-service" element={<TermsOfService />} />
-          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-          <Route path="/refund-policy" element={<RefundPolicy />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
+      <ConflictResolutionProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/auth/confirm" element={<AuthConfirm />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="/auth/reset-password" element={<AuthResetPassword />} />
+            <Route path="/terms-of-service" element={<TermsOfService />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/refund-policy" element={<RefundPolicy />} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </ConflictResolutionProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

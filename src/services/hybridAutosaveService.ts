@@ -3,7 +3,7 @@ import { useAssetStore } from '@/stores/assetStore';
 import { useBookStore } from '@/stores/bookStoreSimple';
 import { useBackgroundStore } from '@/stores/backgroundStore';
 import { useAuthStore } from '@/stores/authStore';
-import { assetUploadService } from './assetUploadService';
+import { r2UploadService } from './R2UploadService';
 
 export type HybridAutosaveStatus = 'idle' | 'local-saving' | 'cloud-syncing' | 'saved' | 'error';
 
@@ -277,30 +277,34 @@ class HybridAutosaveService {
     if (!asset.file) return;
 
     try {
-      // Use your existing assetUploadService
-      const variants = await assetUploadService.generateVariants(asset.file);
+      // Use R2UploadService for direct-to-R2 upload with variants
+      const result = await r2UploadService.uploadWithVariants(
+        asset.file,
+        asset.id,
+        projectId,
+        {
+          generateThumbnail: true,
+          generatePreview: true
+        },
+        (stage, progress) => {
+          console.log(`[HybridAutosave] Asset ${asset.id} ${stage}: ${progress.percentage}%`);
+        }
+      );
       
-      const uploadRequest = {
-        assetId: asset.id,
-        variants,
-        projectId
-      };
-
-      const result = await assetUploadService.uploadAsset(uploadRequest);
-      
-      if (result.success && result.cloudMetadata) {
+      if (result.success) {
         // Update asset in store with cloud metadata
         const assetStore = useAssetStore.getState();
         assetStore.updateAsset(asset.id, {
           cloudStatus: 'synced',
-          cloudId: result.cloudMetadata.id,
-          cloudPath: result.cloudMetadata.cloud_path,
-          cloudSize: result.cloudMetadata.file_size,
-          cloudUpdatedAt: result.cloudMetadata.updated_at,
+          cloudPath: result.r2Key,
+          cloudSize: asset.file.size,
+          cloudUpdatedAt: new Date().toISOString(),
           cloudError: undefined
         });
         
-        console.log(`[HybridAutosave] Asset ${asset.id} uploaded to cloud`);
+        console.log(`[HybridAutosave] Asset ${asset.id} uploaded to cloud: ${result.r2Key}`);
+      } else {
+        throw new Error(result.error || 'Upload failed');
       }
     } catch (error) {
       throw new Error(`Asset upload failed: ${error.message}`);

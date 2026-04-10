@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react';
 import { documentMutationService, type SyncStatus } from '@/services/DocumentMutationService';
 import { useAuthStore } from '@/stores/authStore';
 
-// Re-export for backwards compatibility
-export function useHybridSync() {
+export function useDocumentSync() {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({
     lastSyncTime: null,
     syncEnabled: false,
@@ -36,15 +35,20 @@ export function useHybridSync() {
     return await documentMutationService.syncNow();
   };
 
-  const loadFromCloud = async (bookId: string) => {
-    const result = await documentMutationService.loadDocument(bookId);
+  const loadFromCloud = async (projectId: string) => {
+    const result = await documentMutationService.loadDocument(projectId);
     return result.success;
+  };
+
+  const queueOperation = (operation: Parameters<typeof documentMutationService.queueOperation>[0]) => {
+    documentMutationService.queueOperation(operation);
   };
 
   return {
     syncStatus,
     triggerSync,
     loadFromCloud,
+    queueOperation,
     isAuthenticated,
     isOnline: syncStatus.onlineMode,
     lastSyncTime: syncStatus.lastSyncTime,

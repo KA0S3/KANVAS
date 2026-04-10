@@ -1,7 +1,7 @@
 import { useAssetStore } from '@/stores/assetStore';
 import { useCloudStore } from '@/stores/cloudStore';
 import { useAuthStore } from '@/stores/authStore';
-import { assetUploadService, type UploadRequest } from '@/services/assetUploadService';
+import { r2UploadService } from '@/services/R2UploadService';
 import { UpgradePromptModal } from '@/components/UpgradePromptModal';
 import type { Asset } from '@/components/AssetItem';
 import { useState } from 'react';
@@ -64,60 +64,51 @@ export function useAssetCreation() {
     }
 
     try {
-      // Check quota first
-      const canUpload = await assetUploadService.canUpload(file.size);
-      if (!canUpload) {
-        // Use effectiveLimits.quotaBytes if available, otherwise fallback to quota.available
-        const quotaLimit = effectiveLimits?.quotaBytes || quota.available;
-        
-        // Show upgrade modal
-        setUpgradeModal({
-          isOpen: true,
-          currentUsage: quota.used,
-          quotaLimit,
-          requiredBytes: file.size
-        });
-        
-        // Update asset status to show quota exceeded
-        updateAsset(assetId, { 
-          cloudStatus: 'failed',
-          cloudError: 'Storage quota exceeded'
-        });
-        return;
-      }
-
       // Update asset status to uploading
       updateAsset(assetId, { 
         cloudStatus: 'uploading',
         cloudError: undefined 
       });
 
-      // Generate variants
-      const variants = await assetUploadService.generateVariants(file);
-      
-      // Prepare upload request
-      const uploadRequest: UploadRequest = {
+      // Upload with variants using R2UploadService
+      // Note: Quota check is handled by the getUploadUrls Edge Function
+      const result = await r2UploadService.uploadWithVariants(
+        file,
         assetId,
-        variants,
-        projectId
-      };
+        projectId,
+        {
+          generateThumbnail: true,
+          generatePreview: true
+        },
+        (stage, progress) => {
+          console.log(`[useAssetCreation] Upload ${stage}: ${progress.percentage}%`);
+        }
+      );
 
-      // Upload to cloud
-      const result = await assetUploadService.uploadAsset(uploadRequest);
-
-      if (result.success && result.cloudMetadata) {
+      if (result.success) {
         // Update asset with cloud metadata
         updateAsset(assetId, {
           cloudStatus: 'synced',
-          cloudId: result.cloudMetadata.id,
-          cloudPath: result.cloudMetadata.cloud_path,
-          cloudSize: result.cloudMetadata.file_size,
-          cloudUpdatedAt: result.cloudMetadata.updated_at,
+          cloudPath: result.r2Key,
+          cloudSize: file.size,
+          cloudUpdatedAt: new Date().toISOString(),
           cloudError: undefined
         });
         
-        console.log('Asset successfully uploaded to cloud:', result.cloudMetadata.id);
+        console.log('Asset successfully uploaded to cloud:', result.r2Key);
       } else {
+        // Check if it's a quota error
+        if (result.error?.includes('quota') || result.error?.includes('Quota')) {
+          const quotaLimit = effectiveLimits?.quotaBytes || quota.available;
+          
+          setUpgradeModal({
+            isOpen: true,
+            currentUsage: quota.used,
+            quotaLimit,
+            requiredBytes: file.size
+          });
+        }
+        
         // Handle upload failure but keep local asset
         updateAsset(assetId, { 
           cloudStatus: 'failed',
@@ -146,8 +137,10 @@ export function useAssetCreation() {
       return false;
     }
 
-    // Check quota
-    return await assetUploadService.canUpload(file.size);
+    // Quota check is now handled server-side by getUploadUrls Edge Function
+    // We do a client-side estimate based on current quota
+    const quotaLimit = effectiveLimits?.quotaBytes || quota.available;
+    return (quota.used + file.size) <= quotaLimit;
   };
 
   const closeUpgradeModal = () => {

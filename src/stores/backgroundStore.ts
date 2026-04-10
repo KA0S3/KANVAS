@@ -3,6 +3,7 @@ import { subscribeWithSelector, persist, createJSONStorage } from 'zustand/middl
 import type { BackgroundConfig, BackgroundStore } from '@/types/background';
 import { DEFAULT_BACKGROUND_CONFIG, getAssetKey } from '@/types/background';
 import { getBackground as getBackgroundFromStorage, setBackground as setBackgroundToStorage, loadAllBackgrounds } from '@/utils/backgroundStorage';
+import { documentMutationService } from '@/services/DocumentMutationService';
 
 export const useBackgroundStore = create<BackgroundStore>()(
   subscribeWithSelector(
@@ -49,6 +50,18 @@ export const useBackgroundStore = create<BackgroundStore>()(
             
             // Persist to localStorage immediately
             setBackgroundToStorage(key, clonedConfig);
+            
+            // Queue operation for DocumentMutationService using UPDATE_GLOBAL_BACKGROUNDS (Phase 7)
+            // This stores all background configs in world_document.backgrounds as single source of truth
+            // Build updated configs object including the new config
+            const updatedConfigs = {
+              ...get().configs,
+              [key]: clonedConfig
+            };
+            documentMutationService.queueOperation({
+              op: 'UPDATE_GLOBAL_BACKGROUNDS',
+              backgrounds: updatedConfigs
+            });
           },
 
           cloneConfig: (config: BackgroundConfig): BackgroundConfig => {

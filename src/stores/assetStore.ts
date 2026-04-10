@@ -5,6 +5,7 @@ import type { CustomField, CustomFieldValue, GlobalCustomField, ViewportDisplayS
 import { DEFAULT_VIEWPORT_DISPLAY_SETTINGS } from '@/types/extendedAsset';
 import { useBookStore } from './bookStoreSimple';
 import { StorageCleanup } from '@/utils/storageCleanup';
+import { documentMutationService } from '@/services/DocumentMutationService';
 
 interface AssetStore {
   // Book-scoped asset registry for isolation
@@ -162,6 +163,24 @@ export const useAssetStore = create<AssetStore>()(
         return { bookAssets: newBookAssets };
       });
       
+      // Queue operation for DocumentMutationService
+      documentMutationService.queueOperation({
+        op: 'CREATE_ASSET',
+        assetId: id,
+        parentId,
+        name: newAsset.name,
+        type: newAsset.type,
+        position: {
+          x: newAsset.x || 0,
+          y: newAsset.y || 0,
+          width: newAsset.width,
+          height: newAsset.height,
+          zIndex: 0
+        },
+        isExpanded: true,
+        customFields: {}
+      });
+      
       return id;
     } catch (error) {
       console.error('[AssetStore] Failed to create asset:', error);
@@ -174,31 +193,33 @@ export const useAssetStore = create<AssetStore>()(
 
   // Reparent an asset (move from one parent to another)
   reparentAsset: (assetId: string, newParentId?: string) => {
-    set((state) => {
-      const bookId = state.getCurrentBookId();
-      if (!bookId) return state;
-      
-      const newBookAssets = { ...state.bookAssets };
-      const bookAssets = newBookAssets[bookId] || {};
-      const asset = bookAssets[assetId];
-      
-      if (!asset) return state;
+    const state = useAssetStore.getState();
+    const bookId = state.getCurrentBookId();
+    if (!bookId) return;
+    
+    const bookAssets = state.bookAssets[bookId] || {};
+    const asset = bookAssets[assetId];
+    if (!asset) return;
 
-      const oldParentId = asset.parentId;
+    const oldParentId = asset.parentId;
 
+    set((setState) => {
+      const newBookAssets = { ...setState.bookAssets };
+      const currentBookAssets = newBookAssets[bookId] || {};
+      
       // Remove from old parent's children array
-      if (oldParentId && bookAssets[oldParentId]) {
+      if (oldParentId && currentBookAssets[oldParentId]) {
         newBookAssets[bookId][oldParentId] = {
-          ...bookAssets[oldParentId],
-          children: bookAssets[oldParentId].children.filter(id => id !== assetId),
+          ...currentBookAssets[oldParentId],
+          children: currentBookAssets[oldParentId].children.filter(id => id !== assetId),
         };
       }
 
       // Add to new parent's children array
-      if (newParentId && bookAssets[newParentId]) {
+      if (newParentId && currentBookAssets[newParentId]) {
         newBookAssets[bookId][newParentId] = {
-          ...bookAssets[newParentId],
-          children: [...bookAssets[newParentId].children, assetId],
+          ...currentBookAssets[newParentId],
+          children: [...currentBookAssets[newParentId].children, assetId],
         };
       }
 
@@ -209,6 +230,14 @@ export const useAssetStore = create<AssetStore>()(
       };
 
       return { bookAssets: newBookAssets };
+    });
+    
+    // Queue operation for DocumentMutationService
+    documentMutationService.queueOperation({
+      op: 'MOVE_ASSET',
+      assetId,
+      oldParentId,
+      newParentId
     });
   },
 
@@ -234,6 +263,26 @@ export const useAssetStore = create<AssetStore>()(
 
       return { bookAssets: newBookAssets };
     });
+    
+    // Get the full asset data for the operation
+    const state = useAssetStore.getState();
+    const bookId = state.getCurrentBookId();
+    if (!bookId) return;
+    
+    const bookAssets = state.bookAssets[bookId] || {};
+    const asset = bookAssets[assetId];
+    if (!asset) return;
+    
+    // Queue operation for DocumentMutationService
+    documentMutationService.queueOperation({
+      op: 'UPDATE_POSITION',
+      assetId,
+      x,
+      y,
+      width: asset.width,
+      height: asset.height,
+      zIndex: 0
+    });
   },
 
   // Update asset size
@@ -258,6 +307,26 @@ export const useAssetStore = create<AssetStore>()(
         };
 
         return { bookAssets: newBookAssets };
+      });
+      
+      // Get the full asset data for the operation
+      const state = useAssetStore.getState();
+      const bookId = state.getCurrentBookId();
+      if (!bookId) return;
+      
+      const bookAssets = state.bookAssets[bookId] || {};
+      const asset = bookAssets[assetId];
+      if (!asset) return;
+      
+      // Queue operation for DocumentMutationService
+      documentMutationService.queueOperation({
+        op: 'UPDATE_POSITION',
+        assetId,
+        x: asset.x || 0,
+        y: asset.y || 0,
+        width: Math.max(100, width),
+        height: Math.max(80, height),
+        zIndex: 0
       });
     } catch (error) {
       console.error('[AssetStore] Failed to update asset size:', error);
@@ -286,41 +355,82 @@ export const useAssetStore = create<AssetStore>()(
 
       return { bookAssets: newBookAssets };
     });
+    
+    // If updating name, queue metadata update
+    if (updates.name !== undefined) {
+      documentMutationService.queueOperation({
+        op: 'UPDATE_METADATA',
+        assetId,
+        name: updates.name
+      });
+    }
+    
+    // If updating position-related fields, queue position update
+    if (updates.x !== undefined || updates.y !== undefined || updates.width !== undefined || updates.height !== undefined) {
+      const state = useAssetStore.getState();
+      const bookId = state.getCurrentBookId();
+      if (bookId) {
+        const bookAssets = state.bookAssets[bookId] || {};
+        const asset = bookAssets[assetId];
+        if (asset) {
+          documentMutationService.queueOperation({
+            op: 'UPDATE_POSITION',
+            assetId,
+            x: updates.x ?? asset.x ?? 0,
+            y: updates.y ?? asset.y ?? 0,
+            width: updates.width ?? asset.width ?? 200,
+            height: updates.height ?? asset.height ?? 150,
+            zIndex: 0
+          });
+        }
+      }
+    }
+    
+    // If updating background config, queue background update
+    if (updates.backgroundConfig !== undefined) {
+      documentMutationService.queueOperation({
+        op: 'UPDATE_BACKGROUND_CONFIG',
+        assetId,
+        config: updates.backgroundConfig
+      });
+    }
   },
 
   // Delete an asset and all its descendants recursively
   deleteAsset: (assetId: string) => {
+    const stateBefore = useAssetStore.getState();
+    const bookId = stateBefore.getCurrentBookId();
+    if (!bookId) return;
+    
+    const bookAssets = stateBefore.bookAssets[bookId] || {};
+    const asset = bookAssets[assetId];
+    if (!asset) return;
+
+    // Recursive function to collect all descendant IDs
+    const collectDescendants = (id: string): string[] => {
+      const currentAsset = bookAssets[id];
+      if (!currentAsset || currentAsset.children.length === 0) return [];
+      
+      let descendants: string[] = [];
+      for (const childId of currentAsset.children) {
+        descendants.push(childId);
+        descendants = descendants.concat(collectDescendants(childId));
+      }
+      return descendants;
+    };
+
+    // Collect all IDs to delete (asset + all descendants)
+    const idsToDelete = [assetId, ...collectDescendants(assetId)];
+
     set((state) => {
-      const bookId = state.getCurrentBookId();
-      if (!bookId) return state;
-      
       const newBookAssets = { ...state.bookAssets };
-      const bookAssets = newBookAssets[bookId] || {};
-      const asset = bookAssets[assetId];
-      
-      if (!asset) return state;
-
-      // Recursive function to collect all descendant IDs
-      const collectDescendants = (id: string): string[] => {
-        const currentAsset = bookAssets[id];
-        if (!currentAsset || currentAsset.children.length === 0) return [];
-        
-        let descendants: string[] = [];
-        for (const childId of currentAsset.children) {
-          descendants.push(childId);
-          descendants = descendants.concat(collectDescendants(childId));
-        }
-        return descendants;
-      };
-
-      // Collect all IDs to delete (asset + all descendants)
-      const idsToDelete = [assetId, ...collectDescendants(assetId)];
+      const currentBookAssets = newBookAssets[bookId] || {};
 
       // Remove from parent's children array if it has a parent
-      if (asset.parentId && bookAssets[asset.parentId]) {
+      if (asset.parentId && currentBookAssets[asset.parentId]) {
         newBookAssets[bookId][asset.parentId] = {
-          ...bookAssets[asset.parentId],
-          children: bookAssets[asset.parentId].children.filter(id => !idsToDelete.includes(id)),
+          ...currentBookAssets[asset.parentId],
+          children: currentBookAssets[asset.parentId].children.filter(id => !idsToDelete.includes(id)),
         };
       }
 
@@ -338,6 +448,17 @@ export const useAssetStore = create<AssetStore>()(
         bookAssets: newBookAssets,
         currentActiveId: newActiveId,
       };
+    });
+    
+    // Queue DELETE_ASSET operations for all deleted assets
+    // Delete children first, then parent
+    idsToDelete.reverse().forEach(id => {
+      const deletedAsset = bookAssets[id];
+      documentMutationService.queueOperation({
+        op: 'DELETE_ASSET',
+        assetId: id,
+        parentId: deletedAsset?.parentId
+      });
     });
   },
 

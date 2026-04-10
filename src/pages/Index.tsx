@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { BookOpen, ChevronLeft, Database, Trash2, Edit } from "lucide-react";
+import { ConflictStatusIndicator } from "@/components/ConflictStatusIndicator";
 import cosmicBackground from "@/assets/cosmic-background.png";
 import lightBackground from "@/assets/BG-light.png";
 import { AssetPort } from "@/components/AssetPort";
@@ -23,7 +24,7 @@ import { useMediaStore } from "@/stores/mediaStore";
 import { useBookStore } from "@/stores/bookStoreSimple";
 import { audioEngine } from "@/services/AudioEngine";
 import { autosaveService } from '@/services/autosaveService';
-import { hybridSyncService } from '@/services/hybridSyncService';
+import { documentMutationService } from '@/services/DocumentMutationService';
 import SplashScreen from "@/components/media/SplashScreen";
 import IntroVideo from "@/components/media/IntroVideo";
 import BookEntryAnimation from "@/components/media/BookEntryAnimation";
@@ -86,8 +87,21 @@ const Index = () => {
           const currentBooks = getAllBooks();
           const existingBookIds = new Set(Object.keys(currentBooks));
           
-          // First restore books from cloud (in case localStorage was cleared)
-          const success = await hybridSyncService.loadAllBooksFromCloud();
+          // Load from cloud using DocumentMutationService
+          // Note: Book list loading happens separately - this is for world data
+          const currentBook = currentBookId;
+          let success = false;
+          
+          if (currentBook) {
+            const result = await documentMutationService.loadDocument(currentBook);
+            success = result.success;
+            if (result.success && result.data) {
+              loadWorldData(result.data.world_document);
+            }
+          } else {
+            // No current book, just mark as success for now
+            success = true;
+          }
           
           if (success) {
             console.log('[Index] Books restored from cloud successfully');
@@ -117,7 +131,10 @@ const Index = () => {
                 const batchPromises = batch.map((book, index) => {
                   return new Promise<void>((resolve) => {
                     setTimeout(() => {
-                      hybridSyncService.loadFromCloud(book.id).then(bookSuccess => {
+                      documentMutationService.loadDocument(book.id).then(({ success: bookSuccess, data }) => {
+                        if (bookSuccess && data) {
+                          loadWorldData(data.world_document);
+                        }
                         if (bookSuccess) {
                           console.log(`[Index] Loaded world data for new book: ${book.title}`);
                         } else {
@@ -355,6 +372,11 @@ const Index = () => {
     <div className="h-screen bg-background text-foreground relative overflow-hidden">
       {/* Quota Warning Bar */}
       <QuotaWarningBar />
+      
+      {/* Conflict Resolution Status */}
+      <div className="absolute top-12 right-4 z-50">
+        <ConflictStatusIndicator />
+      </div>
       
             
       {/* Media Experience Layers */}

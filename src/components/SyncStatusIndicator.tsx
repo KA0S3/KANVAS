@@ -3,9 +3,10 @@ import { Cloud, CloudOff, Wifi, WifiOff, Loader2, CheckCircle, AlertCircle, Cloc
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { hybridSyncService, type SyncStatus } from '@/services/hybridSyncService';
+import { documentMutationService, type SyncStatus } from '@/services/DocumentMutationService';
 import { useCloudStore } from '@/stores/cloudStore';
 import { useAuthStore } from '@/stores/authStore';
+import { CloudRetryBadge } from './CloudRetryStatus';
 
 interface SyncStatusIndicatorProps {
   compact?: boolean;
@@ -22,7 +23,8 @@ export function SyncStatusIndicator({ compact = false, showManualSync = true }: 
     storageUsed: 0,
     storageLimit: 0,
     syncInProgress: false,
-    queuedItems: 0
+    queuedItems: 0,
+    documentVersion: 1
   });
   const [isManualSyncing, setIsManualSyncing] = useState(false);
 
@@ -30,12 +32,12 @@ export function SyncStatusIndicator({ compact = false, showManualSync = true }: 
   const { isAuthenticated } = useAuthStore();
 
   useEffect(() => {
-    const unsubscribe = hybridSyncService.subscribe((status) => {
+    const unsubscribe = documentMutationService.subscribe((status) => {
       setSyncStatus(status);
     });
 
     // Get initial status
-    setSyncStatus(hybridSyncService.getSyncStatus());
+    setSyncStatus(documentMutationService.getStatus());
 
     return unsubscribe;
   }, []);
@@ -43,7 +45,7 @@ export function SyncStatusIndicator({ compact = false, showManualSync = true }: 
   const handleManualSync = async () => {
     setIsManualSyncing(true);
     try {
-      await hybridSyncService.triggerManualSync();
+      await documentMutationService.syncNow();
     } catch (error) {
       console.error('[SyncStatusIndicator] Manual sync failed:', error);
     } finally {
@@ -118,26 +120,30 @@ export function SyncStatusIndicator({ compact = false, showManualSync = true }: 
 
   if (compact) {
     return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className={`flex items-center gap-1 cursor-pointer ${getStatusColor()}`}>
-              {getStatusIcon()}
-            </div>
-          </TooltipTrigger>
-          <TooltipContent>
-            <div className="text-sm space-y-1">
-              <p>{getStatusText()}</p>
-              {isAuthenticated && (
-                <>
-                  <p>Storage: {formatBytes(syncStatus.storageUsed)} / {formatBytes(syncStatus.storageLimit)}</p>
-                  {syncStatus.queuedItems > 0 && <p>Queued items: {syncStatus.queuedItems}</p>}
-                </>
-              )}
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <div className="flex items-center gap-2">
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className={`flex items-center gap-1 cursor-pointer ${getStatusColor()}`}>
+                {getStatusIcon()}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <div className="text-sm space-y-1">
+                <p>{getStatusText()}</p>
+                {isAuthenticated && (
+                  <>
+                    <p>Storage: {formatBytes(syncStatus.storageUsed)} / {formatBytes(syncStatus.storageLimit)}</p>
+                    {syncStatus.queuedItems > 0 && <p>Queued items: {syncStatus.queuedItems}</p>}
+                  </>
+                )}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        {/* Show failed upload badge when compact */}
+        {isAuthenticated && <CloudRetryBadge />}
+      </div>
     );
   }
 
@@ -178,6 +184,9 @@ export function SyncStatusIndicator({ compact = false, showManualSync = true }: 
             Offline
           </Badge>
         )}
+
+        {/* Failed upload indicator */}
+        {isAuthenticated && <CloudRetryBadge />}
       </div>
 
       {/* Manual Sync Button */}

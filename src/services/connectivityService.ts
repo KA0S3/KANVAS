@@ -226,17 +226,17 @@ class ConnectivityService {
 
   private processSyncQueueOnReconnect(): void {
     // Import dynamically to avoid circular dependency
-    import('@/services/hybridSyncService').then(({ hybridSyncService }) => {
-      if (hybridSyncService) {
+    import('@/services/DocumentMutationService').then(({ documentMutationService }) => {
+      if (documentMutationService) {
         console.log('[Connectivity] Triggering sync queue processing on reconnection');
         // Small delay to ensure everything is ready
         setTimeout(() => {
-          // Access the public method or trigger a sync cycle
-          hybridSyncService.syncToCloud();
+          // Trigger sync via DocumentMutationService
+          documentMutationService.syncNow();
         }, 1000);
       }
     }).catch(error => {
-      console.error('[Connectivity] Failed to import hybridSyncService:', error);
+      console.error('[Connectivity] Failed to import DocumentMutationService:', error);
     });
   }
 

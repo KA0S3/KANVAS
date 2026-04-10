@@ -4,9 +4,10 @@ import { useBookStore } from '@/stores/bookStoreSimple';
 import { useBackgroundStore } from '@/stores/backgroundStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useCloudStore } from '@/stores/cloudStore';
-import { optimizedSyncService } from './optimizedSyncService';
+import { documentMutationService, type SyncStatus } from './DocumentMutationService';
 
 export type AutosaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+export type { SyncStatus };
 
 interface AutosaveState {
   status: AutosaveStatus;
@@ -118,7 +119,7 @@ class AutosaveService {
       if (isAuthenticated) {
         if (isOnline) {
           console.log('[AutosaveService] User authenticated and online, syncing to cloud');
-          const cloudSyncSuccess = await optimizedSyncService.syncToCloud();
+          const cloudSyncSuccess = await documentMutationService.syncNow();
           
           if (cloudSyncSuccess) {
             console.log('[AutosaveService] Cloud sync successful');
@@ -224,46 +225,52 @@ class AutosaveService {
   }
 
   private async saveWorldData(userId: string, bookId: string, worldData: any): Promise<void> {
-    // Save world data to projects table metadata field
-    const { error } = await supabase
-      .from('projects')
-      .upsert({
-        id: bookId, // Using bookId as projectId
-        user_id: userId,
-        name: worldData.bookTitle || 'Untitled Project',
-        description: JSON.stringify(worldData),
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'id,user_id'
+    // DocumentMutationService handles saving via RPC - no direct table writes
+    // This method is kept for compatibility but now delegates to DocumentMutationService
+    const assetStore = useAssetStore.getState();
+    const assets = assetStore.getWorldData();
+    
+    // Queue all asset changes as operations
+    const bookAssets = assets.assets || {};
+    Object.values(bookAssets).forEach((asset: any) => {
+      documentMutationService.queueOperation({
+        op: 'CREATE_ASSET',
+        assetId: asset.id,
+        parentId: asset.parentId,
+        name: asset.name,
+        type: asset.type,
+        position: {
+          x: asset.x || 0,
+          y: asset.y || 0,
+          width: asset.width || 200,
+          height: asset.height || 150,
+          zIndex: asset.zIndex || 0
+        },
+        isExpanded: asset.isExpanded ?? true,
+        customFields: asset.customFields || {}
       });
-
-    if (error) {
-      throw new Error(`Failed to save world data: ${error.message}`);
-    }
+    });
+    
+    // Trigger immediate sync
+    await documentMutationService.syncNow();
   }
 
   private async saveBackgroundData(userId: string, bookId: string, configs: any): Promise<void> {
-    // Save background configs to assets table as metadata
-    const { error } = await supabase
-      .from('assets')
-      .upsert({
-        id: `${bookId}-backgrounds`, // Unique ID for background configs
-        user_id: userId,
-        project_id: bookId,
-        name: 'Background Configurations',
-        file_path: `backgrounds/${bookId}.json`,
-        file_type: 'application/json',
-        file_size_bytes: JSON.stringify(configs).length,
-        mime_type: 'application/json',
-        metadata: { configs, type: 'background_configurations' },
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'id,user_id'
-      });
-
-    if (error) {
-      throw new Error(`Failed to save background data: ${error.message}`);
-    }
+    // DocumentMutationService handles saving via RPC - no direct table writes
+    // Background configs are now stored in world_document via UPDATE_BACKGROUND_CONFIG operations
+    Object.entries(configs).forEach(([assetId, config]: [string, any]) => {
+      if (assetId.startsWith('asset:')) {
+        const realAssetId = assetId.replace('asset:', '');
+        documentMutationService.queueOperation({
+          op: 'UPDATE_BACKGROUND_CONFIG',
+          assetId: realAssetId,
+          config: config
+        });
+      }
+    });
+    
+    // Trigger immediate sync
+    await documentMutationService.syncNow();
   }
 
   private startPeriodicAutosave(): void {
