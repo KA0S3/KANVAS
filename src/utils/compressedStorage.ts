@@ -13,6 +13,7 @@ interface StorageEntry {
 }
 
 // Simple dictionary-based compression
+// NOTE: Boolean compression removed as it conflicts with numeric values
 const COMPRESSION_PAIRS: [string, string][] = [
   ['"position":', '"pos":'],
   ['"customFields":', '"cf":'],
@@ -37,16 +38,12 @@ const COMPRESSION_PAIRS: [string, string][] = [
   ['"outerRadius":', '"or":'],
   ['"gridSize":', '"gs":'],
   ['"scale":', '"sc":'],
-  [',"x":', ',"x":'], // Keep coordinate keys short
-  [',"y":', ',"y":'],
+  ['"z":', '"z":'], // Keep coordinate keys short
+  ['"x":', '"x":'],
+  ['"y":', '"y":'],
   ['"width":', '"w":'],
   ['"height":', '"h":'],
-  ['true,', '1,'],
-  ['false,', '0,'],
-  ['true}', '1}'],
-  ['false}', '0}'],
-  ['true]', '1]'],
-  ['false]', '0]'],
+  // Boolean compression removed - was corrupting numeric values like "10" -> "1true0"
 ];
 
 function compress(str: string): string {
@@ -113,6 +110,24 @@ class IDBStorage {
     });
   }
 
+  // Get raw compressed data without decompression (for recovery)
+  async getRawItem(key: string): Promise<string | null> {
+    await this.init();
+    if (!this.db) return null;
+
+    return new Promise((resolve, reject) => {
+      const tx = this.db!.transaction([STORE_NAME], 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.get(key);
+
+      request.onsuccess = () => {
+        const entry: StorageEntry | undefined = request.result;
+        resolve(entry ? entry.data : null);
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+
   async setItem(key: string, value: string): Promise<void> {
     await this.init();
     if (!this.db) throw new Error('IDB not initialized');
@@ -161,10 +176,26 @@ import type { PersistStorage, StorageValue } from 'zustand/middleware';
 export const hybridStorage: PersistStorage<unknown> = {
   getItem: async (name: string): Promise<StorageValue<unknown> | null> => {
     try {
-      // Try IndexedDB first
+      // Try IndexedDB first (with decompression)
       const idbValue = await idbStorage.getItem(name);
       if (idbValue !== null) {
-        return JSON.parse(idbValue) as StorageValue<unknown>;
+        try {
+          return JSON.parse(idbValue) as StorageValue<unknown>;
+        } catch (parseError) {
+          // If decompressed data fails to parse, try parsing raw compressed data
+          console.warn(`[hybridStorage] Decompressed data failed to parse for ${name}, trying raw compressed...`);
+          const rawCompressed = await idbStorage.getRawItem(name);
+          if (rawCompressed) {
+            try {
+              // Try to parse the raw compressed data directly (may work if data wasn't actually compressed)
+              return JSON.parse(rawCompressed) as StorageValue<unknown>;
+            } catch {
+              // Data is truly corrupted, log for debugging
+              console.error(`[hybridStorage] Data corruption detected for ${name}. Raw data length: ${rawCompressed.length}`);
+            }
+          }
+          throw parseError;
+        }
       }
       
       // Fallback to localStorage for migration/compatibility
@@ -172,6 +203,7 @@ export const hybridStorage: PersistStorage<unknown> = {
       return localValue ? JSON.parse(localValue) : null;
     } catch (error) {
       console.error(`[hybridStorage] Error reading ${name}:`, error);
+      // Last resort: try localStorage
       try {
         const localValue = localStorage.getItem(name);
         return localValue ? JSON.parse(localValue) : null;
