@@ -172,8 +172,13 @@ export const hybridStorage: PersistStorage<unknown> = {
       return localValue ? JSON.parse(localValue) : null;
     } catch (error) {
       console.error(`[hybridStorage] Error reading ${name}:`, error);
-      const localValue = localStorage.getItem(name);
-      return localValue ? JSON.parse(localValue) : null;
+      try {
+        const localValue = localStorage.getItem(name);
+        return localValue ? JSON.parse(localValue) : null;
+      } catch (localError) {
+        console.error(`[hybridStorage] Error reading ${name} from localStorage fallback:`, localError);
+        return null;
+      }
     }
   },
 
