@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { subscribeWithSelector, persist, createJSONStorage } from 'zustand/middleware';
+import { subscribeWithSelector } from 'zustand/middleware';
 import type { BackgroundConfig, BackgroundStore } from '@/types/background';
 import { DEFAULT_BACKGROUND_CONFIG, getAssetKey } from '@/types/background';
 import { getBackground as getBackgroundFromStorage, setBackground as setBackgroundToStorage, loadAllBackgrounds } from '@/utils/backgroundStorage';
@@ -7,8 +7,7 @@ import { documentMutationService } from '@/services/DocumentMutationService';
 
 export const useBackgroundStore = create<BackgroundStore>()(
   subscribeWithSelector(
-    persist(
-      (set, get) => {
+    (set, get) => {
         // Initialize configs from localStorage on store creation
         const initialConfigs = loadAllBackgrounds() || {};
 
@@ -114,13 +113,6 @@ export const useBackgroundStore = create<BackgroundStore>()(
             };
           },
         };
-      },
-      {
-        name: 'kanvas-background-storage',
-        storage: createJSONStorage(() => localStorage),
-        partialize: (state) => ({
-          configs: state.configs,
-        }),
       }
     )
   )
