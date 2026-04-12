@@ -52,15 +52,19 @@ export const useBackgroundStore = create<BackgroundStore>()(
             
             // Queue operation for DocumentMutationService using UPDATE_GLOBAL_BACKGROUNDS (Phase 7)
             // This stores all background configs in world_document.backgrounds as single source of truth
-            // Build updated configs object including the new config
+            // Only queue if a project is loaded (user has entered a book)
             const updatedConfigs = {
               ...get().configs,
               [key]: clonedConfig
             };
-            documentMutationService.queueOperation({
-              op: 'UPDATE_GLOBAL_BACKGROUNDS',
-              backgrounds: updatedConfigs
-            });
+            if (documentMutationService.getCurrentProjectId()) {
+              documentMutationService.queueOperation({
+                op: 'UPDATE_GLOBAL_BACKGROUNDS',
+                backgrounds: updatedConfigs
+              });
+            } else {
+              console.log('[BackgroundStore] Background saved locally - will sync when book is entered');
+            }
           },
 
           cloneConfig: (config: BackgroundConfig): BackgroundConfig => {

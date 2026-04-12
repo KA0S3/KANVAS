@@ -207,6 +207,13 @@ class DocumentMutationService {
     this.currentProjectId = projectId;
   }
 
+  /**
+   * Get current project ID - used to check if a project is loaded before operations
+   */
+  getCurrentProjectId(): string | null {
+    return this.currentProjectId;
+  }
+
   // Queue operation for batching with compression
   queueOperation(operation: DocumentOperation): void {
     // Compress operations: remove redundant operations on same asset
