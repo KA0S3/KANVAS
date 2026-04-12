@@ -634,7 +634,8 @@ COMMENT ON FUNCTION public.get_project_stats(UUID) IS
 CREATE OR REPLACE FUNCTION public.create_project(
     p_name TEXT,
     p_description TEXT DEFAULT NULL,
-    p_cover_config JSONB DEFAULT '{}'
+    p_cover_config JSONB DEFAULT '{}',
+    p_project_id UUID DEFAULT NULL
 )
 RETURNS UUID
 LANGUAGE plpgsql
@@ -643,7 +644,11 @@ AS $$
 DECLARE
     v_project_id UUID;
 BEGIN
+    -- Use provided ID or generate new one
+    v_project_id := COALESCE(p_project_id, gen_random_uuid());
+    
     INSERT INTO public.projects (
+        id,
         user_id,
         name,
         description,
@@ -651,6 +656,7 @@ BEGIN
         world_document,
         version
     ) VALUES (
+        v_project_id,
         auth.uid(),
         p_name,
         p_description,
@@ -658,14 +664,15 @@ BEGIN
         '{"assets":{},"viewport":{"offset":{"x":0,"y":0},"scale":1}}'::jsonb,
         1
     )
+    ON CONFLICT (id) DO NOTHING
     RETURNING id INTO v_project_id;
     
     RETURN v_project_id;
 END;
 $$;
 
-COMMENT ON FUNCTION public.create_project(TEXT, TEXT, JSONB) IS 
-'Create a new project with empty world document. Returns the new project ID.';
+COMMENT ON FUNCTION public.create_project(TEXT, TEXT, JSONB, UUID) IS 
+'Create a new project with empty world document. Returns the new project ID. Optional p_project_id to use a specific ID.';
 
 -- =====================================================
 -- 8. UPDATE PROJECT META (Name/Description/Cover)

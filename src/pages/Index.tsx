@@ -368,7 +368,7 @@ const Index = () => {
     deleteBook(book.id);
   };
 
-  const handleWorldCreated = (newBookId: string) => {
+  const handleWorldCreated = async (newBookId: string) => {
     // Find the newly created book
     const allBooks = getAllBooks();
     const newBook = allBooks.find(book => book.id === newBookId);
@@ -376,6 +376,22 @@ const Index = () => {
     if (newBook) {
       // Select the new book and focus on it in single view mode
       handleBookSelect(newBook);
+      
+      // Immediately create project on server for cloud sync
+      const { isAuthenticated } = useAuthStore.getState();
+      if (isAuthenticated) {
+        console.log('[Index] Creating server project for new book:', newBook.title);
+        const created = await documentMutationService.createProject(
+          newBook.id,
+          newBook.title,
+          newBook.coverPageSettings
+        );
+        if (created) {
+          console.log('[Index] Server project created for new book:', newBook.title);
+        } else {
+          console.warn('[Index] Failed to create server project for new book');
+        }
+      }
     }
   };
 

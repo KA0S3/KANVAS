@@ -91,17 +91,12 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
   // Initialize sample data
   useSampleData();
 
-  // Check for background migration needs
+  // Migration check disabled - backgrounds now automatically save to IndexedDB
+  // Old data is migrated transparently when loaded
   useEffect(() => {
-    const checkMigration = () => {
-      if (BackgroundMigration.needsMigration()) {
-        setShowMigrationDialog(true);
-      }
-    };
-
-    // Delay check to allow app to initialize
-    const timeout = setTimeout(checkMigration, 2000);
-    return () => clearTimeout(timeout);
+    // Migration is now handled automatically by backgroundStorage.ts
+    // No manual migration dialog needed
+    setShowMigrationDialog(false);
   }, []);
 
   // Listen for background save events

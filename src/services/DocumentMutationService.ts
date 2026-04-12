@@ -168,37 +168,29 @@ class DocumentMutationService {
         return false;
       }
 
-      // Check if project already exists
-      const { data: existing } = await supabase
-        .from('projects')
-        .select('id')
-        .eq('id', projectId)
-        .single();
-
-      if (existing) {
+      // First try to load the project to see if it exists
+      const loadResult = await this.loadDocument(projectId);
+      if (loadResult.success && loadResult.data) {
         console.log('[DocumentMutation] Project already exists:', projectId);
-        this.currentProjectId = projectId;
         return true;
       }
 
-      // Create new project with empty world_document
-      const { error } = await supabase
-        .from('projects')
-        .insert({
-          id: projectId,
-          user_id: user.id,
-          name: projectName,
-          world_document: { assets: {}, tags: {}, globalCustomFields: [], version: 1 },
-          version: 1,
-          cover_config: coverConfig || {}
+      // Create new project using RPC (bypasses RLS)
+      console.log('[DocumentMutation] Creating project via RPC:', projectId);
+      const { data, error } = await supabase
+        .rpc('create_project', {
+          p_name: projectName,
+          p_description: null,
+          p_cover_config: coverConfig || {},
+          p_project_id: projectId
         });
 
       if (error) {
-        console.error('[DocumentMutation] Failed to create project:', error);
+        console.error('[DocumentMutation] Failed to create project via RPC:', error);
         return false;
       }
 
-      console.log('[DocumentMutation] Created new project:', projectId);
+      console.log('[DocumentMutation] Created new project:', data);
       this.currentProjectId = projectId;
       this.currentVersion = 1;
       return true;
