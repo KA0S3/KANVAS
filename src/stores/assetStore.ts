@@ -1051,7 +1051,7 @@ export const useAssetStore = create<AssetStore>()(
     });
   },
 })
-);
+));
 
 // Auto-save functionality: Now handled by autosaveService
 // This subscription is kept for compatibility but autosaveService handles cloud saves
