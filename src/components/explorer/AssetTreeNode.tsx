@@ -23,7 +23,7 @@ interface AssetTreeNodeProps {
 }
 
 export function AssetTreeNode({ asset, depth, searchQuery = '', level = 0, onEdit, onSelectAndFocus, onCreateChildAsset, isDragActive = false }: AssetTreeNodeProps) {
-  const { assets, setActiveAsset, currentActiveId, toggleAssetExpansion } = useAssetStore();
+  const { getCurrentBookAssets, setActiveAsset, currentActiveId, toggleAssetExpansion } = useAssetStore();
   const { getAssetTags } = useTagStore();
   const [contextMenu, setContextMenu] = useState<{
     visible: boolean;
@@ -31,6 +31,7 @@ export function AssetTreeNode({ asset, depth, searchQuery = '', level = 0, onEdi
     y: number;
   }>({ visible: false, x: 0, y: 0 });
   
+  const assets = getCurrentBookAssets();
   const hasChildren = asset.children && asset.children.length > 0;
   const childAssets = asset.children?.map(childId => assets[childId]).filter(Boolean) || [];
   const isExpanded = asset.isExpanded || false;

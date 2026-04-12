@@ -25,7 +25,8 @@ export function TagFilterControls({
   compact = false 
 }: TagFilterControlsProps) {
   const { tags, activeFilters, toggleFilter, clearFilters, setFilters } = useTagStore();
-  const { assets } = useAssetStore();
+  const { getCurrentBookAssets } = useAssetStore();
+  const assets = getCurrentBookAssets();
   
   const [isOpen, setIsOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);

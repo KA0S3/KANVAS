@@ -156,6 +156,65 @@ class DocumentMutationService {
     }
   }
 
+  /**
+   * Create a new project on the server if it doesn't exist
+   * This is needed for new books created locally that need to be synced
+   */
+  async createProject(projectId: string, projectName: string, coverConfig?: any): Promise<boolean> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('[DocumentMutation] Cannot create project - not authenticated');
+        return false;
+      }
+
+      // Check if project already exists
+      const { data: existing } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('id', projectId)
+        .single();
+
+      if (existing) {
+        console.log('[DocumentMutation] Project already exists:', projectId);
+        this.currentProjectId = projectId;
+        return true;
+      }
+
+      // Create new project with empty world_document
+      const { error } = await supabase
+        .from('projects')
+        .insert({
+          id: projectId,
+          user_id: user.id,
+          name: projectName,
+          world_document: { assets: {}, tags: {}, globalCustomFields: [], version: 1 },
+          version: 1,
+          cover_config: coverConfig || {}
+        });
+
+      if (error) {
+        console.error('[DocumentMutation] Failed to create project:', error);
+        return false;
+      }
+
+      console.log('[DocumentMutation] Created new project:', projectId);
+      this.currentProjectId = projectId;
+      this.currentVersion = 1;
+      return true;
+    } catch (error) {
+      console.error('[DocumentMutation] Error creating project:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Set project ID directly (for cases where we know the project exists or was just created)
+   */
+  setProjectId(projectId: string): void {
+    this.currentProjectId = projectId;
+  }
+
   // Queue operation for batching with compression
   queueOperation(operation: DocumentOperation): void {
     // Compress operations: remove redundant operations on same asset

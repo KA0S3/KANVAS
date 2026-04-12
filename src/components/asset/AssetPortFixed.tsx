@@ -14,8 +14,9 @@ interface AssetPortProps {
 }
 
 export function AssetPortFixed({ assetId, viewportSize, className }: AssetPortProps) {
-  const { assets, getAssetChildren } = useAssetStore();
+  const { getCurrentBookAssets, getAssetChildren } = useAssetStore();
   const { getCurrentBook } = useBookStore();
+  const assets = getCurrentBookAssets();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showBackgroundModal, setShowBackgroundModal] = useState(false);
   const [effectiveViewportSize, setEffectiveViewportSize] = useState(viewportSize);

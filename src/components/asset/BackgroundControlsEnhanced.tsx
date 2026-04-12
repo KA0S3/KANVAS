@@ -23,12 +23,13 @@ interface BackgroundControlsEnhancedProps {
 }
 
 export function BackgroundControlsEnhanced({ assetId, onSave, onToggleSidebar }: BackgroundControlsEnhancedProps) {
-  const { assets, updateAsset, setIsEditingBackground } = useAssetStore();
+  const { getCurrentBookAssets, updateAsset, setIsEditingBackground } = useAssetStore();
   const { getCurrentBook, getWorldData, updateWorldData } = useBookStore();
   const { getBackground, setBackground, loadBackgroundImage, getStorageInfo } = useBackgroundStoreEnhanced();
   const { user, plan, isAuthenticated } = useAuthStore();
   const { syncEnabled } = useCloudStore();
   
+  const assets = getCurrentBookAssets();
   const asset = assetId ? assets[assetId] : null;
   const currentBook = getCurrentBook();
   

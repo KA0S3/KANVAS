@@ -20,10 +20,11 @@ interface BackgroundControlsProps {
 }
 
 export function BackgroundControls({ assetId, onSave, onToggleSidebar }: BackgroundControlsProps) {
-  const { assets, updateAsset, setIsEditingBackground } = useAssetStore();
+  const { getCurrentBookAssets, updateAsset, setIsEditingBackground } = useAssetStore();
   const { getCurrentBook, getWorldData, updateWorldData } = useBookStore();
   const { getBackground, setBackground, migrateLegacyConfig } = useBackgroundStore();
   
+  const assets = getCurrentBookAssets();
   const asset = assetId ? assets[assetId] : null;
   const currentBook = getCurrentBook();
   

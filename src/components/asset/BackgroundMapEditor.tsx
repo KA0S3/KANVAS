@@ -30,9 +30,10 @@ interface BackgroundMapEditorProps {
 }
 
 export function BackgroundMapEditor({ isOpen, onClose, assetId, viewportSize: _viewportSize, onSave }: BackgroundMapEditorProps) {
-  const { assets, updateAsset } = useAssetStore();
+  const { getCurrentBookAssets, updateAsset } = useAssetStore();
   const { getCurrentBook, getWorldData, updateWorldData } = useBookStore();
   const { getBackground, setBackground } = useBackgroundStore();
+  const assets = getCurrentBookAssets();
   
   // Hook to get actual window size
   const [windowSize, setWindowSize] = useState({ width: 800, height: 600 });

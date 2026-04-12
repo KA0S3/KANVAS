@@ -31,9 +31,10 @@ interface BackgroundMapEditorProps {
 }
 
 export function BackgroundMapEditorFixed({ isOpen, onClose, assetId, onSave }: BackgroundMapEditorProps) {
-  const { assets } = useAssetStore();
+  const { getCurrentBookAssets } = useAssetStore();
   const { getCurrentBook } = useBookStore();
   const { getBackground } = useBackgroundStore();
+  const assets = getCurrentBookAssets();
   
   // Hook to get actual window size
   const [windowSize, setWindowSize] = useState({ width: 800, height: 600 });

@@ -63,7 +63,8 @@ export function AssetCreationModal({ isOpen, onClose, initialData, parentId, gen
   const { tags } = useTagStore();
   const { syncEnabled } = useCloudStore();
   const { isAuthenticated, plan } = useAuthStore();
-  const { assets } = useAssetStore();
+  const { getCurrentBookAssets } = useAssetStore();
+  const assets = getCurrentBookAssets();
   
   // Calculate the correct position based on whether this is a child asset or root asset
   const getCalculatedPosition = useCallback(() => {

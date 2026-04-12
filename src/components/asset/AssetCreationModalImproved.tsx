@@ -62,7 +62,8 @@ export function AssetCreationModalImproved({ isOpen, onClose, initialData, paren
   const { tags } = useTagStore();
   const { syncEnabled } = useCloudStore();
   const { isAuthenticated, plan } = useAuthStore();
-  const { assets } = useAssetStore();
+  const { getCurrentBookAssets } = useAssetStore();
+  const assets = getCurrentBookAssets();
   
   // Collapsible sections state
   const [expandedSections, setExpandedSections] = useState({

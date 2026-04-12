@@ -318,10 +318,35 @@ const Index = () => {
     // Don't close library here - let user stay in book library
   };
 
-  const handleEnterBook = (book: Book) => {
+  const handleEnterBook = async (book: Book) => {
     // Start book entry animation instead of direct entry
     setShowBookEntryAnimation(true);
     setBookLibraryOpen(false);
+    
+    // Load document from server to set currentProjectId for sync
+    // This is critical - without it, asset operations won't sync
+    const { isAuthenticated } = useAuthStore.getState();
+    if (isAuthenticated) {
+      const result = await documentMutationService.loadDocument(book.id);
+      if (result.success && result.data) {
+        console.log('[Index] Loaded document for sync:', result.data.version);
+      } else if (result.error === 'Project not found') {
+        // Book doesn't exist on server yet - create it
+        console.log('[Index] Book not found on server, creating project...');
+        const created = await documentMutationService.createProject(
+          book.id, 
+          book.title,
+          book.coverPageSettings
+        );
+        if (created) {
+          console.log('[Index] Created project on server for book:', book.title);
+        } else {
+          console.warn('[Index] Failed to create project on server');
+        }
+      } else {
+        console.warn('[Index] Could not load document from server:', result.error);
+      }
+    }
     
     // Store the book data for after animation
     setTimeout(() => {

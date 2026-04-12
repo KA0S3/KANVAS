@@ -90,7 +90,8 @@ interface AssetExplorerProps {
 }
 
 export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerProps) {
-  const { assets, updateAsset, currentActiveId, currentViewportId, setIsEditingBackground, reparentAsset } = useAssetStore();
+  const { getCurrentBookAssets, updateAsset, currentActiveId, currentViewportId, setIsEditingBackground, reparentAsset } = useAssetStore();
+  const assets = getCurrentBookAssets();
   const [searchQuery, setSearchQuery] = useState('');
   const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
@@ -117,7 +118,8 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
     const { active } = event;
     console.log('Drag started:', active.id);
     setActiveId(active.id as string);
-    const asset = assets[active.id as string];
+    const currentAssets = getCurrentBookAssets();
+    const asset = currentAssets[active.id as string];
     setDraggedAsset(asset || null);
   };
 
@@ -125,14 +127,15 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
     const { active, over } = event;
     if (!over) return;
     
-    const activeAsset = assets[active.id as string];
-    const overAsset = assets[over.id as string];
+    const currentAssets = getCurrentBookAssets();
+    const activeAsset = currentAssets[active.id as string];
+    const overAsset = currentAssets[over.id as string];
     
     if (!activeAsset || !overAsset) return;
     
     // Prevent dropping a parent onto its own child
     const isDescendant = (parentId: string, childId: string): boolean => {
-      const parent = assets[parentId];
+      const parent = currentAssets[parentId];
       if (!parent) return false;
       
       if (parent.children.includes(childId)) return true;
@@ -156,7 +159,8 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
       return;
     }
     
-    const activeAsset = assets[active.id as string];
+    const currentAssets = getCurrentBookAssets();
+    const activeAsset = currentAssets[active.id as string];
     
     if (!activeAsset) {
       console.warn('Active asset not found:', active.id);
@@ -177,7 +181,7 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
       return;
     }
     
-    const overAsset = assets[over.id as string];
+    const overAsset = currentAssets[over.id as string];
     
     if (!overAsset) {
       console.warn('Over asset not found:', over.id);
@@ -190,7 +194,7 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
     
     // Prevent dropping a parent onto its own child
     const isDescendant = (parentId: string, childId: string): boolean => {
-      const parent = assets[parentId];
+      const parent = currentAssets[parentId];
       if (!parent) return false;
       
       if (parent.children.includes(childId)) return true;
@@ -247,7 +251,7 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
     };
   }, []);
   
-  const rootAssets = assets ? Object.values(assets).filter(asset => !asset.parentId) : [];
+  const rootAssets = Object.values(assets).filter(asset => !asset.parentId);
   
   const openCreateAssetModal = useCallback(() => {
     console.log('🎯 Opening create modal');
@@ -300,7 +304,8 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
     console.log('Creating child asset for parent:', parentId);
     
     // Calculate position for child asset (offset from parent)
-    const parentAsset = assets[parentId];
+    const currentAssets = getCurrentBookAssets();
+    const parentAsset = currentAssets[parentId];
     let position;
     if (parentAsset) {
       // Position child near parent
@@ -331,7 +336,7 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
       // This will be used by the modal
       (window as any).pendingParentId = parentId;
     }, 0);
-  }, [assets]);
+  }, [getCurrentBookAssets]);
 
   const handleSelectAndFocus = (asset: Asset) => {
     // Set the asset as active
@@ -345,9 +350,9 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
   };
   
   // Get breadcrumb path to active asset
-  const activeAsset = currentActiveId && assets ? assets[currentActiveId] : null;
+  const activeAsset = currentActiveId ? assets[currentActiveId] : null;
   const breadcrumbs: string[] = [];
-  if (activeAsset && assets) {
+  if (activeAsset) {
     let current = activeAsset;
     while (current) {
       breadcrumbs.unshift(current.name);

@@ -12,7 +12,7 @@ import type { Asset } from '@/components/AssetItem';
 
 export const useAssetTree = () => {
   const {
-    assets,
+    getCurrentBookAssets,
     currentActiveId,
     createAsset,
     reparentAsset,
@@ -25,6 +25,8 @@ export const useAssetTree = () => {
     getAssetChildren,
     getAssetTree,
   } = useAssetStore();
+  
+  const assets = getCurrentBookAssets();
 
   // Tree state for UI (expansion, selection)
   const [treeState, setTreeState] = useState<AssetTreeState>({

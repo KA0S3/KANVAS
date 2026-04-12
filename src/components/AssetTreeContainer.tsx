@@ -22,7 +22,8 @@ export const AssetTreeContainer: React.FC<AssetTreeContainerProps> = ({
 }) => {
   const { treeNodes, flattenedTree, reparentAsset, setActiveAsset } = useAssetTree();
   const { getSelectedTags, clearTagSelection } = useTagStore();
-  const { assets } = useAssetStore();
+  const { getCurrentBookAssets } = useAssetStore();
+  const assets = getCurrentBookAssets();
   
   // Initialize sample tags
   useTagInitializer();

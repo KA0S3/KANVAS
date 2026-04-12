@@ -57,9 +57,10 @@ interface AssetEditModalProps {
 }
 
 export function AssetEditModalImproved({ isOpen, onClose, assetId, isNewAsset = false, viewportSize, onCreateAsset, isCreating = false, initialData }: AssetEditModalProps) {
-  const { assets, updateAsset, deleteAsset } = useAssetStore();
+  const { getCurrentBookAssets, updateAsset, deleteAsset } = useAssetStore();
   const { tags, addTagToAsset, removeTagFromAsset } = useTagStore();
   
+  const assets = getCurrentBookAssets();
   const asset = assetId ? assets[assetId] : null;
   
   // Collapsible sections state
