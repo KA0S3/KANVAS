@@ -1,10 +1,11 @@
 import { create } from 'zustand';
-import { subscribeWithSelector, persist, createJSONStorage } from 'zustand/middleware';
+import { subscribeWithSelector } from 'zustand/middleware';
 import type { Asset } from '@/components/AssetItem';
 import type { CustomField, CustomFieldValue, GlobalCustomField, ViewportDisplaySettings } from '@/types/extendedAsset';
 import { DEFAULT_VIEWPORT_DISPLAY_SETTINGS } from '@/types/extendedAsset';
 import { useBookStore } from './bookStoreSimple';
-import { StorageCleanup } from '@/utils/storageCleanup';
+import { supabase } from '@/lib/supabase';
+import { v4 as uuidv4 } from 'uuid';
 import { documentMutationService } from '@/services/DocumentMutationService';
 
 interface AssetStore {
@@ -77,9 +78,8 @@ interface AssetStore {
 }
 
 export const useAssetStore = create<AssetStore>()(
-  persist(
-    subscribeWithSelector(
-      (set, get) => ({
+  subscribeWithSelector(
+    (set, get) => ({
     // Initial state
     bookAssets: {},
     currentActiveId: null,
@@ -1050,62 +1050,8 @@ export const useAssetStore = create<AssetStore>()(
       };
     });
   },
-})),
-      {
-        name: 'kanvas-assets',
-        storage: createJSONStorage(() => ({
-          getItem: (name) => {
-            try {
-              return localStorage.getItem(name);
-            } catch (error) {
-              console.warn('[AssetStore] Failed to get item from localStorage:', error);
-              return null;
-            }
-          },
-          setItem: (name, value) => {
-            try {
-              // Check storage quota before setting
-              StorageCleanup.checkAndCleanup();
-              localStorage.setItem(name, value);
-            } catch (error) {
-              if (error instanceof Error && error.name === 'QuotaExceededError') {
-                console.error('[AssetStore] Storage quota exceeded, attempting cleanup...');
-                // Emergency cleanup
-                StorageCleanup.cleanupOldBackgrounds();
-                StorageCleanup.cleanupExpiredData();
-                
-                try {
-                  localStorage.setItem(name, value);
-                } catch (retryError) {
-                  console.error('[AssetStore] Still unable to save after cleanup - continuing with in-memory state only:', retryError);
-                  // CRITICAL FIX: Don't throw - let state update continue in memory
-                  // The app will work without persistence for this session
-                }
-              } else {
-                console.error('[AssetStore] Failed to set item in localStorage - continuing in memory:', error);
-                // CRITICAL FIX: Don't throw - let state update continue
-              }
-            }
-          },
-          removeItem: (name) => {
-            try {
-              localStorage.removeItem(name);
-            } catch (error) {
-              console.warn('[AssetStore] Failed to remove item from localStorage:', error);
-            }
-          },
-        })),
-        // Simplified persist - avoid custom serialization issues
-        partialize: (state) => ({
-          bookAssets: state.bookAssets,
-          currentActiveId: state.currentActiveId,
-          currentViewportId: state.currentViewportId,
-          bookGlobalCustomFields: state.bookGlobalCustomFields,
-          isEditingBackground: state.isEditingBackground,
-        }),
-      }
-    )
-  );
+})
+);
 
 // Auto-save functionality: Now handled by autosaveService
 // This subscription is kept for compatibility but autosaveService handles cloud saves
@@ -1133,3 +1079,48 @@ useAssetStore.subscribe(
     },
   }
 );
+
+// Initialize assetStore from bookStore on app start
+// This ensures assetStore is populated from the single source of truth (bookStore)
+const initFromBookStore = () => {
+  const bookState = useBookStore.getState();
+  if (bookState.currentBookId && bookState.books[bookState.currentBookId]) {
+    const book = bookState.books[bookState.currentBookId];
+    const assetStore = useAssetStore.getState();
+
+    // Only initialize if assetStore is empty for this book
+    if (!assetStore.bookAssets[bookState.currentBookId] || Object.keys(assetStore.bookAssets[bookState.currentBookId] || {}).length === 0) {
+      if (book.worldData?.assets && Object.keys(book.worldData.assets).length > 0) {
+        console.log(`[AssetStore] Initializing from bookStore for book ${bookState.currentBookId}:`, Object.keys(book.worldData.assets).length, 'assets');
+
+        // Convert flat assets to parent-child hierarchy
+        const assets = book.worldData.assets;
+        const bookAssets: Record<string, Asset> = {};
+
+        Object.values(assets).forEach((asset: any) => {
+          bookAssets[asset.id] = {
+            ...asset,
+            children: Object.values(assets)
+              .filter((a: any) => a.parentId === asset.id)
+              .map((a: any) => a.id),
+          };
+        });
+
+        useAssetStore.setState({
+          bookAssets: {
+            ...assetStore.bookAssets,
+            [bookState.currentBookId]: bookAssets,
+          },
+          bookGlobalCustomFields: {
+            ...assetStore.bookGlobalCustomFields,
+            [bookState.currentBookId]: book.worldData.globalCustomFields || [],
+          },
+        });
+      }
+    }
+  }
+};
+
+// Run initialization immediately and on book changes
+initFromBookStore();
+useBookStore.subscribe((state) => state.currentBookId, initFromBookStore);

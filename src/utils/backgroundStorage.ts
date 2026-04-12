@@ -5,6 +5,15 @@ import { indexedDBStorage } from './indexedDBStorage';
 const STORAGE_PREFIX = 'background:';
 const METADATA_PREFIX = 'bgmeta:';
 
+// Debug: Log all localStorage keys at module load
+const allKeys: string[] = [];
+for (let i = 0; i < localStorage.length; i++) {
+  const key = localStorage.key(i);
+  if (key) allKeys.push(key);
+}
+console.log('[BackgroundStorage] Module loaded. All localStorage keys:', allKeys);
+console.log('[BackgroundStorage] Background-related keys:', allKeys.filter(k => k.startsWith(STORAGE_PREFIX) || k.startsWith(METADATA_PREFIX)));
+
 /**
  * Centralized background storage utility
  * Uses IndexedDB for image blobs, localStorage for metadata
@@ -146,23 +155,26 @@ export async function setBackgroundAsync(assetId: string, config: BackgroundConf
 export function setBackground(assetId: string, config: BackgroundConfig): void {
   try {
     const storageKey = getStorageKey(assetId);
+    console.log(`[BackgroundStorage] Saving background for ${assetId} to key ${storageKey}`);
     const configToStore = JSON.parse(JSON.stringify(config));
-    
+
     // If there's a large base64 image, trigger async IndexedDB storage
     if (configToStore.imageUrl?.startsWith('data:') && configToStore.imageUrl.length > 50000) {
       // Store metadata without the large image for now
       configToStore.imageUrl = '[INDEXEDDB-PENDING]';
       localStorage.setItem(storageKey, JSON.stringify(configToStore));
-      
+      console.log(`[BackgroundStorage] Stored metadata (large image pending IndexedDB) for ${assetId}`);
+
       // Async store the image
       setBackgroundAsync(assetId, config).catch(err => {
         console.error(`[BackgroundStorage] Async image storage failed:`, err);
       });
     } else {
       localStorage.setItem(storageKey, JSON.stringify(configToStore));
+      console.log(`[BackgroundStorage] Successfully saved background for ${assetId} to ${storageKey}`);
     }
   } catch (error) {
-    console.error(`Error saving background config for ${assetId}:`, error);
+    console.error(`[BackgroundStorage] Error saving background config for ${assetId}:`, error);
   }
 }
 
@@ -207,7 +219,8 @@ export async function loadAllBackgroundsAsync(): Promise<Record<string, Backgrou
 // Sync version for backward compatibility
 export function loadAllBackgrounds(): Record<string, BackgroundConfig> {
   const configs: Record<string, BackgroundConfig> = {};
-  
+  const foundKeys: string[] = [];
+
   try {
     // Check new metadata format
     for (let i = 0; i < localStorage.length; i++) {
@@ -217,10 +230,11 @@ export function loadAllBackgrounds(): Record<string, BackgroundConfig> {
         const stored = localStorage.getItem(key);
         if (stored) {
           configs[assetId] = JSON.parse(stored);
+          foundKeys.push(assetId);
         }
       }
     }
-    
+
     // Check old format
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
@@ -230,14 +244,17 @@ export function loadAllBackgrounds(): Record<string, BackgroundConfig> {
           const stored = localStorage.getItem(key);
           if (stored) {
             configs[assetId] = JSON.parse(stored);
+            foundKeys.push(`${assetId} (old format)`);
           }
         }
       }
     }
+
+    console.log(`[BackgroundStorage] loadAllBackgrounds found ${foundKeys.length} backgrounds:`, foundKeys);
   } catch (error) {
     console.error('Error loading all background configs:', error);
   }
-  
+
   return configs;
 }
 

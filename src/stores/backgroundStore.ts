@@ -5,11 +5,19 @@ import { DEFAULT_BACKGROUND_CONFIG, getAssetKey } from '@/types/background';
 import { getBackground as getBackgroundFromStorage, setBackground as setBackgroundToStorage, loadAllBackgrounds } from '@/utils/backgroundStorage';
 import { documentMutationService } from '@/services/DocumentMutationService';
 
+const storeInitTime = Date.now();
+console.log('[BackgroundStore] ============================================');
+console.log('[BackgroundStore] STORE INITIALIZING at', storeInitTime);
+console.log('[BackgroundStore] ============================================');
+
 export const useBackgroundStore = create<BackgroundStore>()(
   subscribeWithSelector(
     (set, get) => {
         // Initialize configs from localStorage on store creation
+        console.log('[BackgroundStore] Running store creator function...');
         const initialConfigs = loadAllBackgrounds() || {};
+        const configCount = Object.keys(initialConfigs).length;
+        console.log(`[BackgroundStore] ✅ Store initialized with ${configCount} backgrounds:`, Object.keys(initialConfigs));
 
         return {
           configs: initialConfigs,
@@ -17,28 +25,35 @@ export const useBackgroundStore = create<BackgroundStore>()(
           getBackground: (assetId: string) => {
             const state = get();
             const key = getAssetKey(assetId);
-            
+
             // Try to get from in-memory store first
             if (state.configs[key]) {
+              console.log(`[BackgroundStore] Found background in memory for ${assetId} (key: ${key})`);
               return state.cloneConfig(state.configs[key]);
             }
-            
+
             // Fallback to localStorage and update store
+            console.log(`[BackgroundStore] Background not in memory, checking localStorage for ${assetId} (key: ${key})`);
             const localStorageConfig = getBackgroundFromStorage(key);
+            if (localStorageConfig && localStorageConfig.mode !== 'glass') {
+              console.log(`[BackgroundStore] Found background in localStorage for ${assetId}:`, localStorageConfig.mode);
+            }
             set((state) => ({
               configs: {
                 ...state.configs,
                 [key]: localStorageConfig,
               },
             }));
-            
+
             return localStorageConfig;
           },
 
           setBackground: (assetId: string, config: BackgroundConfig) => {
             const key = getAssetKey(assetId);
             const clonedConfig = get().cloneConfig(config);
-            
+
+            console.log(`[BackgroundStore] Setting background for ${assetId} (key: ${key}):`, clonedConfig.mode);
+
             // Update in-memory store
             set((state) => ({
               configs: {
@@ -46,9 +61,10 @@ export const useBackgroundStore = create<BackgroundStore>()(
                 [key]: clonedConfig,
               },
             }));
-            
+
             // Persist to localStorage immediately
             setBackgroundToStorage(key, clonedConfig);
+            console.log(`[BackgroundStore] Saved background to localStorage for ${assetId}`);
             
             // Queue operation for DocumentMutationService using UPDATE_GLOBAL_BACKGROUNDS (Phase 7)
             // This stores all background configs in world_document.backgrounds as single source of truth

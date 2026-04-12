@@ -1,7 +1,8 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import type { Book, BookViewMode, BookLibrarySettings, BookCoverPreset, LeatherColorPreset, WorldData } from '@/types/book';
 import { performanceMonitor } from '@/utils/performanceMonitor';
+import { hybridStorage } from '@/utils/compressedStorage';
 
 const defaultCoverPresets: BookCoverPreset[] = [
   { id: 'cosmic-blue', name: 'Cosmic Blue', color: '#3b82f6', gradient: 'linear-gradient(135deg, #3b82f6, #8b5cf6)' },
@@ -313,7 +314,7 @@ export const useBookStore = create<BookStore>()(
     },
     {
       name: 'kanvas-world-storage',
-      storage: createJSONStorage(() => localStorage),
+      storage: hybridStorage,
       partialize: (state) => ({
         books: state.books,
         currentBookId: state.currentBookId,
