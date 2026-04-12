@@ -115,7 +115,6 @@ export const useBackgroundStore = create<BackgroundStore>()(
         };
       }
     )
-  )
 );
 
 // Helper function for getting asset key with book context
