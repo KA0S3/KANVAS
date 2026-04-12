@@ -20,6 +20,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useTagStore } from "@/stores/tagStore";
 import { useThemeStore } from "@/stores/themeStore";
 import { useBackgroundStore } from "@/stores/backgroundStore";
+import type { BackgroundConfig } from "@/types/background";
 import { useMediaStore } from "@/stores/mediaStore";
 import { useBookStore } from "@/stores/bookStoreSimple";
 import { audioEngine } from "@/services/AudioEngine";
@@ -97,6 +98,18 @@ const Index = () => {
             success = result.success;
             if (result.success && result.data) {
               loadWorldData(result.data.world_document);
+
+              // Restore backgrounds from world_document.backgrounds
+              if (result.data.world_document?.backgrounds) {
+                const backgroundStore = useBackgroundStore.getState();
+                const backgrounds = result.data.world_document.backgrounds;
+                console.log('[Index] Restoring', Object.keys(backgrounds).length, 'backgrounds for current book');
+
+                Object.entries(backgrounds).forEach(([key, config]) => {
+                  const clonedConfig = backgroundStore.cloneConfig(config as BackgroundConfig);
+                  backgroundStore.setBackground(key, clonedConfig);
+                });
+              }
             }
           } else {
             // No current book, just mark as success for now
@@ -134,6 +147,18 @@ const Index = () => {
                       documentMutationService.loadDocument(book.id).then(({ success: bookSuccess, data }) => {
                         if (bookSuccess && data) {
                           loadWorldData(data.world_document);
+
+                          // Restore backgrounds for this book
+                          if (data.world_document?.backgrounds) {
+                            const backgroundStore = useBackgroundStore.getState();
+                            const backgrounds = data.world_document.backgrounds;
+                            console.log(`[Index] Restoring ${Object.keys(backgrounds).length} backgrounds for book: ${book.title}`);
+
+                            Object.entries(backgrounds).forEach(([key, config]) => {
+                              const clonedConfig = backgroundStore.cloneConfig(config as BackgroundConfig);
+                              backgroundStore.setBackground(key, clonedConfig);
+                            });
+                          }
                         }
                         if (bookSuccess) {
                           console.log(`[Index] Loaded world data for new book: ${book.title}`);
@@ -365,6 +390,18 @@ const Index = () => {
       setCurrentBook(book.id);
       loadWorldData(book.worldData);
       loadTagWorldData(book.worldData);
+
+      // Restore backgrounds from book's worldData if present
+      if (book.worldData?.backgrounds) {
+        const backgroundStore = useBackgroundStore.getState();
+        const backgrounds = book.worldData.backgrounds;
+        console.log('[Index] Restoring', Object.keys(backgrounds).length, 'backgrounds from book worldData');
+
+        Object.entries(backgrounds).forEach(([key, config]) => {
+          const clonedConfig = backgroundStore.cloneConfig(config as BackgroundConfig);
+          backgroundStore.setBackground(key, clonedConfig);
+        });
+      }
     }, 100);
   };
 

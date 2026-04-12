@@ -74,6 +74,7 @@ export interface WorldData {
   viewportOffset: { x: number; y: number };
   viewportScale: number;
   rootBackgroundConfig?: any;
+  backgrounds?: Record<string, any>; // Background configs stored with book
 }
 
 export interface BookCoverPreset {

@@ -6,6 +6,7 @@ import { connectivityService } from '@/services/connectivityService';
 import { performanceMonitor } from '@/utils/performanceMonitor';
 import { ConflictResolver, type Conflict, type ConflictResolution, type ConflictStrategy } from './ConflictResolver';
 import type { Asset } from '@/components/AssetItem';
+import type { BackgroundConfig } from '@/types/background';
 
 // Document operation types
 export type DocumentOperation =
@@ -498,14 +499,28 @@ class DocumentMutationService {
    */
   private async applyServerDocument(serverDoc: any): Promise<void> {
     console.log('[DocumentMutation] Applying server document to local state');
-    
+
     // Update version
     this.currentVersion = serverDoc.version;
-    
+
     // Update asset store with server data
     const assetStore = (await import('@/stores/assetStore')).useAssetStore.getState();
     assetStore.loadWorldData(serverDoc.world_document);
-    
+
+    // Restore backgrounds from world_document.backgrounds to backgroundStore
+    if (serverDoc.world_document?.backgrounds) {
+      const backgroundStore = (await import('@/stores/backgroundStore')).useBackgroundStore.getState();
+      const backgrounds = serverDoc.world_document.backgrounds;
+      console.log('[DocumentMutation] Restoring', Object.keys(backgrounds).length, 'backgrounds from server');
+
+      Object.entries(backgrounds).forEach(([key, config]) => {
+        // Don't trigger cloud sync when restoring from cloud (avoid loop)
+        // Directly update store state and localStorage
+        const clonedConfig = backgroundStore.cloneConfig(config as BackgroundConfig);
+        backgroundStore.setBackground(key, clonedConfig);
+      });
+    }
+
     // Dispatch event for other components
     window.dispatchEvent(new CustomEvent('document-synced', {
       detail: {
