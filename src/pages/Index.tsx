@@ -288,7 +288,8 @@ const Index = () => {
     }
 
     // Only save if we have meaningful state to preserve
-    if (!currentBookId && appPhase === 'LIBRARY') {
+    // Must have a book ID to save - otherwise we save null bookId which breaks viewport restoration
+    if (!currentBookId) {
       return;
     }
 
