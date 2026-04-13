@@ -24,8 +24,10 @@ export const useAssetTree = () => {
     getRootAssets,
     getAssetChildren,
     getAssetTree,
+    bookAssets,
   } = useAssetStore();
-  
+
+  // Subscribe to bookAssets for reactivity - ensures re-render when assets load from storage
   const assets = getCurrentBookAssets();
 
   // Tree state for UI (expansion, selection)

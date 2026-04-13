@@ -1123,4 +1123,17 @@ const initFromBookStore = () => {
 
 // Run initialization immediately and on book changes
 initFromBookStore();
-useBookStore.subscribe((state) => state.currentBookId, initFromBookStore);
+
+// Subscribe to bookStore changes - need to use selector syntax manually
+// since bookStore doesn't use subscribeWithSelector
+let lastBookId: string | null = null;
+let lastBooksCount = 0;
+useBookStore.subscribe((state) => {
+  // Check if currentBookId changed or books data was populated (rehydration)
+  const booksCount = Object.keys(state.books).length;
+  if (state.currentBookId !== lastBookId || booksCount !== lastBooksCount) {
+    lastBookId = state.currentBookId;
+    lastBooksCount = booksCount;
+    initFromBookStore();
+  }
+});
