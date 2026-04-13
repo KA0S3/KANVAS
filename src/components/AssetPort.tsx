@@ -195,6 +195,16 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
     }
   }, []);
 
+  // Sync enteredAssetId from store's currentViewportId on mount/restore
+  // This ensures that when the page is refreshed, we restore the correct viewport
+  useEffect(() => {
+    // Only sync if we have a valid currentViewportId in the store and assets are loaded
+    if (currentViewportId && assets && assets[currentViewportId]) {
+      console.log(`[AssetPort] Restoring viewport from store: ${currentViewportId}`);
+      setEnteredAssetId(currentViewportId);
+    }
+  }, [currentViewportId, assets]);
+
   const openCreateAssetModal = useCallback(() => {
     console.log('🎯 Opening create modal');
     
