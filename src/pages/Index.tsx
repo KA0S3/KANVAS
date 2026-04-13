@@ -262,10 +262,9 @@ const Index = () => {
         }
       }
 
-      // Restore viewport state if it exists
-      if (cachedState.currentViewportId) {
-        setCurrentViewportId(cachedState.currentViewportId);
-      }
+      // Note: Viewport restoration is now handled by assetStore.initFromBookStore()
+      // which runs after assets are loaded, ensuring the viewport asset exists
+      // before attempting to restore. This prevents race conditions.
 
       // Restore active asset if it exists
       if (cachedState.currentActiveId) {
