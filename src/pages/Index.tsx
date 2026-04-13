@@ -322,6 +322,11 @@ const Index = () => {
     }
 
     navigationCache.saveState(currentState);
+    console.log('[Index] Navigation state saved:', JSON.stringify({
+      currentBookId: currentState.currentBookId,
+      currentViewportId: currentState.currentViewportId,
+      appPhase: currentState.appPhase,
+    }));
   }, [
     appPhase,
     currentBookId,
