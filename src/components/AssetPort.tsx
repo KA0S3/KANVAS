@@ -125,7 +125,7 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
   
   const { currentActiveId, setCurrentViewportId, currentViewportId, isEditingBackground, setIsEditingBackground, updateAsset } = useAssetStore();
   const { getCurrentBook, getWorldData, updateWorldData } = useBookStore();
-  const { getBackground, setBackground, migrateLegacyConfig } = useBackgroundStore();
+  const { getBackground, setBackground, migrateLegacyConfig, configs: backgroundConfigs } = useBackgroundStore();
   const { isAuthenticated, user, plan, effectiveLimits } = useAuthStore();
   const { quota } = useCloudStore();
   const navigate = useNavigate();
@@ -490,8 +490,9 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
 
   const breadcrumbPath = getBreadcrumbPath();
 
-  // Get current background config from new store
-  const backgroundConfig = getBackground(getAssetKeyWithBook(enteredAssetId || 'root', currentBook?.id));
+  // Get current background config from new store - subscribe to configs for reactivity
+  const assetKey = getAssetKeyWithBook(enteredAssetId || 'root', currentBook?.id);
+  const backgroundConfig = backgroundConfigs[assetKey] || getBackground(assetKey);
   
   // State for tracking image natural size
   const [imageNaturalSize, setImageNaturalSize] = useState<{ width: number; height: number } | null>(null);

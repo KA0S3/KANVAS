@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import type { BackgroundConfig, BackgroundStore } from '@/types/background';
 import { DEFAULT_BACKGROUND_CONFIG, getAssetKey } from '@/types/background';
-import { getBackground as getBackgroundFromStorage, setBackground as setBackgroundToStorage, loadAllBackgrounds } from '@/utils/backgroundStorage';
+import { getBackground as getBackgroundFromStorage, setBackground as setBackgroundToStorage, loadAllBackgrounds, loadAllBackgroundsAsync } from '@/utils/backgroundStorage';
 import { documentMutationService } from '@/services/DocumentMutationService';
 
 const storeInitTime = Date.now();
@@ -17,7 +17,31 @@ export const useBackgroundStore = create<BackgroundStore>()(
         console.log('[BackgroundStore] Running store creator function...');
         const initialConfigs = loadAllBackgrounds() || {};
         const configCount = Object.keys(initialConfigs).length;
-        console.log(`[BackgroundStore] ✅ Store initialized with ${configCount} backgrounds:`, Object.keys(initialConfigs));
+        console.log(`[BackgroundStore] Initial sync load complete: ${configCount} backgrounds found`);
+
+        // Async load images from IndexedDB to restore actual image URLs
+        // The sync load only gets metadata (with imageUrl: null), we need to fetch the actual images
+        if (configCount > 0) {
+          console.log('[BackgroundStore] Starting async IndexedDB image load...');
+          loadAllBackgroundsAsync().then(loadedConfigs => {
+            const loadedCount = Object.keys(loadedConfigs).length;
+            const configsWithImages = Object.entries(loadedConfigs).filter(([_, config]) => config.imageUrl).length;
+            console.log(`[BackgroundStore] ✅ Async load complete: ${loadedCount} configs, ${configsWithImages} with images`);
+            
+            // Merge loaded configs with current state (preserving any in-memory changes)
+            set((state) => ({
+              configs: {
+                ...state.configs,
+                ...loadedConfigs
+              }
+            }));
+            console.log('[BackgroundStore] Store updated with images from IndexedDB');
+          }).catch(error => {
+            console.error('[BackgroundStore] Failed to load images from IndexedDB:', error);
+          });
+        } else {
+          console.log('[BackgroundStore] ✅ Store initialized - no backgrounds to load');
+        }
 
         return {
           configs: initialConfigs,

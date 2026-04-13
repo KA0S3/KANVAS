@@ -22,14 +22,15 @@ interface BackgroundControlsProps {
 export function BackgroundControls({ assetId, onSave, onToggleSidebar }: BackgroundControlsProps) {
   const { getCurrentBookAssets, updateAsset, setIsEditingBackground } = useAssetStore();
   const { getCurrentBook, getWorldData, updateWorldData } = useBookStore();
-  const { getBackground, setBackground, migrateLegacyConfig } = useBackgroundStore();
-  
+  const { getBackground, setBackground, migrateLegacyConfig, configs: backgroundConfigs } = useBackgroundStore();
+
   const assets = getCurrentBookAssets();
   const asset = assetId ? assets[assetId] : null;
   const currentBook = getCurrentBook();
-  
-  // Get background config using new store
-  const backgroundConfig = getBackground(getAssetKeyWithBook(assetId || 'root', currentBook?.id));
+
+  // Get background config using new store - subscribe to configs for reactivity
+  const assetKey = getAssetKeyWithBook(assetId || 'root', currentBook?.id);
+  const backgroundConfig = backgroundConfigs[assetKey] || getBackground(assetKey);
   const [localConfig, setLocalConfig] = useState<BackgroundConfig>(backgroundConfig);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [imageNaturalSize, setImageNaturalSize] = useState<{ width: number; height: number } | null>(null);

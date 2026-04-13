@@ -32,9 +32,9 @@ interface BackgroundMapEditorProps {
 export function BackgroundMapEditor({ isOpen, onClose, assetId, viewportSize: _viewportSize, onSave }: BackgroundMapEditorProps) {
   const { getCurrentBookAssets, updateAsset } = useAssetStore();
   const { getCurrentBook, getWorldData, updateWorldData } = useBookStore();
-  const { getBackground, setBackground } = useBackgroundStore();
+  const { getBackground, setBackground, configs: backgroundConfigs } = useBackgroundStore();
   const assets = getCurrentBookAssets();
-  
+
   // Hook to get actual window size
   const [windowSize, setWindowSize] = useState({ width: 800, height: 600 });
   
@@ -68,9 +68,10 @@ export function BackgroundMapEditor({ isOpen, onClose, assetId, viewportSize: _v
   
   const asset = assetId ? assets[assetId] : null;
   const currentBook = getCurrentBook();
-  
-  // Get background config using new store
-  const backgroundConfig = getBackground(getAssetKeyWithBook(assetId || 'root', currentBook?.id));
+
+  // Get background config using new store - subscribe to configs for reactivity
+  const assetKey = getAssetKeyWithBook(assetId || 'root', currentBook?.id);
+  const backgroundConfig = backgroundConfigs[assetKey] || getBackground(assetKey);
   const [localConfig, setLocalConfig] = useState<BackgroundConfig>(backgroundConfig);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
