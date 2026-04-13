@@ -495,8 +495,11 @@ export const useAssetStore = create<AssetStore>()(
     } else {
       console.log('[AssetStore] Clearing viewport context');
     }
-    
+
     set({ currentViewportId: assetId });
+
+    // Save to localStorage for persistence across refreshes
+    saveViewportToStorage(bookId, assetId);
   },
 
   // Get asset by ID from current book
@@ -1080,8 +1083,30 @@ useAssetStore.subscribe(
   }
 );
 
-// Import navigation cache for viewport restoration
-import { navigationCache } from '@/utils/navigationCache';
+// Simple viewport persistence - direct localStorage
+const VIEWPORT_STORAGE_KEY = 'kanvas-last-viewport';
+
+const saveViewportToStorage = (bookId: string, viewportId: string | null) => {
+  if (!bookId) return;
+  try {
+    localStorage.setItem(VIEWPORT_STORAGE_KEY, JSON.stringify({ bookId, viewportId, timestamp: Date.now() }));
+  } catch (e) {
+    // ignore
+  }
+};
+
+const getViewportFromStorage = (): { bookId: string; viewportId: string } | null => {
+  try {
+    const raw = localStorage.getItem(VIEWPORT_STORAGE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    // Only valid if less than 24 hours old
+    if (Date.now() - data.timestamp > 24 * 60 * 60 * 1000) return null;
+    return data;
+  } catch (e) {
+    return null;
+  }
+};
 
 // Initialize assetStore from bookStore on app start
 // This ensures assetStore is populated from the single source of truth (bookStore)
@@ -1121,31 +1146,14 @@ const initFromBookStore = () => {
           },
         });
 
-        // After assets load, restore viewport if there's a cached one for this book
-        const cachedState = navigationCache.getState();
-        const debugInfo = {
-          hasCachedState: !!cachedState,
-          cachedBookId: cachedState?.currentBookId,
-          currentBookId: bookId,
-          bookIdMatch: cachedState?.currentBookId === bookId,
-          cachedViewportId: cachedState?.currentViewportId,
-          assetIds: Object.keys(bookAssets),
-          viewportExistsInAssets: cachedState?.currentViewportId ? !!bookAssets[cachedState.currentViewportId] : false,
-        };
-        console.log('[AssetStore] Checking viewport restoration:', JSON.stringify(debugInfo));
-        if (cachedState?.currentBookId === bookId && cachedState?.currentViewportId) {
-          // Check if the cached viewport exists in our loaded assets
-          if (bookAssets[cachedState.currentViewportId]) {
-            console.log(`[AssetStore] Restoring viewport to ${cachedState.currentViewportId}`);
-            useAssetStore.setState({
-              currentViewportId: cachedState.currentViewportId,
-              currentActiveId: cachedState.currentActiveId || cachedState.currentViewportId,
-            });
-          } else {
-            console.log(`[AssetStore] Cached viewport ${cachedState.currentViewportId} not found in assets, staying at root`);
-          }
-        } else {
-          console.log(`[AssetStore] Viewport restoration skipped - no matching cached state`);
+        // Restore viewport if we have one saved for this book
+        const savedViewport = getViewportFromStorage();
+        if (savedViewport?.bookId === bookId && savedViewport.viewportId && bookAssets[savedViewport.viewportId]) {
+          console.log(`[AssetStore] Restoring viewport to ${savedViewport.viewportId}`);
+          useAssetStore.setState({
+            currentViewportId: savedViewport.viewportId,
+            currentActiveId: savedViewport.viewportId,
+          });
         }
       }
     }
