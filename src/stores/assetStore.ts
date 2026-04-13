@@ -1080,6 +1080,9 @@ useAssetStore.subscribe(
   }
 );
 
+// Import navigation cache for viewport restoration
+import { navigationCache } from '@/utils/navigationCache';
+
 // Initialize assetStore from bookStore on app start
 // This ensures assetStore is populated from the single source of truth (bookStore)
 const initFromBookStore = () => {
@@ -1087,11 +1090,12 @@ const initFromBookStore = () => {
   if (bookState.currentBookId && bookState.books[bookState.currentBookId]) {
     const book = bookState.books[bookState.currentBookId];
     const assetStore = useAssetStore.getState();
+    const bookId = bookState.currentBookId;
 
     // Only initialize if assetStore is empty for this book
-    if (!assetStore.bookAssets[bookState.currentBookId] || Object.keys(assetStore.bookAssets[bookState.currentBookId] || {}).length === 0) {
+    if (!assetStore.bookAssets[bookId] || Object.keys(assetStore.bookAssets[bookId] || {}).length === 0) {
       if (book.worldData?.assets && Object.keys(book.worldData.assets).length > 0) {
-        console.log(`[AssetStore] Initializing from bookStore for book ${bookState.currentBookId}:`, Object.keys(book.worldData.assets).length, 'assets');
+        console.log(`[AssetStore] Initializing from bookStore for book ${bookId}:`, Object.keys(book.worldData.assets).length, 'assets');
 
         // Convert flat assets to parent-child hierarchy
         const assets = book.worldData.assets;
@@ -1109,13 +1113,28 @@ const initFromBookStore = () => {
         useAssetStore.setState({
           bookAssets: {
             ...assetStore.bookAssets,
-            [bookState.currentBookId]: bookAssets,
+            [bookId]: bookAssets,
           },
           bookGlobalCustomFields: {
             ...assetStore.bookGlobalCustomFields,
-            [bookState.currentBookId]: book.worldData.globalCustomFields || [],
+            [bookId]: book.worldData.globalCustomFields || [],
           },
         });
+
+        // After assets load, restore viewport if there's a cached one for this book
+        const cachedState = navigationCache.getState();
+        if (cachedState?.currentBookId === bookId && cachedState?.currentViewportId) {
+          // Check if the cached viewport exists in our loaded assets
+          if (bookAssets[cachedState.currentViewportId]) {
+            console.log(`[AssetStore] Restoring viewport to ${cachedState.currentViewportId}`);
+            useAssetStore.setState({
+              currentViewportId: cachedState.currentViewportId,
+              currentActiveId: cachedState.currentActiveId || cachedState.currentViewportId,
+            });
+          } else {
+            console.log(`[AssetStore] Cached viewport ${cachedState.currentViewportId} not found in assets, staying at root`);
+          }
+        }
       }
     }
   }
