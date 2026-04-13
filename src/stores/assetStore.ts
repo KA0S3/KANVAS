@@ -1123,6 +1123,15 @@ const initFromBookStore = () => {
 
         // After assets load, restore viewport if there's a cached one for this book
         const cachedState = navigationCache.getState();
+        console.log(`[AssetStore] Checking viewport restoration:`, {
+          hasCachedState: !!cachedState,
+          cachedBookId: cachedState?.currentBookId,
+          currentBookId: bookId,
+          bookIdMatch: cachedState?.currentBookId === bookId,
+          cachedViewportId: cachedState?.currentViewportId,
+          assetIds: Object.keys(bookAssets),
+          viewportExistsInAssets: cachedState?.currentViewportId ? !!bookAssets[cachedState.currentViewportId] : false,
+        });
         if (cachedState?.currentBookId === bookId && cachedState?.currentViewportId) {
           // Check if the cached viewport exists in our loaded assets
           if (bookAssets[cachedState.currentViewportId]) {
@@ -1134,6 +1143,8 @@ const initFromBookStore = () => {
           } else {
             console.log(`[AssetStore] Cached viewport ${cachedState.currentViewportId} not found in assets, staying at root`);
           }
+        } else {
+          console.log(`[AssetStore] Viewport restoration skipped - no matching cached state`);
         }
       }
     }
