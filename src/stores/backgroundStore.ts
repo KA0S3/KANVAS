@@ -52,16 +52,11 @@ export const useBackgroundStore = create<BackgroundStore>()(
 
             // Try to get from in-memory store first
             if (state.configs[key]) {
-              console.log(`[BackgroundStore] Found background in memory for ${assetId} (key: ${key})`);
               return state.cloneConfig(state.configs[key]);
             }
 
             // Fallback to localStorage and update store
-            console.log(`[BackgroundStore] Background not in memory, checking localStorage for ${assetId} (key: ${key})`);
             const localStorageConfig = getBackgroundFromStorage(key);
-            if (localStorageConfig && localStorageConfig.mode !== 'glass') {
-              console.log(`[BackgroundStore] Found background in localStorage for ${assetId}:`, localStorageConfig.mode);
-            }
             set((state) => ({
               configs: {
                 ...state.configs,

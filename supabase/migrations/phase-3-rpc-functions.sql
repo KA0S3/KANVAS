@@ -248,7 +248,7 @@ BEGIN
             WHEN 'CREATE_ASSET' THEN
                 v_new_doc := jsonb_set(
                     v_new_doc,
-                    '{assets,' || v_asset_id || '}',
+                    ARRAY['assets', v_asset_id],
                     jsonb_build_object(
                         'id', v_asset_id,
                         'parentId', v_op->>'parentId',
@@ -268,7 +268,7 @@ BEGIN
                 IF v_parent_id IS NOT NULL AND v_parent_id != '' THEN
                     v_new_doc := jsonb_set(
                         v_new_doc,
-                        '{assets,' || v_parent_id || ',children}',
+                        ARRAY['assets', v_parent_id, 'children'],
                         COALESCE(v_new_doc->'assets'->v_parent_id->'children', '[]'::jsonb) || jsonb_build_array(v_asset_id)
                     );
                 END IF;
@@ -292,7 +292,7 @@ BEGIN
                             
                             v_new_doc := jsonb_set(
                                 v_new_doc,
-                                '{assets,' || v_parent_id || ',children}',
+                                ARRAY['assets', v_parent_id, 'children'],
                                 COALESCE(v_filtered_children, '[]'::jsonb)
                             );
                         END IF;
@@ -300,7 +300,7 @@ BEGIN
                 END IF;
                 
                 -- Remove asset from document
-                v_new_doc := v_new_doc #- '{assets,' || v_asset_id || '}';
+                v_new_doc := v_new_doc #- ARRAY['assets', v_asset_id];
 
             -- MOVE_ASSET: Change asset parent
             WHEN 'MOVE_ASSET' THEN
@@ -316,7 +316,7 @@ BEGIN
                     -- Update asset's parentId
                     v_new_doc := jsonb_set(
                         v_new_doc,
-                        '{assets,' || v_asset_id || ',parentId}',
+                        ARRAY['assets', v_asset_id, 'parentId'],
                         to_jsonb(v_new_parent_id)
                     );
                     
@@ -331,7 +331,7 @@ BEGIN
                             
                             v_new_doc := jsonb_set(
                                 v_new_doc,
-                                '{assets,' || v_old_parent_id || ',children}',
+                                ARRAY['assets', v_old_parent_id, 'children'],
                                 COALESCE(v_new_children, '[]'::jsonb)
                             );
                         END IF;
@@ -341,7 +341,7 @@ BEGIN
                     IF v_new_parent_id IS NOT NULL AND v_new_parent_id != '' THEN
                         v_new_doc := jsonb_set(
                             v_new_doc,
-                            '{assets,' || v_new_parent_id || ',children}',
+                            ARRAY['assets', v_new_parent_id, 'children'],
                             COALESCE(v_new_doc->'assets'->v_new_parent_id->'children', '[]'::jsonb) || jsonb_build_array(v_asset_id)
                         );
                     END IF;
@@ -351,7 +351,7 @@ BEGIN
             WHEN 'UPDATE_POSITION' THEN
                 v_new_doc := jsonb_set(
                     v_new_doc,
-                    '{assets,' || v_asset_id || ',position}',
+                    ARRAY['assets', v_asset_id, 'position'],
                     jsonb_build_object(
                         'x', COALESCE((v_op->>'x')::int, COALESCE((v_new_doc->'assets'->v_asset_id->'position'->>'x')::int, 0)),
                         'y', COALESCE((v_op->>'y')::int, COALESCE((v_new_doc->'assets'->v_asset_id->'position'->>'y')::int, 0)),
@@ -366,7 +366,7 @@ BEGIN
                 IF v_op->>'name' IS NOT NULL THEN
                     v_new_doc := jsonb_set(
                         v_new_doc,
-                        '{assets,' || v_asset_id || ',name}',
+                        ARRAY['assets', v_asset_id, 'name'],
                         to_jsonb(v_op->>'name')
                     );
                 END IF;
@@ -374,7 +374,7 @@ BEGIN
                 IF v_op->>'type' IS NOT NULL THEN
                     v_new_doc := jsonb_set(
                         v_new_doc,
-                        '{assets,' || v_asset_id || ',type}',
+                        ARRAY['assets', v_asset_id, 'type'],
                         to_jsonb(v_op->>'type')
                     );
                 END IF;
@@ -382,7 +382,7 @@ BEGIN
                 IF v_op->>'isExpanded' IS NOT NULL THEN
                     v_new_doc := jsonb_set(
                         v_new_doc,
-                        '{assets,' || v_asset_id || ',isExpanded}',
+                        ARRAY['assets', v_asset_id, 'isExpanded'],
                         to_jsonb((v_op->>'isExpanded')::boolean)
                     );
                 END IF;
@@ -391,7 +391,7 @@ BEGIN
             WHEN 'UPDATE_VIEWPORT' THEN
                 v_new_doc := jsonb_set(
                     v_new_doc,
-                    '{viewport}',
+                    ARRAY['viewport'],
                     jsonb_build_object(
                         'offset', jsonb_build_object(
                             'x', COALESCE((v_op->>'offsetX')::int, 0),
@@ -406,7 +406,7 @@ BEGIN
             WHEN 'UPDATE_BACKGROUND_CONFIG' THEN
                 v_new_doc := jsonb_set(
                     v_new_doc,
-                    '{assets,' || v_asset_id || ',backgroundConfig}',
+                    ARRAY['assets', v_asset_id, 'backgroundConfig'],
                     COALESCE(v_op->'config', '{}'::jsonb)
                 );
 
@@ -414,7 +414,7 @@ BEGIN
             WHEN 'UPDATE_CUSTOM_FIELDS' THEN
                 v_new_doc := jsonb_set(
                     v_new_doc,
-                    '{assets,' || v_asset_id || ',customFields}',
+                    ARRAY['assets', v_asset_id, 'customFields'],
                     COALESCE(v_op->'customFields', '{}'::jsonb)
                 );
 
@@ -422,7 +422,7 @@ BEGIN
             WHEN 'UPDATE_COVER_CONFIG' THEN
                 v_new_doc := jsonb_set(
                     v_new_doc,
-                    '{coverConfig}',
+                    ARRAY['coverConfig'],
                     COALESCE(v_op->'config', '{}'::jsonb)
                 );
 
@@ -783,7 +783,7 @@ BEGIN
     LOOP
         v_new_doc := jsonb_set(
             v_new_doc,
-            '{assets,' || (v_asset->>'id') || '}',
+            ARRAY['assets', (v_asset->>'id')],
             v_asset
         );
         
@@ -791,7 +791,7 @@ BEGIN
         IF v_asset->>'parentId' IS NOT NULL THEN
             v_new_doc := jsonb_set(
                 v_new_doc,
-                '{assets,' || (v_asset->>'parentId') || ',children}',
+                ARRAY['assets', (v_asset->>'parentId'), 'children'],
                 COALESCE(v_new_doc->'assets'->(v_asset->>'parentId')->'children', '[]'::jsonb) || jsonb_build_array(v_asset->>'id')
             );
         END IF;

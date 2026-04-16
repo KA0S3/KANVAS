@@ -400,7 +400,7 @@ class DataMigrationService {
    */
   async shouldMigrateLocalData(): Promise<boolean> {
     const localData = this.getLocalData();
-    return localData !== null && Object.keys(localData.assets).length > 0;
+    return localData !== null && localData.assets !== null && Object.keys(localData.assets).length > 0;
   }
 
   /**
