@@ -263,6 +263,7 @@ const Index = () => {
       const book = getAllBooks().find(b => b.id === cachedState.currentBookId);
       if (book) {
         setCurrentBook(cachedState.currentBookId);
+        documentMutationService.setProjectId(cachedState.currentBookId);
         
         // Load world data if we were in a book view and the book has world data
         if (cachedState.appPhase === 'BOOK_VIEW' && book.worldData) {
@@ -348,6 +349,8 @@ const Index = () => {
 
   const handleBookSelect = (book: Book) => {
     setCurrentBook(book.id);
+    // Set project ID for DocumentMutationService so operations can sync
+    documentMutationService.setProjectId(book.id);
     // Don't load world data here - only load when entering viewport from single view
     // Don't close library here - let user stay in book library
   };
@@ -397,6 +400,7 @@ const Index = () => {
     // Store the book data for after animation
     setTimeout(() => {
       setCurrentBook(book.id);
+      documentMutationService.setProjectId(book.id);
       loadWorldData(book.worldData);
       loadTagWorldData(book.worldData);
 
