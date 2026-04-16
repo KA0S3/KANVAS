@@ -281,10 +281,20 @@ class DocumentMutationService {
 
   // Immediate sync (for critical operations)
   async syncNow(): Promise<boolean> {
-    if (this.syncInProgress) return false;
-    if (!connectivityService.isOnline()) return false;
-    if (this.offlineQueue.length === 0) return true;
+    if (this.syncInProgress) {
+      console.log('[DocumentMutation] syncNow: sync in progress, skipping');
+      return false;
+    }
+    if (!connectivityService.isOnline()) {
+      console.log('[DocumentMutation] syncNow: offline, skipping');
+      return false;
+    }
+    if (this.offlineQueue.length === 0) {
+      console.log('[DocumentMutation] syncNow: queue empty, nothing to sync');
+      return true;
+    }
 
+    console.log(`[DocumentMutation] syncNow: syncing ${this.offlineQueue.length} operations`);
     return this.performSync();
   }
 

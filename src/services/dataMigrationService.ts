@@ -161,7 +161,7 @@ class DataMigrationService {
       const backgrounds = backgroundStore.configs;
       const globalCustomFields = assetStore.globalCustomFields;
 
-      if (Object.keys(assets).length === 0 && Object.keys(books).length === 0) {
+      if (!assets || !books || (Object.keys(assets).length === 0 && Object.keys(books).length === 0)) {
         return null;
       }
 
