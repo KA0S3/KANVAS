@@ -430,12 +430,12 @@ export function AssetItem({ asset, onDelete, onMouseDown, onTouchStart, onDouble
             </div>
           )}
 
-          <div className={`h-full overflow-hidden relative ${
-            portraitImage && displaySettings.thumbnail && !isAssetTooSmall ? 'pt-7' : 'flex flex-col'
-          } ${displaySettings.thumbnail ? 'glass' : 'bg-transparent'} border-2 border-gray-800 shadow-[0_0_20px_rgba(0,0,0,0.8),0_0_40px_rgba(0,0,0,0.6),0_0_60px_rgba(0,0,0,0.4),inset_0_0_10px_rgba(0,0,0,0.3)] rounded-t-lg`}>
+          <div className={`h-full overflow-hidden relative flex flex-col ${
+            displaySettings.thumbnail ? 'glass' : 'bg-transparent'
+          } border-2 border-gray-800 shadow-[0_0_20px_rgba(0,0,0,0.8),0_0_40px_rgba(0,0,0,0.6),0_0_60px_rgba(0,0,0,0.4),inset_0_0_10px_rgba(0,0,0,0.3)] rounded-t-lg`}>
             {/* Name tab integrated with the square - only when asset is large enough */}
             {displaySettings.name && !isAssetTooSmall && (
-              <div className="absolute top-0 left-0 right-0 h-7 border-b z-10 bg-black/80 rounded-t-lg" style={{
+              <div className="h-7 border-b z-10 bg-black/80 rounded-t-lg flex-shrink-0" style={{
                 borderColor: 'rgba(255,255,255,0.1)',
                 boxShadow: 'inset 0 0 8px rgba(0,0,0,0.6), inset 0 0 16px rgba(0,0,0,0.4), inset 0 0 24px rgba(0,0,0,0.2)'
               }}>
@@ -455,85 +455,78 @@ export function AssetItem({ asset, onDelete, onMouseDown, onTouchStart, onDouble
                 </div>
               </div>
             )}
-            {/* Thumbnail with overlay content - when thumbnail enabled */}
-            {portraitImage && displaySettings.thumbnail ? (
-              <>
-                <div className="absolute inset-0 w-full h-full">
-                  <img
-                    src={portraitImage}
-                    alt={`${asset.name} portrait`}
-                    className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-                    style={{ filter: `blur(${displaySettings.portraitBlur * 8}px)` }}
-                  />
-                </div>
-                {!isAssetTooSmall && (
-                  <>
-                    <div className="absolute top-6 left-0 w-full h-[calc(100%-1.5rem)] bg-gradient-to-t from-black/60 via-black/20 to-transparent pointer-events-none" />
-                    <div className="relative z-10 h-full flex flex-col justify-end p-3 pointer-events-none">
-                      {displaySettings.description && asset.description && (
-                        <div className="mb-2">
-                          <div className="text-xs text-white/90 line-clamp-3 drop-shadow-md">{asset.description}</div>
+            {/* Content area - thumbnail or fields */}
+            <div className="relative overflow-hidden" style={{ height: `${(asset.height || 150) - (displaySettings.name && !isAssetTooSmall ? 28 : 0)}px` }}>
+              {/* Thumbnail with overlay content - when thumbnail enabled */}
+              {portraitImage && displaySettings.thumbnail ? (
+                <>
+                  <div className="absolute inset-0 w-full h-full">
+                    <img
+                      src={portraitImage}
+                      alt={`${asset.name} portrait`}
+                      className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                      style={{ filter: `blur(${displaySettings.portraitBlur * 8}px)` }}
+                    />
+                  </div>
+                  {!isAssetTooSmall && (
+                    <>
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent pointer-events-none" />
+                      <div className="absolute bottom-0 left-0 right-0 top-1/2 z-10 pointer-events-auto">
+                        <div className="h-full overflow-y-auto p-3 relative">
+                          <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/40 via-transparent to-black/40 z-10" />
+                          {displaySettings.description && asset.description && (
+                            <div className="text-xs text-white/90 line-clamp-3 drop-shadow-md mb-3">{asset.description}</div>
+                          )}
+                          {displayedCustomFields.length > 0 && displayedCustomFields.map((field, index) => (
+                            <div key={index} className="text-xs relative mb-2">
+                              <div className="font-medium text-white/90 drop-shadow-md">{field.label}:</div>
+                              {field.type === 'image' && field.value ? (
+                                <img src={field.value} alt={field.label} className="w-full h-12 object-cover rounded border border-white/20 mt-1" />
+                              ) : (
+                                <div className="text-white/80 drop-shadow-md">{field.value}</div>
+                              )}
+                            </div>
+                          ))}
                         </div>
-                      )}
-                      <div className="space-y-2">
-                        {displayedCustomFields.length > 0 && (
-                          <div className="space-y-1 max-h-20 overflow-y-auto">
-                            {displayedCustomFields.map((field, index) => (
-                              <div key={index} className="text-xs">
-                                <div className="font-medium text-white/90 drop-shadow-md">{field.label}:</div>
-                                {field.type === 'image' && field.value ? (
-                                  <img src={field.value} alt={field.label} className="w-full h-12 object-cover rounded border border-white/20 mt-1" />
-                                ) : (
-                                  <div className="text-white/80 truncate drop-shadow-md">{field.value}</div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {assetTags.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {assetTags.slice(0, 3).map((tag, index) => (
-                              <div key={tag.id} className="w-2 h-2 rounded-full border border-white/30" style={{ backgroundColor: tag.color }} title={tag.name} />
-                            ))}
-                            {assetTags.length > 3 && <div className="text-xs text-white/80">+{assetTags.length - 3}</div>}
-                          </div>
+                      </div>
+                    </>
+                  )}
+                </>
+              ) : (
+                /* Layout when thumbnail hidden, no portrait, or asset is too small */
+                <>
+                  <div className="absolute bottom-0 left-0 right-0 top-1/2 overflow-y-auto p-3 relative">
+                    <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/20 via-transparent to-black/20 z-10" />
+                    {displaySettings.description && asset.description && (
+                      <div className="text-xs text-muted-foreground line-clamp-2 mb-3">{asset.description}</div>
+                    )}
+                    {displayedCustomFields.length > 0 && displayedCustomFields.map((field, index) => (
+                      <div key={index} className="text-xs relative mb-2">
+                        <div className="font-medium text-foreground/80">{field.label}:</div>
+                        {field.type === 'image' && field.value ? (
+                          <img src={field.value} alt={field.label} className="w-full h-16 object-cover rounded border border-glass-border/30 mt-1" />
+                        ) : (
+                          <div className="text-muted-foreground">{field.value}</div>
                         )}
                       </div>
-                    </div>
-                  </>
-                )}
-              </>
-          ) : (
-            /* Layout when thumbnail hidden, no portrait, or asset is too small */
-            <>
-              {displaySettings.description && asset.description && (
-                <div className="text-xs text-muted-foreground mb-2 line-clamp-2 flex-shrink-0">{asset.description}</div>
+                    ))}
+                  </div>
+                </>
               )}
-              {displayedCustomFields.length > 0 && (
-                <div className="space-y-1 flex-shrink-0 overflow-y-auto">
-                  {displayedCustomFields.map((field, index) => (
-                    <div key={index} className="text-xs">
-                      <div className="font-medium text-foreground/80">{field.label}:</div>
-                      {field.type === 'image' && field.value ? (
-                        <img src={field.value} alt={field.label} className="w-full h-16 object-cover rounded border border-glass-border/30 mt-1" />
-                      ) : (
-                        <div className="text-muted-foreground truncate">{field.value}</div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+            </div>
+            </div>
+
+          {/* Tag dots at the bottom for square assets */}
+          {assetTags.length > 0 && (
+            <div className="absolute top-full left-0 right-0 mt-2 flex flex-wrap gap-1 justify-center z-10">
+              {assetTags.slice(0, 6).map((tag, index) => (
+                <div key={tag.id} className="w-2 h-2 rounded-full border border-foreground/30" style={{ backgroundColor: tag.color }} title={tag.name} />
+              ))}
+              {assetTags.length > 6 && (
+                <div className="text-xs text-foreground/80">+{assetTags.length - 6}</div>
               )}
-              {assetTags.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-2 flex-shrink-0">
-                  {assetTags.slice(0, 3).map((tag, index) => (
-                    <div key={tag.id} className="w-2 h-2 rounded-full border border-border/50" style={{ backgroundColor: tag.color }} title={tag.name} />
-                  ))}
-                  {assetTags.length > 3 && <div className="text-xs text-muted-foreground">+{assetTags.length - 3}</div>}
-                </div>
-              )}
-            </>
+            </div>
           )}
-          </div>
         </>
       )}
       
