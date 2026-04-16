@@ -284,7 +284,7 @@ export function AssetItem({ asset, onDelete, onMouseDown, onTouchStart, onDouble
           {/* Main circular container */}
           <div className={`h-full overflow-hidden relative rounded-full ${
             displaySettings.thumbnail ? 'glass' : 'bg-transparent'
-          } ${displaySettings.thumbnail ? '' : 'flex flex-col'} border-2 border-gray-800 shadow-[0_0_20px_rgba(0,0,0,0.8),0_0_40px_rgba(0,0,0,0.6),0_0_60px_rgba(0,0,0,0.4),inset_0_0_10px_rgba(0,0,0,0.3)]`}>
+          } border-2 border-gray-800 shadow-[0_0_20px_rgba(0,0,0,0.8),0_0_40px_rgba(0,0,0,0.6),0_0_60px_rgba(0,0,0,0.4),inset_0_0_10px_rgba(0,0,0,0.3)]`}>
             {/* Thumbnail - only when enabled */}
             {portraitImage && displaySettings.thumbnail && (
               <img
@@ -293,6 +293,31 @@ export function AssetItem({ asset, onDelete, onMouseDown, onTouchStart, onDouble
                 className="w-full h-full object-cover pointer-events-none"
                 style={{ filter: `blur(${displaySettings.portraitBlur * 8}px)` }}
               />
+            )}
+            {/* Gradient overlay for better text visibility */}
+            {portraitImage && displaySettings.thumbnail && (
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent pointer-events-none" />
+            )}
+            {/* Custom fields overlay at bottom half */}
+            {(displayedCustomFields.length > 0 || (displaySettings.description && asset.description)) && (
+              <div className="absolute bottom-0 left-0 right-0 top-1/2 z-10 pointer-events-auto">
+                <div className="h-full overflow-y-auto p-4 relative">
+                  <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/40 via-transparent to-black/40 z-10" />
+                  {displaySettings.description && asset.description && (
+                    <div className="text-xs text-white/90 line-clamp-2 drop-shadow-md mb-2">{asset.description}</div>
+                  )}
+                  {displayedCustomFields.length > 0 && displayedCustomFields.map((field, index) => (
+                    <div key={index} className="text-xs relative mb-2">
+                      <div className="font-medium text-white/90 drop-shadow-md">{field.label}:</div>
+                      {field.type === 'image' && field.value ? (
+                        <img src={field.value} alt={field.label} className="w-12 h-12 object-cover rounded border border-white/20 mx-auto mt-1" />
+                      ) : (
+                        <div className="text-white/80 drop-shadow-md text-center">{field.value}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
 
@@ -313,27 +338,6 @@ export function AssetItem({ asset, onDelete, onMouseDown, onTouchStart, onDouble
               onMouseDown={handleResizeStart}
             >
               <Maximize2 className="w-3 h-3 text-primary" />
-            </div>
-          )}
-
-          {/* Backstory/custom fields below the circle */}
-          {displayedCustomFields.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-2 text-center z-10">
-              <div className="space-y-1 max-h-16 overflow-y-auto">
-                {displayedCustomFields.slice(0, 3).map((field, index) => (
-                  <div key={index} className="text-xs">
-                    <div className="font-medium text-foreground/90">{field.label}:</div>
-                    {field.type === 'image' && field.value ? (
-                      <img src={field.value} alt={field.label} className="w-12 h-12 object-cover rounded border border-glass-border/30 mx-auto mt-0.5" />
-                    ) : (
-                      <div className="text-foreground/80 truncate max-w-[200px] mx-auto">{field.value}</div>
-                    )}
-                  </div>
-                ))}
-                {displayedCustomFields.length > 3 && (
-                  <div className="text-xs text-foreground/70 italic">+{displayedCustomFields.length - 3} more...</div>
-                )}
-              </div>
             </div>
           )}
 
@@ -495,21 +499,23 @@ export function AssetItem({ asset, onDelete, onMouseDown, onTouchStart, onDouble
               ) : (
                 /* Layout when thumbnail hidden, no portrait, or asset is too small */
                 <>
-                  <div className="absolute bottom-0 left-0 right-0 top-1/2 overflow-y-auto p-3 relative">
-                    <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/20 via-transparent to-black/20 z-10" />
-                    {displaySettings.description && asset.description && (
-                      <div className="text-xs text-muted-foreground line-clamp-2 mb-3">{asset.description}</div>
-                    )}
-                    {displayedCustomFields.length > 0 && displayedCustomFields.map((field, index) => (
-                      <div key={index} className="text-xs relative mb-2">
-                        <div className="font-medium text-foreground/80">{field.label}:</div>
-                        {field.type === 'image' && field.value ? (
-                          <img src={field.value} alt={field.label} className="w-full h-16 object-cover rounded border border-glass-border/30 mt-1" />
-                        ) : (
-                          <div className="text-muted-foreground">{field.value}</div>
-                        )}
-                      </div>
-                    ))}
+                  <div className="absolute bottom-0 left-0 right-0 top-1/2 z-10 pointer-events-auto">
+                    <div className="h-full overflow-y-auto p-3 relative">
+                      <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/20 via-transparent to-black/20 z-10" />
+                      {displaySettings.description && asset.description && (
+                        <div className="text-xs text-muted-foreground line-clamp-2 mb-3">{asset.description}</div>
+                      )}
+                      {displayedCustomFields.length > 0 && displayedCustomFields.map((field, index) => (
+                        <div key={index} className="text-xs relative mb-2">
+                          <div className="font-medium text-foreground/80">{field.label}:</div>
+                          {field.type === 'image' && field.value ? (
+                            <img src={field.value} alt={field.label} className="w-full h-16 object-cover rounded border border-glass-border/30 mt-1" />
+                          ) : (
+                            <div className="text-muted-foreground">{field.value}</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </>
               )}
