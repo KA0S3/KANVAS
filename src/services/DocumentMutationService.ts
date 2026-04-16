@@ -219,6 +219,12 @@ class DocumentMutationService {
 
   // Queue operation for batching with compression
   queueOperation(operation: DocumentOperation): void {
+    // Skip queuing if no project is loaded (e.g., creating assets on index page)
+    if (!this.currentProjectId) {
+      console.log('[DocumentMutation] Skipping operation queue - no project loaded');
+      return;
+    }
+
     // Compress operations: remove redundant operations on same asset
     this.compressOperations(operation);
     
@@ -287,6 +293,10 @@ class DocumentMutationService {
     }
     if (!connectivityService.isOnline()) {
       console.log('[DocumentMutation] syncNow: offline, skipping');
+      return false;
+    }
+    if (!this.currentProjectId) {
+      console.log('[DocumentMutation] syncNow: no project loaded, skipping');
       return false;
     }
     if (this.offlineQueue.length === 0) {
