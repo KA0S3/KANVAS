@@ -80,6 +80,7 @@ class DocumentMutationService {
   private cloudRetryCounts: Map<string, { count: number; lastRetry: number }> = new Map();
   private cloudRetryInterval: number | null = null;
   private isCloudRetryRunning: boolean = false;
+  private onlineHandler: (() => void) | null = null;
 
   private constructor() {
     // Initialize with server-wins strategy for MVP
@@ -90,11 +91,22 @@ class DocumentMutationService {
     });
 
     // Listen for online/offline events to trigger sync
-    window.addEventListener('online', () => {
+    const handleOnline = () => {
       console.log('[DocumentMutation] Connection restored, triggering sync');
       this.syncNow();
       // Also trigger cloud retry when back online
       this.startCloudRetryPolling();
+    };
+    window.addEventListener('online', handleOnline);
+
+    // Store handler reference for cleanup
+    this.onlineHandler = handleOnline;
+
+    // Cleanup on page unload to prevent memory leak
+    window.addEventListener('beforeunload', () => {
+      if (this.onlineHandler) {
+        window.removeEventListener('online', this.onlineHandler);
+      }
     });
 
     // NOTE: Cloud retry polling NOT started automatically to prevent Supabase quota flood

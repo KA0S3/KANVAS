@@ -28,6 +28,7 @@ class AutosaveService {
   private queue: AutosaveQueue;
   private debounceTimer: number | null = null;
   private autosaveTimer: number | null = null;
+  private visibilityChangeHandler: (() => void) | null = null;
   private subscribers: Set<(state: AutosaveState) => void> = new Set();
   
   // Configurable intervals (in milliseconds)
@@ -94,10 +95,21 @@ class AutosaveService {
   }
 
   private setupVisibilityHandlers(): void {
-    document.addEventListener('visibilitychange', () => {
+    const handleVisibilityChange = () => {
       if (document.hidden && this.state.pendingChanges) {
         console.log('[Autosave] Page hidden, performing emergency save');
         this.performAutosave();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Store handler for cleanup
+    this.visibilityChangeHandler = handleVisibilityChange;
+
+    // Cleanup on page unload to prevent memory leak
+    window.addEventListener('beforeunload', () => {
+      if (this.visibilityChangeHandler) {
+        document.removeEventListener('visibilitychange', this.visibilityChangeHandler);
       }
     });
   }

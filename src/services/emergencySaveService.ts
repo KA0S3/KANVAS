@@ -14,6 +14,9 @@ interface EmergencyBackup {
 class EmergencySaveService {
   private static instance: EmergencySaveService;
   private isInitialized: boolean = false;
+  private beforeUnloadHandler: ((e: Event) => void) | null = null;
+  private pageHideHandler: ((e: Event) => void) | null = null;
+  private visibilityChangeHandler: (() => void) | null = null;
 
   static getInstance(): EmergencySaveService {
     if (!EmergencySaveService.instance) {
@@ -36,20 +39,41 @@ class EmergencySaveService {
 
   private setupEmergencyHandlers(): void {
     // Save on beforeunload (works in most browsers)
-    window.addEventListener('beforeunload', (e) => {
+    const handleBeforeUnload = (e: Event) => {
       this.performEmergencySave();
       // Note: Modern browsers ignore custom messages, but the save will execute
-    });
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
 
     // Save on pagehide (more reliable, especially on mobile)
-    window.addEventListener('pagehide', (e) => {
+    const handlePageHide = (e: Event) => {
       this.performEmergencySave();
-    });
+    };
+    window.addEventListener('pagehide', handlePageHide);
 
     // Save on visibility change (user switches tabs)
-    document.addEventListener('visibilitychange', () => {
+    const handleVisibilityChange = () => {
       if (document.hidden) {
         this.performEmergencySave();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Store handlers for cleanup
+    this.beforeUnloadHandler = handleBeforeUnload;
+    this.pageHideHandler = handlePageHide;
+    this.visibilityChangeHandler = handleVisibilityChange;
+
+    // Cleanup on page unload to prevent memory leak
+    window.addEventListener('beforeunload', () => {
+      if (this.beforeUnloadHandler) {
+        window.removeEventListener('beforeunload', this.beforeUnloadHandler);
+      }
+      if (this.pageHideHandler) {
+        window.removeEventListener('pagehide', this.pageHideHandler);
+      }
+      if (this.visibilityChangeHandler) {
+        document.removeEventListener('visibilitychange', this.visibilityChangeHandler);
       }
     });
 

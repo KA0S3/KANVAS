@@ -45,6 +45,7 @@ class R2UploadService {
   }
 
   private retryListeners: Set<(assetId: string, retryCount: number, cloudError?: string) => void> = new Set();
+  private cloudRetryHandler: ((event: Event) => void) | null = null;
 
   constructor() {
     // R2 public endpoint for constructing public URLs
@@ -52,7 +53,15 @@ class R2UploadService {
     this.r2PublicEndpoint = import.meta.env.VITE_R2_PUBLIC_ENDPOINT || '';
 
     // Listen for cloud retry events from DocumentMutationService (Phase 10)
-    window.addEventListener('cloud-retry-upload', this.handleCloudRetryEvent.bind(this));
+    this.cloudRetryHandler = this.handleCloudRetryEvent.bind(this);
+    window.addEventListener('cloud-retry-upload', this.cloudRetryHandler);
+
+    // Cleanup on page unload to prevent memory leak
+    window.addEventListener('beforeunload', () => {
+      if (this.cloudRetryHandler) {
+        window.removeEventListener('cloud-retry-upload', this.cloudRetryHandler);
+      }
+    });
   }
 
   /**

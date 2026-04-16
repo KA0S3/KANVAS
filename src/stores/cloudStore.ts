@@ -245,6 +245,9 @@ if (typeof window !== 'undefined') {
   window.addEventListener('online', handleOnline);
   window.addEventListener('offline', handleOffline);
 
-  // Cleanup function (will be called when store is destroyed)
-  // Note: In production, you might want to add proper cleanup
+  // Cleanup event listeners on page unload to prevent memory leaks
+  window.addEventListener('beforeunload', () => {
+    window.removeEventListener('online', handleOnline);
+    window.removeEventListener('offline', handleOffline);
+  });
 }

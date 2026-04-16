@@ -136,7 +136,7 @@ class ConnectivityService {
       });
 
       clearTimeout(timeoutId);
-      
+
       if (response.ok) {
         console.log('[Connectivity] External endpoint successful');
         return true;
@@ -145,11 +145,19 @@ class ConnectivityService {
       console.log('[Connectivity] External endpoint failed:', error);
     }
 
-    // Method 4: Last resort - check if we can reach Supabase
+    // Method 4: Last resort - check if we can reach Supabase auth endpoint
     try {
-      const { data } = await supabase.from('_health').select('count').limit(1);
-      console.log('[Connectivity] Supabase check successful');
-      return true;
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/auth/v1/user`, {
+        method: 'HEAD',
+        cache: 'no-cache',
+        signal: AbortSignal.timeout(this.HEARTBEAT_TIMEOUT)
+      });
+
+      if (response.ok || response.status === 401) {
+        // 401 is OK - it means Supabase is reachable, just not authenticated
+        console.log('[Connectivity] Supabase check successful');
+        return true;
+      }
     } catch (error) {
       console.log('[Connectivity] Supabase check failed:', error);
     }
