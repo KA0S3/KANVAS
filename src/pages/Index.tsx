@@ -47,7 +47,7 @@ const Index = () => {
   const [lastCloudLoadTime, setLastCloudLoadTime] = useState(0);
   const createWorldButtonRef = useRef<HTMLButtonElement>(null);
   const { currentActiveId, loadWorldData, isEditingBackground, setIsEditingBackground, currentViewportId, setActiveAsset, getCurrentBookAssets, setCurrentViewportId } = useAssetStore(); // Using getCurrentBookAssets method
-  // const { loadWorldData: loadTagWorldData } = useTagStore(); // Temporarily disabled to debug
+  const { loadWorldData: loadTagWorldData } = useTagStore();
   const { currentBookId, setCurrentBook, getAllBooks, deleteBook } = useBookStore(); // Adding back book store - confirmed working
   const { theme } = useThemeStore(); // Adding back theme store - confirmed working
   // const { getBackground } = useBackgroundStore(); // Temporarily disabled to debug
@@ -57,7 +57,6 @@ const Index = () => {
   const showAds = false; // Temporarily disabled
 
   // Fallback functions and values
-  const loadTagWorldData = (data: any) => {};
   const getBackground = () => null;
 
   // Initialize auth on mount
@@ -109,6 +108,16 @@ const Index = () => {
                   const clonedConfig = backgroundStore.cloneConfig(config as BackgroundConfig);
                   backgroundStore.setBackground(key, clonedConfig);
                 });
+              }
+
+              // Restore tags from world_document.tags and assetTags
+              if (result.data.world_document?.tags || result.data.world_document?.assetTags) {
+                const tagData = {
+                  tags: result.data.world_document.tags || {},
+                  assetTags: result.data.world_document.assetTags || {}
+                };
+                console.log('[Index] Restoring tags:', Object.keys(tagData.tags).length, 'tags and', Object.keys(tagData.assetTags).length, 'asset tag associations');
+                loadTagWorldData(tagData);
               }
             }
           } else {

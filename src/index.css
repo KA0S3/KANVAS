@@ -212,7 +212,7 @@
     background: hsl(var(--glass-bg) / 0.25);
     backdrop-filter: blur(var(--glass-blur));
     -webkit-backdrop-filter: blur(var(--glass-blur));
-    border: 1px solid hsl(var(--glass-border) / 0.2);
+    border: 0.5px solid hsl(var(--glass-border) / 0.15);
   }
 
   .glass-strong {
@@ -220,20 +220,36 @@
     background: hsl(var(--glass-bg) / 0.3);
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
-    border: 1px solid hsl(var(--glass-border) / 0.3);
+    border: 0.5px solid hsl(var(--glass-border) / 0.2);
   }
 
   .cosmic-glow {
-    box-shadow: 
-      0 0 20px hsl(var(--glow-primary) / 0.3),
-      0 0 40px hsl(var(--glow-secondary) / 0.2),
-      inset 0 1px 0 hsl(var(--glass-border) / 0.3);
+    /* Inset-to-outset gradient: color originates from inner edge, fades outward */
+    box-shadow:
+      /* Inner glow - originates from inner edge of border */
+      inset 0 0 8px hsl(var(--primary) / 0.25),
+      inset 0 0 16px hsl(var(--primary) / 0.15),
+      inset 0 0 24px hsl(var(--primary) / 0.08),
+      /* Outer atmospheric fade */
+      0 0 12px hsl(var(--primary) / 0.2),
+      0 0 24px hsl(var(--primary) / 0.12),
+      0 0 40px hsl(var(--primary) / 0.06),
+      /* Glass border highlight */
+      inset 0 0.5px 0 hsl(var(--glass-border) / 0.25);
+    transition: box-shadow 0.3s ease;
   }
 
   .cosmic-glow-subtle {
-    box-shadow: 
-      0 0 15px hsl(var(--glow-primary) / 0.15),
-      0 0 30px hsl(var(--glow-secondary) / 0.1);
+    /* Softer atmospheric glow with smooth fade */
+    box-shadow:
+      /* Inner subtle glow */
+      inset 0 0 6px hsl(var(--glow-primary) / 0.12),
+      inset 0 0 12px hsl(var(--glow-primary) / 0.06),
+      /* Outer atmospheric fade */
+      0 0 10px hsl(var(--glow-primary) / 0.1),
+      0 0 20px hsl(var(--glow-primary) / 0.05),
+      0 0 32px hsl(var(--glow-secondary) / 0.04);
+    transition: box-shadow 0.3s ease;
   }
 
   .tag-glow {
@@ -257,16 +273,49 @@
 
   .asset-item {
     @apply glass rounded-lg p-3 cursor-grab active:cursor-grabbing transition-all duration-200;
+    /* Subtle atmospheric border glow using primary color */
+    box-shadow:
+      /* Inset glow from inner edge - creates depth */
+      inset 0 0 6px hsl(var(--primary) / 0.08),
+      inset 0 0 10px hsl(var(--primary) / 0.04),
+      /* Outer soft atmospheric glow */
+      0 0 8px hsl(var(--primary) / 0.06),
+      0 0 16px hsl(var(--primary) / 0.03);
+    transition: box-shadow 0.3s ease, border-color 0.3s ease;
   }
 
   .asset-item:hover {
-    @apply cosmic-glow-subtle;
-    border-color: hsl(var(--primary) / 0.4);
+    /* Enhanced atmospheric glow on hover */
+    box-shadow:
+      inset 0 0 8px hsl(var(--glow-primary) / 0.15),
+      inset 0 0 14px hsl(var(--glow-primary) / 0.08),
+      0 0 12px hsl(var(--glow-primary) / 0.12),
+      0 0 24px hsl(var(--glow-primary) / 0.06),
+      0 0 36px hsl(var(--glow-secondary) / 0.04);
+    border-color: hsl(var(--primary) / 0.25);
   }
 
   .asset-item.dragging {
     @apply opacity-50 scale-105;
-    box-shadow: 0 0 30px hsl(var(--glow-primary) / 0.5);
+    /* Stronger atmospheric glow while dragging */
+    box-shadow:
+      inset 0 0 10px hsl(var(--glow-primary) / 0.2),
+      inset 0 0 18px hsl(var(--glow-primary) / 0.1),
+      0 0 16px hsl(var(--glow-primary) / 0.25),
+      0 0 32px hsl(var(--glow-primary) / 0.15),
+      0 0 48px hsl(var(--glow-secondary) / 0.1);
+  }
+
+  /* Asset glow variants that respect border color variable */
+  .asset-glow-inset {
+    /* Creates glow originating from inner edge using border color */
+    box-shadow:
+      inset 0 0 8px hsl(var(--glass-border) / 0.3),
+      inset 0 0 16px hsl(var(--glass-border) / 0.15),
+      inset 0 0 24px hsl(var(--glass-border) / 0.08),
+      0 0 12px hsl(var(--glass-border) / 0.12),
+      0 0 24px hsl(var(--glass-border) / 0.06);
+    transition: box-shadow 0.3s ease;
   }
 
   .fantasy-overlay {
@@ -473,11 +522,15 @@
 
   .fractal-card {
     @apply glass rounded-xl p-3;
-    border-color: hsl(var(--glass-border) / 0.35);
+    border-color: hsl(var(--glass-border) / 0.25);
     background: hsl(var(--glass-bg) / 0.25);
+    /* Subtle inset-to-outset glow using glass border color */
     box-shadow:
-      inset 0 1px 0 hsl(var(--glass-border) / 0.35),
-      0 0 20px hsl(var(--glow-secondary) / 0.12);
+      inset 0 0.5px 0 hsl(var(--glass-border) / 0.25),
+      inset 0 0 8px hsl(var(--glass-border) / 0.15),
+      0 0 16px hsl(var(--glow-secondary) / 0.08),
+      0 0 28px hsl(var(--glow-secondary) / 0.04);
+    transition: box-shadow 0.3s ease;
   }
 
   /* Fog overlay system */

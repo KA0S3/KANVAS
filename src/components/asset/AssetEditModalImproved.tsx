@@ -307,7 +307,9 @@ export function AssetEditModalImproved({ isOpen, onClose, assetId, isNewAsset = 
     setRefreshTrigger(prev => prev + 1);
   };
 
-  const toggleSection = (section: keyof typeof expandedSections) => {
+  const toggleSection = (section: keyof typeof expandedSections) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     setExpandedSections(prev => ({
       ...prev,
       [section]: !prev[section]
@@ -316,7 +318,8 @@ export function AssetEditModalImproved({ isOpen, onClose, assetId, isNewAsset = 
 
   const SectionHeader = ({ title, section, icon }: { title: string; section: keyof typeof expandedSections; icon: React.ReactNode }) => (
     <button
-      onClick={() => toggleSection(section)}
+      type="button"
+      onClick={toggleSection(section)}
       className="w-full flex items-center justify-between p-3 rounded-lg border border-glass-border/30 bg-glass/20 hover:bg-glass/30 transition-colors"
     >
       <div className="flex items-center gap-2">
@@ -335,8 +338,12 @@ export function AssetEditModalImproved({ isOpen, onClose, assetId, isNewAsset = 
 
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={handleCloseAttempt}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto glass cosmic-glow border-glass-border/40">
+      <Dialog open={isOpen} onOpenChange={(open) => !open && handleCloseAttempt()}>
+      <DialogContent 
+        className="max-w-5xl max-h-[90vh] overflow-y-auto glass cosmic-glow border-glass-border/40"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="text-xl font-bold">
             {isNewAsset ? 'Create New Asset' : 'Edit Asset'}

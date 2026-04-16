@@ -158,7 +158,17 @@ export const AssetContextMenu: React.FC<AssetContextMenuProps> = ({
     onClose();
   };
 
-  
+  const handleToggleThumbnail = () => {
+    const currentSettings = asset.viewportDisplaySettings || { name: true, description: false, thumbnail: true, portraitBlur: 0 };
+    updateAsset(asset.id, {
+      viewportDisplaySettings: {
+        ...currentSettings,
+        thumbnail: !currentSettings.thumbnail,
+      },
+    });
+    onClose();
+  };
+
   const handleCreateChild = (e: React.MouseEvent) => {
     console.log('Create Child button clicked for asset:', asset.name);
     e.stopPropagation();
@@ -308,6 +318,15 @@ export const AssetContextMenu: React.FC<AssetContextMenuProps> = ({
             >
               <Palette className="w-4 h-4" />
               {asset.showTagBorder ? 'Hide Tag Border' : 'Show Tag Border'}
+            </button>
+
+            {/* Toggle Background */}
+            <button
+              onClick={handleToggleThumbnail}
+              className="w-full px-3 py-2 flex items-center gap-2 text-sm text-foreground hover:bg-glass-border/20 transition-colors"
+            >
+              <Image className="w-4 h-4" />
+              {asset.viewportDisplaySettings?.thumbnail === false ? 'Background On' : 'Background Off'}
             </button>
 
             {/* Delete */}

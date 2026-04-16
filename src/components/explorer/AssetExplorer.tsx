@@ -1,6 +1,7 @@
 import { Plus, Search, Settings, User, Tag, Users, Building, Sparkles, Swords, X, Image, GripVertical, ChevronDown, ChevronRight } from 'lucide-react';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useAssetStore } from '@/stores/assetStore';
+import { useMediaStore } from '@/stores/mediaStore';
 import { AssetTreeNode } from './AssetTreeNode';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -91,6 +92,7 @@ interface AssetExplorerProps {
 
 export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerProps) {
   const { getCurrentBookAssets, updateAsset, currentActiveId, currentViewportId, setIsEditingBackground, reparentAsset } = useAssetStore();
+  const { professionalMode } = useMediaStore();
   const assets = getCurrentBookAssets();
   const [searchQuery, setSearchQuery] = useState('');
   const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
@@ -419,7 +421,8 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
           )}
         </div>
         
-        {/* Four main buttons */}
+        {/* Four main buttons - hidden in professional mode */}
+        {!professionalMode && (
         <div id="generators-button" className="flex gap-1">
           <button
             type="button"
@@ -466,6 +469,7 @@ export function AssetExplorer({ sidebarOpen, onToggleSidebar }: AssetExplorerPro
             <span className="text-xs">Battles</span>
           </button>
         </div>
+        )}
       </div>
       
       {/* Header */}

@@ -1,43 +1,125 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import splashImage from '@/assets/Splash-i.png';
 import { useMediaStore } from '@/stores/mediaStore';
 import { audioEngine } from '@/services/AudioEngine';
-import WhatIsKanvasModal from '@/components/WhatIsKanvasModal';
 
 const SplashScreen = () => {
-  const { startIntro, audioEnabled, setAudioEnabled, setVideoSoundsEnabled } = useMediaStore();
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const { startIntro } = useMediaStore();
+  const [mouseX, setMouseX] = useState(50);
+  const [borderPosition, setBorderPosition] = useState(50);
+  const mouseHalfRef = useRef<'left' | 'right'>('left');
+  const pulseDirectionRef = useRef(1);
+  const isPulsingRef = useRef(false);
+  const pulsePhaseRef = useRef(0);
+  const mouseOnScreenRef = useRef(false);
+  const mountTimeRef = useRef(Date.now());
+  const bufferElapsedRef = useRef(false);
 
-
-  const handleClick = async () => {
-    // Start audio with user interaction to bypass autoplay restrictions
-    try {
-      await audioEngine.startWithUserInteraction();
-    } catch (error) {
-      console.log('Audio start attempted, will retry after intro');
+  const handleMouseMove = (e: React.MouseEvent) => {
+    mouseOnScreenRef.current = true;
+    const percentage = (e.clientX / window.innerWidth) * 100;
+    setMouseX(percentage);
+    const newHalf = percentage < 50 ? 'left' : 'right';
+    if (newHalf !== mouseHalfRef.current) {
+      mouseHalfRef.current = newHalf;
+      isPulsingRef.current = false;
+      pulseDirectionRef.current = 1;
+      pulsePhaseRef.current = 0;
     }
-    startIntro();
   };
 
-  const handleAudioToggle = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const newAudioState = !audioEnabled;
-    setAudioEnabled(newAudioState);
-    setVideoSoundsEnabled(newAudioState);
+  const handleMouseLeave = () => {
+    mouseOnScreenRef.current = false;
+    isPulsingRef.current = false;
+    pulsePhaseRef.current = 0;
   };
 
-  const handleWhatIsKanvasClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsModalOpen(true);
+  const handleClick = async (e: React.MouseEvent) => {
+    // Detect which side was clicked based on mouse position
+    const clickX = e.clientX;
+    const screenWidth = window.innerWidth;
+    const launchMode = clickX < screenWidth / 2 ? 'professional' : 'full';
+
+    // Only start audio for full mode
+    if (launchMode === 'full') {
+      try {
+        await audioEngine.startWithUserInteraction();
+      } catch (error) {
+        console.log('Audio start attempted, will retry after intro');
+      }
+    }
+
+    startIntro(launchMode);
   };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setBorderPosition((prev) => {
+        const speed = 0.05;
+        const edgeThreshold = 5;
+        const pulseRange = 20;
+        const pulseSpeed = 0.02;
+
+        // Check if 7-second buffer has elapsed
+        const elapsedTime = Date.now() - mountTimeRef.current;
+        if (elapsedTime < 7000) {
+          bufferElapsedRef.current = false;
+          return 50; // Stay at center during buffer
+        }
+        bufferElapsedRef.current = true;
+
+        // Return to middle if mouse is off screen
+        if (!mouseOnScreenRef.current) {
+          if (prev > 50) {
+            return Math.max(prev - speed, 50);
+          } else if (prev < 50) {
+            return Math.min(prev + speed, 50);
+          }
+          return 50;
+        }
+
+        if (mouseHalfRef.current === 'left') {
+          // Moving toward right edge (color expanding)
+          if (!isPulsingRef.current && prev < 100 - edgeThreshold) {
+            return Math.min(prev + speed, 100 - edgeThreshold);
+          } else {
+            // Start or continue pulsing at the edge with sine wave easing
+            isPulsingRef.current = true;
+            const center = 100 - edgeThreshold;
+            pulsePhaseRef.current += pulseSpeed;
+            const sineValue = Math.sin(pulsePhaseRef.current);
+            const easedPosition = center + (sineValue * pulseRange);
+            return Math.max(0, Math.min(100, easedPosition));
+          }
+        } else {
+          // Moving toward left edge (gray expanding)
+          if (!isPulsingRef.current && prev > edgeThreshold) {
+            return Math.max(prev - speed, edgeThreshold);
+          } else {
+            // Start or continue pulsing at the edge with sine wave easing
+            isPulsingRef.current = true;
+            const center = edgeThreshold;
+            pulsePhaseRef.current += pulseSpeed;
+            const sineValue = Math.sin(pulsePhaseRef.current);
+            const easedPosition = center + (sineValue * pulseRange);
+            return Math.max(0, Math.min(100, easedPosition));
+          }
+        }
+      });
+    }, 16);
+
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div 
       className="fixed inset-0 w-full h-screen cursor-pointer overflow-hidden bg-black"
       onClick={handleClick}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
       style={{ zIndex: 9999 }}
     >
-      {/* Background Image */}
+      {/* Background Image - Full (Colored) */}
       <div 
         className="absolute inset-0 w-full h-full"
         style={{
@@ -48,112 +130,164 @@ const SplashScreen = () => {
         }}
       />
       
-      {/* Overlay Content */}
-      <div className="relative z-10 flex flex-col items-center justify-center h-full text-white">
-        {/* What is KANVAS? Button - Top Left */}
-        <button
-          onClick={handleWhatIsKanvasClick}
-          className="absolute top-6 left-6 px-4 py-2 rounded-lg transition-all hover:scale-105"
-          style={{
-            fontFamily: '"MedievalSharp", "Almendra", cursive',
-            textShadow: '0 0 10px rgba(255, 255, 255, 0.3)'
-          }}
-        >
-          <span className="text-white font-medium">What is KANVAS?</span>
-        </button>
-
-        {/* Main Title */}
+      {/* Grayscale Gradient Overlay */}
+      <div 
+        className="absolute inset-0 w-full h-full"
+        style={{
+          background: `linear-gradient(to right, rgba(128, 128, 128, 1) 0%, rgba(128, 128, 128, 0.8) ${borderPosition}%, transparent ${borderPosition + 10}%, transparent 100%)`,
+          mixBlendMode: 'saturation',
+        }}
+      />
+      
+      {/* KANVAS Text */}
+      <div 
+        className="absolute inset-0 flex items-start justify-center z-10"
+        style={{
+          fontFamily: '"MedievalSharp", "Almendra", cursive',
+          paddingTop: 'clamp(3rem, 8vh, 8rem)',
+        }}
+      >
         <h1 
-          className="text-9xl md:text-11xl lg:text-12xl font-bold mb-4 text-center animate-pulse-glow"
+          className="text-white font-normal"
           style={{
-            fontFamily: '"MedievalSharp", "Almendra", cursive',
-            textShadow: '0 0 30px rgba(255, 255, 255, 0.6), 0 0 60px rgba(255, 255, 255, 0.4)',
-            letterSpacing: '0.15em'
+            fontSize: 'clamp(3rem, 12vw, 10rem)',
+            letterSpacing: '0.3em',
+            textShadow: '0 0 20px rgba(255, 255, 255, 0.5), 0 0 40px rgba(255, 255, 255, 0.3)',
           }}
         >
           KANVAS
         </h1>
-        
-        {/* Tagline */}
+      </div>
+      
+      {/* Terms and Conditions Notice */}
+      <div 
+        className="absolute left-0 right-0 text-center z-10"
+        style={{
+          bottom: 'clamp(1rem, 3vh, 2rem)',
+        }}
+      >
         <p 
-          className="text-xl md:text-2xl opacity-60 mb-8 text-center"
+          className="text-white opacity-60"
           style={{
-            fontFamily: '"MedievalSharp", "Almendra", cursive',
-            textShadow: '0 0 10px rgba(255, 255, 255, 0.3)'
+            fontSize: 'clamp(0.6rem, 1.5vw, 0.8rem)',
           }}
         >
-          For the Visual Organizer
-        </p>
-        
-        {/* Subtitle with Audio Toggle */}
-        <div className="flex items-center gap-3">
-          <p 
-            className="text-lg md:text-xl opacity-75"
-            style={{
-              fontFamily: '"MedievalSharp", "Almendra", cursive',
-              textShadow: '0 0 10px rgba(255, 255, 255, 0.3)'
+          By interacting with this app you confirm you have read and understood the{' '}
+          <a 
+            href="/terms-of-service" 
+            className="underline hover:opacity-100 text-white"
+            onClick={(e) => {
+              e.stopPropagation();
             }}
           >
-            Click anywhere to enter
-          </p>
-          
-          {/* Audio Toggle */}
-          <div 
-            className="flex items-center gap-1 px-2 py-1 rounded-full hover:bg-white/20 transition-all cursor-pointer"
-            onClick={handleAudioToggle}
+            Terms & Conditions
+          </a>
+          {' '}and{' '}
+          <a 
+            href="/privacy-policy" 
+            className="underline hover:opacity-100 text-white"
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
           >
-            <span className="text-xs text-white opacity-75">Audio</span>
-            <div className="relative w-8 h-4">
-              <div 
-                className={`absolute inset-0.5 rounded-full transition-colors ${
-                  audioEnabled ? 'bg-green-500' : 'bg-gray-500'
-                }`}
-              />
-              <div 
-                className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform ${
-                  audioEnabled ? 'translate-x-4' : 'translate-x-0.5'
-                }`}
-              />
-            </div>
-            <span className="text-xs text-white opacity-60">
-              {audioEnabled ? 'ON' : 'OFF'}
-            </span>
-          </div>
-        </div>
+            Privacy Policy
+          </a>
+        </p>
+      </div>
 
-        
-        {/* Terms and Conditions Notice */}
-        <div className="absolute bottom-4 left-0 right-0 text-center">
-          <p className="text-xs text-white opacity-60">
-            By interacting with this app you confirm you have read and understood the{' '}
-            <a 
-              href="/terms-of-service" 
-              className="underline hover:opacity-100 text-white"
-              onClick={(e) => {
-                e.stopPropagation();
-              }}
-            >
-              Terms & Conditions
-            </a>
-            {' '}and{' '}
-            <a 
-              href="/privacy-policy" 
-              className="underline hover:opacity-100 text-white"
-              onClick={(e) => {
-                e.stopPropagation();
-              }}
-            >
-              Privacy Policy
-            </a>
+      {/* Left Text - Professional (Gray side) */}
+      <div
+        className="absolute z-20 flex items-center gap-2"
+        style={{
+          left: 'clamp(1rem, 5vw, 4rem)',
+          top: 'clamp(55%, 60vh, 65%)',
+          transform: 'translateY(-50%)',
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+        }}
+      >
+        <p
+          className="font-normal"
+          style={{
+            fontSize: 'clamp(1.5rem, 4vw, 3rem)',
+            color: 'white',
+          }}
+        >
+          ←
+        </p>
+        <div>
+          <p
+            className="font-normal transition-all duration-300"
+            style={{
+              fontSize: 'clamp(1rem, 3vw, 2.3rem)',
+              color: 'white',
+              fontFamily: '"Cinzel", "Trajan Pro", serif',
+              transform: `scale(${1 + ((borderPosition - 50) / 50) * 0.15})`,
+            }}
+          >
+            Professional
+          </p>
+          <p
+            className="font-normal"
+            style={{
+              fontSize: 'clamp(0.7rem, 1.8vw, 1.4rem)',
+              color: 'white',
+              fontFamily: '"Cinzel", "Trajan Pro", serif',
+              marginTop: '0.3rem',
+            }}
+          >
+            clean & quiet
           </p>
         </div>
       </div>
 
-      {/* What is KANVAS? Modal */}
-      <WhatIsKanvasModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-      />
+      {/* Right Text - Experience (Color side) */}
+      <div
+        className="absolute z-20 flex items-center gap-2"
+        style={{
+          right: 'clamp(1rem, 5vw, 4rem)',
+          top: 'clamp(55%, 60vh, 65%)',
+          transform: 'translateY(-50%)',
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+        }}
+      >
+        <div>
+          <p
+            className="font-normal transition-all duration-300"
+            style={{
+              fontSize: 'clamp(1rem, 3vw, 2.3rem)',
+              color: 'white',
+              fontFamily: '"MedievalSharp", "Uncial Antiqua", cursive',
+              transform: `scale(${1 + ((50 - borderPosition) / 50) * 0.15})`,
+            }}
+          >
+            Experience
+          </p>
+          <p
+            className="font-normal"
+            style={{
+              fontSize: 'clamp(0.7rem, 1.8vw, 1.4rem)',
+              color: 'white',
+              fontFamily: '"MedievalSharp", "Uncial Antiqua", cursive',
+              marginTop: '0.3rem',
+            }}
+          >
+            sound will play
+          </p>
+        </div>
+        <p
+          className="font-normal"
+          style={{
+            fontSize: 'clamp(1.5rem, 4vw, 3rem)',
+            color: 'white',
+          }}
+        >
+          →
+        </p>
+      </div>
     </div>
   );
 };

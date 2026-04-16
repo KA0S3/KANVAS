@@ -104,7 +104,8 @@ export function BackgroundMapEditor({ isOpen, onClose, assetId, viewportSize: _v
       const newSize = { width: img.naturalWidth, height: img.naturalHeight };
       setImageNaturalSize(newSize);
       setLocalConfig(prev => {
-        if (prev.imageSize && prev.imageSize.width === newSize.width && prev.imageSize.height === newSize.height) {
+        // Only update imageSize if not already set - preserves saved scale on refresh
+        if (prev.imageSize) {
           return prev;
         }
         return { ...prev, imageSize: newSize };

@@ -4,6 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ConflictResolutionProvider } from "@/components/ConflictResolutionProvider";
+import { useEffect } from "react";
+import { emergencySaveService } from "@/services/emergencySaveService";
 import Index from "./pages/Index";
 import AuthConfirm from "./pages/AuthConfirm";
 import AuthCallback from "./pages/AuthCallback";
@@ -15,7 +17,13 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-const App = () => (
+const App = () => {
+  // Initialize emergency save service on app mount
+  useEffect(() => {
+    emergencySaveService.initialize();
+  }, []);
+
+  return (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <ConflictResolutionProvider>
@@ -37,6 +45,7 @@ const App = () => (
       </ConflictResolutionProvider>
     </TooltipProvider>
   </QueryClientProvider>
-);
+  );
+};
 
 export default App;

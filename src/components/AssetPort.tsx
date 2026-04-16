@@ -123,7 +123,7 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
     getAssetPath,
   } = useAssetTree();
   
-  const { currentActiveId, setCurrentViewportId, currentViewportId, isEditingBackground, setIsEditingBackground, updateAsset } = useAssetStore();
+  const { currentActiveId, setCurrentViewportId, currentViewportId, isEditingBackground, setIsEditingBackground, updateAsset, updateAssetPositionFast } = useAssetStore();
   const { getCurrentBook, getWorldData, updateWorldData } = useBookStore();
   const { getBackground, setBackground, migrateLegacyConfig, configs: backgroundConfigs } = useBackgroundStore();
   const { isAuthenticated, user, plan, effectiveLimits } = useAuthStore();
@@ -305,10 +305,19 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
   }, [assets, setActiveAsset]);
 
   const handleExitAsset = useCallback(() => {
-    setEnteredAssetId(null);
-    setActiveAsset(null);
-    setCurrentViewportId(null); // Clear current viewport context in store
-  }, [setActiveAsset, setCurrentViewportId]);
+    if (enteredAssetId && assets[enteredAssetId]?.parentId) {
+      // Go up one level to parent
+      const parentId = assets[enteredAssetId].parentId;
+      setEnteredAssetId(parentId);
+      setCurrentViewportId(parentId);
+      setActiveAsset(parentId);
+    } else {
+      // At root level, exit to root
+      setEnteredAssetId(null);
+      setActiveAsset(null);
+      setCurrentViewportId(null);
+    }
+  }, [enteredAssetId, assets, setActiveAsset, setCurrentViewportId]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent, asset: Asset) => {
     e.preventDefault();
@@ -361,13 +370,18 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
     const boundedX = Math.max(0, Math.min(screenX, containerRect.width - 200));
     const boundedY = Math.max(0, Math.min(screenY, containerRect.height - 50));
     
-    // Update asset position directly
-    updateAssetPosition(selectedAsset, boundedX, boundedY);
-  }, [isTouchDragging, selectedAsset, dragOffset, updateAssetPosition]);
+    // Update asset position using fast method (no mutation queueing during drag)
+    updateAssetPositionFast(selectedAsset, boundedX, boundedY);
+  }, [isTouchDragging, selectedAsset, dragOffset, updateAssetPositionFast]);
 
   const handleTouchEnd = useCallback(() => {
     setIsTouchDragging(false);
-   }, []);
+    // Save final position via mutation service when drag ends
+    if (selectedAsset && assets[selectedAsset]) {
+      const asset = assets[selectedAsset];
+      updateAssetPosition(selectedAsset, asset.x, asset.y);
+    }
+   }, [selectedAsset, assets, updateAssetPosition]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging || !selectedAsset || !containerRef.current) return;
@@ -380,13 +394,18 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
     const boundedX = Math.max(0, Math.min(screenX, containerRect.width - 200));
     const boundedY = Math.max(0, Math.min(screenY, containerRect.height - 50));
     
-    // Update asset position directly
-    updateAssetPosition(selectedAsset, boundedX, boundedY);
-  }, [isDragging, selectedAsset, dragOffset, updateAssetPosition]);
+    // Update asset position using fast method (no mutation queueing during drag)
+    updateAssetPositionFast(selectedAsset, boundedX, boundedY);
+  }, [isDragging, selectedAsset, dragOffset, updateAssetPositionFast]);
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
-   }, []);
+    // Save final position via mutation service when drag ends
+    if (selectedAsset && assets[selectedAsset]) {
+      const asset = assets[selectedAsset];
+      updateAssetPosition(selectedAsset, asset.x, asset.y);
+    }
+   }, [selectedAsset, assets, updateAssetPosition]);
 
   const handleContainerClick = useCallback((e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
@@ -519,10 +538,9 @@ export function AssetPort({ onToggleSidebar, currentWorldTitle, onOpenWorldLibra
       const newSize = { width: img.naturalWidth, height: img.naturalHeight };
       setImageNaturalSize(newSize);
       
-      // Update config with image size if not already set
-      if (!backgroundConfig.imageSize || 
-          backgroundConfig.imageSize.width !== newSize.width || 
-          backgroundConfig.imageSize.height !== newSize.height) {
+      // Only update config with image size if it's not already set
+      // Don't overwrite if already saved - this preserves user's scale settings on refresh
+      if (!backgroundConfig.imageSize) {
         const assetKey = getAssetKeyWithBook(enteredAssetId || 'root', currentBook?.id);
         const updatedConfig = { ...backgroundConfig, imageSize: newSize };
         setBackground(assetKey, updatedConfig);

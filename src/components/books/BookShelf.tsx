@@ -4,6 +4,7 @@ import { Settings, User, Users, Building, Sparkles, Swords, Wand2 } from 'lucide
 import { useBookStore } from '@/stores/bookStoreSimple';
 import { useThemeStore } from '@/stores/themeStore';
 import { useAuthStore } from '@/stores/authStore';
+import { useMediaStore } from '@/stores/mediaStore';
 import { Button } from '@/components/ui/button';
 import { SettingsPanel } from '@/components/settings/SettingsPanel';
 import { AccountModal } from '@/components/account/AccountModal';
@@ -35,6 +36,7 @@ const BookShelf: React.FC<BookShelfProps> = ({
   const { viewMode, setViewMode, getAllBooks, currentBookId, setCurrentBook, getCurrentBook } = useBookStore();
   const { theme } = useThemeStore();
   const { user, plan, isAuthenticated, effectiveLimits } = useAuthStore();
+  const { professionalMode } = useMediaStore();
   const navigate = useNavigate();
   const books = getAllBooks();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -217,74 +219,76 @@ const BookShelf: React.FC<BookShelfProps> = ({
               Settings
             </Button>
             
-            {/* Generators Button */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setGeneratorsOpen(!generatorsOpen);
-                }}
-                className={`
-                  whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border hover:text-accent-foreground py-2 px-3 h-10 flex items-center justify-center gap-2 bg-sidebar-accent/20 border-sidebar-border hover:bg-sidebar-accent/40
-                  ${
-                    theme === 'dark' 
-                      ? 'border-white/20 text-white hover:bg-white/10' 
-                      : 'border-border text-foreground hover:bg-accent'
-                  }
-                `}
-                title="Generators"
-              >
-                <Wand2 className="w-4 h-4" />
-              </button>
-              
-              {generatorsOpen && (
-                <div className="absolute top-full mt-1 right-0 z-50 min-w-[160px] bg-sidebar border border-sidebar-border rounded-md shadow-lg overflow-hidden">
-                  <div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openGenerator('character-generator');
-                      }}
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-sidebar-accent/40 flex items-center gap-2 transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
-                    >
-                      <Users className="w-4 h-4" />
-                      <span>Characters</span>
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openGenerator('city-generator');
-                      }}
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-sidebar-accent/40 flex items-center gap-2 transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
-                    >
-                      <Building className="w-4 h-4" />
-                      <span>Cities</span>
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openGenerator('god-generator');
-                      }}
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-sidebar-accent/40 flex items-center gap-2 transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
-                    >
-                      <Sparkles className="w-4 h-4" />
-                      <span>Gods</span>
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openGenerator('battle-manager');
-                      }}
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-sidebar-accent/40 flex items-center gap-2 transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
-                    >
-                      <Swords className="w-4 h-4" />
-                      <span>Battles</span>
-                    </button>
+            {/* Generators Button - hidden in professional mode */}
+            {!professionalMode && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setGeneratorsOpen(!generatorsOpen);
+                  }}
+                  className={`
+                    whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border hover:text-accent-foreground py-2 px-3 h-10 flex items-center justify-center gap-2 bg-sidebar-accent/20 border-sidebar-border hover:bg-sidebar-accent/40
+                    ${
+                      theme === 'dark' 
+                        ? 'border-white/20 text-white hover:bg-white/10' 
+                        : 'border-border text-foreground hover:bg-accent'
+                    }
+                  `}
+                  title="Generators"
+                >
+                  <Wand2 className="w-4 h-4" />
+                </button>
+                
+                {generatorsOpen && (
+                  <div className="absolute top-full mt-1 right-0 z-50 min-w-[160px] bg-sidebar border border-sidebar-border rounded-md shadow-lg overflow-hidden">
+                    <div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openGenerator('character-generator');
+                        }}
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-sidebar-accent/40 flex items-center gap-2 transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                      >
+                        <Users className="w-4 h-4" />
+                        <span>Characters</span>
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openGenerator('city-generator');
+                        }}
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-sidebar-accent/40 flex items-center gap-2 transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                      >
+                        <Building className="w-4 h-4" />
+                        <span>Cities</span>
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openGenerator('god-generator');
+                        }}
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-sidebar-accent/40 flex items-center gap-2 transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                        <span>Gods</span>
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openGenerator('battle-manager');
+                        }}
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-sidebar-accent/40 flex items-center gap-2 transition-all duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                      >
+                        <Swords className="w-4 h-4" />
+                        <span>Battles</span>
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

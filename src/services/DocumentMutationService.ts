@@ -19,7 +19,9 @@ export type DocumentOperation =
   | { op: 'UPDATE_BACKGROUND_CONFIG'; assetId: string; config: Record<string, any> }
   | { op: 'UPDATE_GLOBAL_BACKGROUNDS'; backgrounds: Record<string, Record<string, any>> }
   | { op: 'UPDATE_ASSET_BACKGROUND'; assetId: string; config: Record<string, any> }
-  | { op: 'UPDATE_CUSTOM_FIELDS'; assetId: string; customFields: Record<string, any> };
+  | { op: 'UPDATE_CUSTOM_FIELDS'; assetId: string; customFields: Record<string, any> }
+  | { op: 'UPDATE_GLOBAL_TAGS'; tags: Record<string, any>; assetTags: Record<string, string[]> }
+  | { op: 'UPDATE_ASSET_TAGS'; assetId: string; tagIds: string[] };
 
 interface AssetPosition {
   x: number;

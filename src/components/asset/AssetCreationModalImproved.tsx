@@ -265,7 +265,9 @@ export function AssetCreationModalImproved({ isOpen, onClose, initialData, paren
     }));
   };
 
-  const toggleSection = (section: keyof typeof expandedSections) => {
+  const toggleSection = (section: keyof typeof expandedSections) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     setExpandedSections(prev => ({
       ...prev,
       [section]: !prev[section]
@@ -274,7 +276,8 @@ export function AssetCreationModalImproved({ isOpen, onClose, initialData, paren
 
   const SectionHeader = ({ title, section, icon }: { title: string; section: keyof typeof expandedSections; icon: React.ReactNode }) => (
     <button
-      onClick={() => toggleSection(section)}
+      type="button"
+      onClick={toggleSection(section)}
       className="w-full flex items-center justify-between p-3 rounded-lg border border-glass-border/30 bg-glass/20 hover:bg-glass/30 transition-colors"
     >
       <div className="flex items-center gap-2">
@@ -291,8 +294,12 @@ export function AssetCreationModalImproved({ isOpen, onClose, initialData, paren
 
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto glass cosmic-glow border-glass-border/40">
+      <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
+        <DialogContent 
+          className="max-w-5xl max-h-[90vh] overflow-y-auto glass cosmic-glow border-glass-border/40"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle className="text-xl font-bold">Create New Asset</DialogTitle>
           </DialogHeader>
@@ -526,19 +533,19 @@ export function AssetCreationModalImproved({ isOpen, onClose, initialData, paren
                           />
                         </div>
 
-                        {/* Thumbnail Display */}
+                        {/* Background Display */}
                         <div className="flex items-center justify-between p-3 rounded-lg border border-glass-border/30 bg-glass/30">
                           <div className="flex items-center gap-2">
-                            {formData.viewportDisplaySettings.thumbnail ? (
+                            {formData.viewportDisplaySettings.thumbnail === false ? (
                               <Eye className="w-4 h-4 text-green-400" />
                             ) : (
                               <EyeOff className="w-4 h-4 text-muted-foreground" />
                             )}
-                            <Label className="text-sm font-medium">Thumbnail</Label>
+                            <Label className="text-sm font-medium">Background</Label>
                           </div>
                           <Switch
-                            checked={formData.viewportDisplaySettings.thumbnail}
-                            onCheckedChange={(checked) => handleViewportSettingChange('thumbnail', checked)}
+                            checked={formData.viewportDisplaySettings.thumbnail === false}
+                            onCheckedChange={(checked) => handleViewportSettingChange('thumbnail', !checked)}
                           />
                         </div>
 

@@ -4,7 +4,6 @@ import { useAssetCreation } from '@/hooks/useAssetCreation';
 import { useTagStore } from '@/stores/tagStore';
 import { useCloudStore } from '@/stores/cloudStore';
 import { useAuthStore } from '@/stores/authStore';
-import { useAssetStore } from '@/stores/assetStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -63,8 +62,6 @@ export function AssetCreationModal({ isOpen, onClose, initialData, parentId, gen
   const { tags } = useTagStore();
   const { syncEnabled } = useCloudStore();
   const { isAuthenticated, plan } = useAuthStore();
-  const { getCurrentBookAssets } = useAssetStore();
-  const assets = getCurrentBookAssets();
   
   // Calculate the correct position based on whether this is a child asset or root asset
   const getCalculatedPosition = useCallback(() => {
@@ -128,7 +125,7 @@ export function AssetCreationModal({ isOpen, onClose, initialData, parentId, gen
     }
   }, [generatorImportData]);
 
-  // Update position when parentId or assets change (but not on every render)
+  // Update position when parentId changes (e.g., when creating child vs root asset)
   useEffect(() => {
     const calculatedPosition = getCalculatedPosition();
     setFormData(prev => ({
@@ -136,7 +133,7 @@ export function AssetCreationModal({ isOpen, onClose, initialData, parentId, gen
       x: calculatedPosition.x,
       y: calculatedPosition.y,
     }));
-  }, [parentId, assets]); // Only depend on parentId and assets, not on getCalculatedPosition itself
+  }, [parentId, getCalculatedPosition]);
 
   const [isCreating, setIsCreating] = useState(false);
   const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] = useState(false);
@@ -502,26 +499,26 @@ export function AssetCreationModal({ isOpen, onClose, initialData, parentId, gen
                     />
                   </div>
 
-                  {/* Thumbnail Display */}
+                  {/* Background Display */}
                   <div className="flex items-center justify-between p-3 rounded-lg border border-glass-border/30 bg-glass/30">
                     <div className="flex items-center gap-3">
                       <div className="flex items-center gap-2">
-                        {formData.viewportDisplaySettings.thumbnail ? (
+                        {formData.viewportDisplaySettings.thumbnail === false ? (
                           <Eye className="w-4 h-4 text-green-400" />
                         ) : (
                           <EyeOff className="w-4 h-4 text-muted-foreground" />
                         )}
                         <Label className="text-sm font-medium">
-                          Thumbnail
+                          Background
                         </Label>
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        Show the asset's thumbnail in the viewport
+                        Show background image through transparent asset
                       </div>
                     </div>
                     <Switch
-                      checked={formData.viewportDisplaySettings.thumbnail}
-                      onCheckedChange={(checked) => handleViewportSettingChange('thumbnail', checked)}
+                      checked={formData.viewportDisplaySettings.thumbnail === false}
+                      onCheckedChange={(checked) => handleViewportSettingChange('thumbnail', !checked)}
                     />
                   </div>
 

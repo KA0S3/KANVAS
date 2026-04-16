@@ -82,27 +82,27 @@ export function ViewportDisplaySettingsManager({
           />
         </div>
 
-        {/* Thumbnail Display */}
+        {/* Background Display */}
         <div className="flex items-center justify-between p-3 rounded-lg border border-glass-border/30 bg-glass/30">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
-              {settings.thumbnail ? (
+              {settings.thumbnail === false ? (
                 <Eye className="w-4 h-4 text-green-400" />
               ) : (
                 <EyeOff className="w-4 h-4 text-muted-foreground" />
               )}
-              <Label htmlFor="thumbnail-display" className="text-sm font-medium">
-                Thumbnail
+              <Label htmlFor="background-display" className="text-sm font-medium">
+                Background
               </Label>
             </div>
             <div className="text-xs text-muted-foreground">
-              Show the asset's thumbnail in the viewport
+              Show background image through transparent asset
             </div>
           </div>
           <Switch
-            id="thumbnail-display"
-            checked={settings.thumbnail}
-            onCheckedChange={(checked) => handleSettingChange('thumbnail', checked)}
+            id="background-display"
+            checked={settings.thumbnail === false}
+            onCheckedChange={(checked) => handleSettingChange('thumbnail', !checked)}
           />
         </div>
 
@@ -150,7 +150,7 @@ export function ViewportDisplaySettingsManager({
           <div className="text-xs text-muted-foreground space-y-1">
             <div>• Name: {settings.name ? 'Visible' : 'Hidden'}</div>
             <div>• Description: {settings.description ? 'Visible' : 'Hidden'}</div>
-            <div>• Thumbnail: {settings.thumbnail ? 'Visible' : 'Hidden'}</div>
+            <div>• Background: {settings.thumbnail === false ? 'On' : 'Off'}</div>
             <div>• Portrait Blur: {Math.round(settings.portraitBlur * 100)}%</div>
           </div>
         </div>

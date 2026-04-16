@@ -40,6 +40,7 @@ interface AssetStore {
   reparentAsset: (assetId: string, newParentId?: string) => void;
   deleteAsset: (assetId: string) => void;
   updateAssetPosition: (assetId: string, x: number, y: number) => void;
+  updateAssetPositionFast: (assetId: string, x: number, y: number) => void;
   updateAssetSize: (assetId: string, width: number, height: number) => void;
   updateAsset: (assetId: string, updates: Partial<Omit<Asset, 'id' | 'children' | 'parentId'>>) => void;
   setActiveAsset: (assetId: string | null) => void;
@@ -238,6 +239,30 @@ export const useAssetStore = create<AssetStore>()(
       assetId,
       oldParentId,
       newParentId
+    });
+  },
+
+  // Update asset position (fast - no mutation queueing, for drag operations)
+  updateAssetPositionFast: (assetId: string, x: number, y: number) => {
+    set((state) => {
+      const bookId = state.getCurrentBookId();
+      if (!bookId) return state;
+      
+      const bookAssets = state.bookAssets[bookId] || {};
+      const asset = bookAssets[assetId];
+      if (!asset) return state;
+
+      const newBookAssets = { ...state.bookAssets };
+      newBookAssets[bookId] = {
+        ...bookAssets,
+        [assetId]: {
+          ...asset,
+          x,
+          y,
+        },
+      };
+
+      return { bookAssets: newBookAssets };
     });
   },
 

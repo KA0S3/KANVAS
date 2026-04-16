@@ -12,6 +12,7 @@ interface MediaState {
   audioEnabled: boolean;
   videoSoundsEnabled: boolean;
   audioVolume: number;
+  professionalMode: boolean;
   
   // Actions
   setAppPhase: (phase: AppPhase) => void;
@@ -24,7 +25,7 @@ interface MediaState {
   setAudioVolume: (volume: number) => void;
   
   // Phase transitions
-  startIntro: () => void;
+  startIntro: (launchMode?: 'full' | 'professional') => void;
   showLibrary: () => void;
   enterBookView: () => void;
   returnToLibrary: () => void;
@@ -41,6 +42,7 @@ export const useMediaStore = create<MediaState>()(
       audioEnabled: true,
       videoSoundsEnabled: true,
       audioVolume: 0.08, // Default to 8% for background music
+      professionalMode: false,
 
       setAppPhase: (phase) => {
         set({ appPhase: phase });
@@ -54,7 +56,19 @@ export const useMediaStore = create<MediaState>()(
       setVideoSoundsEnabled: (enabled) => set({ videoSoundsEnabled: enabled }),
       setAudioVolume: (volume) => set({ audioVolume: Math.max(0, Math.min(1, volume)) }),
 
-      startIntro: () => set({ appPhase: 'INTRO_VIDEO' }),
+      startIntro: (launchMode = 'full') => {
+        if (launchMode === 'professional') {
+          set({ 
+            appPhase: 'INTRO_VIDEO',
+            audioEnabled: false,
+            videosEnabled: false,
+            videoSoundsEnabled: false,
+            professionalMode: true
+          });
+        } else {
+          set({ appPhase: 'INTRO_VIDEO' });
+        }
+      },
       showLibrary: () => set({ appPhase: 'LIBRARY' }),
       enterBookView: () => set({ appPhase: 'BOOK_VIEW' }),
       returnToLibrary: () => set({ appPhase: 'LIBRARY' }),

@@ -56,6 +56,7 @@ class AutosaveService {
     };
 
     this.setupStoreSubscriptions();
+    this.setupVisibilityHandlers();
     this.startPeriodicAutosave();
   }
 
@@ -90,6 +91,15 @@ class AutosaveService {
     //   unsubscribeAssets();
     //   unsubscribeBackgrounds();
     // };
+  }
+
+  private setupVisibilityHandlers(): void {
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && this.state.pendingChanges) {
+        console.log('[Autosave] Page hidden, performing emergency save');
+        this.performAutosave();
+      }
+    });
   }
 
   private debounceAutosave(): void {
