@@ -49,13 +49,11 @@ export function CloudRetryStatus({ compact = false, projectId }: CloudRetryStatu
     }
   }, []);
 
-  // Initial load and periodic refresh
+  // Initial load only - disabled periodic refresh to prevent Supabase quota flood
   useEffect(() => {
     loadFailedUploads();
-    
-    // Refresh every 30 seconds
-    const interval = setInterval(loadFailedUploads, 30000);
-    return () => clearInterval(interval);
+    // NOTE: Polling disabled to prevent Supabase quota flood
+    // Refresh manually via retry actions instead
   }, [loadFailedUploads]);
 
   // Listen for cloud retry events
@@ -297,8 +295,8 @@ export function CloudRetryBadge() {
     };
 
     checkFailed();
-    const interval = setInterval(checkFailed, 60000); // Check every minute
-    return () => clearInterval(interval);
+    // NOTE: Polling disabled to prevent Supabase quota flood
+    // Refresh manually via retry actions instead
   }, []);
 
   if (failedCount === 0) return null;

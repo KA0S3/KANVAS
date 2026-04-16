@@ -97,8 +97,8 @@ class DocumentMutationService {
       this.startCloudRetryPolling();
     });
 
-    // Start cloud retry polling (Phase 10)
-    this.startCloudRetryPolling();
+    // NOTE: Cloud retry polling NOT started automatically to prevent Supabase quota flood
+    // Call startCloudRetryPolling() explicitly when needed
   }
 
   static getInstance(): DocumentMutationService {
@@ -285,6 +285,12 @@ class DocumentMutationService {
     }
   }
 
+  // Clear stuck sync flag (for recovery)
+  clearSyncInProgress(): void {
+    this.syncInProgress = false;
+    console.log('[DocumentMutation] Cleared stuck sync flag');
+  }
+
   // Immediate sync (for critical operations)
   async syncNow(): Promise<boolean> {
     if (this.syncInProgress) {
@@ -354,7 +360,15 @@ class DocumentMutationService {
           p_operations: operations
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[DocumentMutation] RPC error details:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        });
+        throw error;
+      }
       
       const result = data[0];
       
@@ -1186,8 +1200,9 @@ class DocumentMutationService {
   /**
    * Start periodic cloud retry polling
    * Runs every minute to check for failed uploads
+   * Call explicitly when needed (not auto-started to prevent quota flood)
    */
-  private startCloudRetryPolling(): void {
+  startCloudRetryPolling(): void {
     if (this.cloudRetryInterval) return; // Already running
     
     console.log('[DocumentMutation] Starting cloud retry polling');

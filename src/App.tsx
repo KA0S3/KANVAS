@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ConflictResolutionProvider } from "@/components/ConflictResolutionProvider";
 import { useEffect } from "react";
 import { emergencySaveService } from "@/services/emergencySaveService";
+import { connectivityService } from "@/services/connectivityService";
 import Index from "./pages/Index";
 import AuthConfirm from "./pages/AuthConfirm";
 import AuthCallback from "./pages/AuthCallback";
@@ -18,9 +19,14 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 const App = () => {
-  // Initialize emergency save service on app mount
+  // Initialize services on app mount
   useEffect(() => {
     emergencySaveService.initialize();
+    connectivityService.startHeartbeat();
+
+    return () => {
+      connectivityService.stopHeartbeat();
+    };
   }, []);
 
   return (

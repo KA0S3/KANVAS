@@ -39,7 +39,8 @@ class ConnectivityService {
     };
     
     this.setupEventListeners();
-    this.startHeartbeat();
+    // NOTE: Heartbeat NOT started automatically to prevent Supabase quota flood
+    // Call startHeartbeat() explicitly when needed
   }
 
   private setupEventListeners(): void {
@@ -68,18 +69,6 @@ class ConnectivityService {
 
       document.addEventListener('visibilitychange', handleVisibilityChange);
     }
-  }
-
-  private startHeartbeat(): void {
-    if (this.heartbeatInterval) {
-      clearInterval(this.heartbeatInterval);
-    }
-
-    this.heartbeatInterval = window.setInterval(() => {
-      this.performHeartbeat();
-    }, this.HEARTBEAT_INTERVAL);
-
-    console.log('[Connectivity] Started heartbeat checks');
   }
 
   private async performHeartbeat(): Promise<void> {
@@ -277,6 +266,29 @@ class ConnectivityService {
     return await this.checkConnectivityNow();
   }
 
+  // Public method to start heartbeat (call explicitly when needed)
+  startHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      console.log('[Connectivity] Heartbeat already running');
+      return;
+    }
+
+    this.heartbeatInterval = window.setInterval(() => {
+      this.performHeartbeat();
+    }, this.HEARTBEAT_INTERVAL);
+
+    console.log('[Connectivity] Started heartbeat checks');
+  }
+
+  // Public method to stop heartbeat
+  stopHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+      console.log('[Connectivity] Heartbeat stopped');
+    }
+  }
+
   // Manual override for testing
   setOnline(online: boolean): void {
     console.log(`[Connectivity] Manual override: ${online ? 'online' : 'offline'}`);
@@ -288,10 +300,7 @@ class ConnectivityService {
 
   // Cleanup
   destroy(): void {
-    if (this.heartbeatInterval) {
-      clearInterval(this.heartbeatInterval);
-      this.heartbeatInterval = null;
-    }
+    this.stopHeartbeat();
     this.subscribers.clear();
     
     // Remove event listeners
