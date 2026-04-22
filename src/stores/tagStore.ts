@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { useBookStore } from './bookStoreSimple';
+import { useAssetStore } from './assetStore';
 import { documentMutationService } from '@/services/DocumentMutationService';
 
 const TAG_STORAGE_KEY = 'kaos_tags';
@@ -112,13 +113,9 @@ export const useTagStore = create<TagStore>()(
       // Save to localStorage immediately
       saveTagsToStorage(updatedTags);
 
-      // Queue operation to DocumentMutationService using UPDATE_GLOBAL_TAGS (Phase 12)
+      // Sync tags using saveGlobalTags (MASTER_PLAN.md state-based tracking)
       if (documentMutationService.getCurrentProjectId()) {
-        documentMutationService.queueOperation({
-          op: 'UPDATE_GLOBAL_TAGS',
-          tags: updatedTags,
-          assetTags: state.assetTags,
-        });
+        documentMutationService.saveGlobalTags(updatedTags);
       }
 
       return {
@@ -151,13 +148,9 @@ export const useTagStore = create<TagStore>()(
       saveTagsToStorage(newTags);
       saveAssetTagsToStorage(newAssetTags);
 
-      // Queue operation to DocumentMutationService using UPDATE_GLOBAL_TAGS (Phase 12)
+      // Sync tags using saveGlobalTags (MASTER_PLAN.md state-based tracking)
       if (documentMutationService.getCurrentProjectId()) {
-        documentMutationService.queueOperation({
-          op: 'UPDATE_GLOBAL_TAGS',
-          tags: newTags,
-          assetTags: newAssetTags,
-        });
+        documentMutationService.saveGlobalTags(newTags);
       }
 
       return {
@@ -185,13 +178,9 @@ export const useTagStore = create<TagStore>()(
       // Save to localStorage immediately
       saveTagsToStorage(updatedTags);
 
-      // Queue operation to DocumentMutationService using UPDATE_GLOBAL_TAGS (Phase 12)
+      // Sync tags using saveGlobalTags (MASTER_PLAN.md state-based tracking)
       if (documentMutationService.getCurrentProjectId()) {
-        documentMutationService.queueOperation({
-          op: 'UPDATE_GLOBAL_TAGS',
-          tags: updatedTags,
-          assetTags: state.assetTags,
-        });
+        documentMutationService.saveGlobalTags(updatedTags);
       }
 
       return {
@@ -216,13 +205,19 @@ export const useTagStore = create<TagStore>()(
       // Save to localStorage immediately
       saveAssetTagsToStorage(updatedAssetTags);
 
-      // Queue operation to DocumentMutationService using UPDATE_ASSET_TAGS (Phase 12)
+      // Sync asset tags using markAssetChanged (MASTER_PLAN.md state-based tracking)
+      // Tags are stored in custom_fields, so we mark the asset as changed
       if (documentMutationService.getCurrentProjectId()) {
-        documentMutationService.queueOperation({
-          op: 'UPDATE_ASSET_TAGS',
-          assetId: assetId,
-          tagIds: updatedAssetTags[assetId],
-        });
+        const assetStore = useAssetStore.getState();
+        const bookId = assetStore.getCurrentBookId();
+        if (bookId) {
+          const bookAssets = assetStore.bookAssets[bookId] || {};
+          const asset = bookAssets[assetId];
+          if (asset) {
+            const updatedAsset = { ...asset, tags: updatedAssetTags[assetId] };
+            documentMutationService.markAssetChanged(assetId, updatedAsset);
+          }
+        }
       }
 
       return {
@@ -244,13 +239,19 @@ export const useTagStore = create<TagStore>()(
       // Save to localStorage immediately
       saveAssetTagsToStorage(updatedAssetTags);
 
-      // Queue operation to DocumentMutationService using UPDATE_ASSET_TAGS (Phase 12)
+      // Sync asset tags using markAssetChanged (MASTER_PLAN.md state-based tracking)
+      // Tags are stored in custom_fields, so we mark the asset as changed
       if (documentMutationService.getCurrentProjectId()) {
-        documentMutationService.queueOperation({
-          op: 'UPDATE_ASSET_TAGS',
-          assetId: assetId,
-          tagIds: updatedAssetTags[assetId],
-        });
+        const assetStore = useAssetStore.getState();
+        const bookId = assetStore.getCurrentBookId();
+        if (bookId) {
+          const bookAssets = assetStore.bookAssets[bookId] || {};
+          const asset = bookAssets[assetId];
+          if (asset) {
+            const updatedAsset = { ...asset, tags: updatedAssetTags[assetId] };
+            documentMutationService.markAssetChanged(assetId, updatedAsset);
+          }
+        }
       }
 
       return {

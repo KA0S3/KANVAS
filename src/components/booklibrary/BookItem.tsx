@@ -3,6 +3,7 @@ import { BookOpen, Edit, Trash2, X, Calendar, Tag, Image } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import type { Book } from '@/types/book';
+import { useTagStore } from '@/stores/tagStore';
 
 interface BookItemProps {
   book: Book;
@@ -24,6 +25,7 @@ export function BookItem({
   const [isHovered, setIsHovered] = useState(false);
   const [isFlipped, setIsFlipped] = useState(false);
   const [showStats, setShowStats] = useState(false);
+  const { tags } = useTagStore();
 
   const bookStyle = book.coverImage 
     ? { backgroundImage: `url(${book.coverImage})` }
@@ -61,7 +63,7 @@ export function BookItem({
   };
 
   const getTagCount = () => {
-    return Object.keys(book.worldData.tags || {}).length;
+    return Object.keys(tags).length;
   };
 
   const formatDate = (timestamp: number) => {

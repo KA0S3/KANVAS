@@ -147,16 +147,31 @@ const SplashScreen = () => {
           paddingTop: 'clamp(3rem, 8vh, 8rem)',
         }}
       >
-        <h1 
-          className="text-white font-normal"
-          style={{
-            fontSize: 'clamp(3rem, 12vw, 10rem)',
-            letterSpacing: '0.3em',
-            textShadow: '0 0 20px rgba(255, 255, 255, 0.5), 0 0 40px rgba(255, 255, 255, 0.3)',
-          }}
-        >
-          KANVAS
-        </h1>
+        <div>
+          <h1 
+            className="text-white font-normal"
+            style={{
+              fontSize: 'clamp(3rem, 12vw, 10rem)',
+              letterSpacing: '0.3em',
+              textShadow: '0 0 20px rgba(255, 255, 255, 0.5), 0 0 40px rgba(255, 255, 255, 0.3)',
+              marginBottom: '-0.4em',
+            }}
+          >
+            KANVAS
+          </h1>
+          <p 
+            className="text-white font-bold text-center uppercase"
+            style={{
+              fontSize: 'clamp(0.8rem, 2.5vw, 1.8rem)',
+              letterSpacing: '0.3em',
+              textShadow: '0 0 20px rgba(255, 255, 255, 0.5), 0 0 40px rgba(255, 255, 255, 0.3)',
+              fontFamily: '"MedievalSharp", "Almendra", cursive',
+              marginTop: '0.1em',
+            }}
+          >
+            FOR THE VISUAL
+          </p>
+        </div>
       </div>
       
       {/* Terms and Conditions Notice */}

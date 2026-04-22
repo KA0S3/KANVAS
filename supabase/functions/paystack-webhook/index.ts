@@ -350,7 +350,8 @@ function getPlanTypeFromProductKey(productKey: string): string {
   const productMapping: Record<string, string> = {
     'PRO_SUBSCRIPTION': 'pro',
     'LIFETIME': 'lifetime',
-    'STORAGE_10GB': 'free' // Storage add-ons don't change plan type
+    'STORAGE_10GB': 'free', // Storage add-ons don't change plan type
+    'STORAGE_50GB': 'free' // Storage add-ons don't change plan type
   }
   return productMapping[productKey] || 'free'
 }

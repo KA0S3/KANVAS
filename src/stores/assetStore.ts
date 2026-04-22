@@ -7,6 +7,7 @@ import { useBookStore } from './bookStoreSimple';
 import { supabase } from '@/lib/supabase';
 import { v4 as uuidv4 } from 'uuid';
 import { documentMutationService } from '@/services/DocumentMutationService';
+import { markPositionChanged, markAssetChanged } from '@/services/changeTrackingService';
 
 interface AssetStore {
   // Book-scoped asset registry for isolation
@@ -163,25 +164,10 @@ export const useAssetStore = create<AssetStore>()(
         
         return { bookAssets: newBookAssets };
       });
-      
-      // Queue operation for DocumentMutationService
-      documentMutationService.queueOperation({
-        op: 'CREATE_ASSET',
-        assetId: id,
-        parentId,
-        name: newAsset.name,
-        type: newAsset.type,
-        position: {
-          x: newAsset.x || 0,
-          y: newAsset.y || 0,
-          width: newAsset.width,
-          height: newAsset.height,
-          zIndex: 0
-        },
-        isExpanded: true,
-        customFields: {}
-      });
-      
+
+      // Phase 3 Integration: Track metadata changes (MASTER_PLAN.md state-based tracking)
+      markAssetChanged(id, newAsset);
+
       return id;
     } catch (error) {
       console.error('[AssetStore] Failed to create asset:', error);
@@ -232,14 +218,10 @@ export const useAssetStore = create<AssetStore>()(
 
       return { bookAssets: newBookAssets };
     });
-    
-    // Queue operation for DocumentMutationService
-    documentMutationService.queueOperation({
-      op: 'MOVE_ASSET',
-      assetId,
-      oldParentId,
-      newParentId
-    });
+
+    // Phase 3 Integration: Track metadata changes (MASTER_PLAN.md state-based tracking)
+    const updatedAsset = { ...asset, parentId: newParentId };
+    markAssetChanged(assetId, updatedAsset);
   },
 
   // Update asset position (fast - no mutation queueing, for drag operations)
@@ -247,7 +229,7 @@ export const useAssetStore = create<AssetStore>()(
     set((state) => {
       const bookId = state.getCurrentBookId();
       if (!bookId) return state;
-      
+
       const bookAssets = state.bookAssets[bookId] || {};
       const asset = bookAssets[assetId];
       if (!asset) return state;
@@ -264,6 +246,9 @@ export const useAssetStore = create<AssetStore>()(
 
       return { bookAssets: newBookAssets };
     });
+
+    // Phase 3 Integration: Track position changes for hot updates
+    markPositionChanged(assetId, x, y, 0);
   },
 
   // Update asset position
@@ -288,26 +273,18 @@ export const useAssetStore = create<AssetStore>()(
 
       return { bookAssets: newBookAssets };
     });
-    
+
     // Get the full asset data for the operation
     const state = useAssetStore.getState();
     const bookId = state.getCurrentBookId();
     if (!bookId) return;
-    
+
     const bookAssets = state.bookAssets[bookId] || {};
     const asset = bookAssets[assetId];
     if (!asset) return;
-    
-    // Queue operation for DocumentMutationService
-    documentMutationService.queueOperation({
-      op: 'UPDATE_POSITION',
-      assetId,
-      x,
-      y,
-      width: asset.width,
-      height: asset.height,
-      zIndex: 0
-    });
+
+    // Phase 3 Integration: Track position changes (MASTER_PLAN.md state-based tracking)
+    documentMutationService.markPositionChanged(assetId, x, y, 0);
   },
 
   // Update asset size
@@ -338,21 +315,16 @@ export const useAssetStore = create<AssetStore>()(
       const state = useAssetStore.getState();
       const bookId = state.getCurrentBookId();
       if (!bookId) return;
-      
+
       const bookAssets = state.bookAssets[bookId] || {};
       const asset = bookAssets[assetId];
       if (!asset) return;
-      
-      // Queue operation for DocumentMutationService
-      documentMutationService.queueOperation({
-        op: 'UPDATE_POSITION',
-        assetId,
-        x: asset.x || 0,
-        y: asset.y || 0,
-        width: Math.max(100, width),
-        height: Math.max(80, height),
-        zIndex: 0
-      });
+
+      // Phase 3 Integration: Track metadata changes
+      markAssetChanged(assetId, asset);
+
+      // Phase 3 Integration: Track position changes (MASTER_PLAN.md state-based tracking)
+      documentMutationService.markPositionChanged(assetId, asset.x || 0, asset.y || 0, 0);
     } catch (error) {
       console.error('[AssetStore] Failed to update asset size:', error);
       // Continue without updating size to prevent crashes
@@ -380,45 +352,38 @@ export const useAssetStore = create<AssetStore>()(
 
       return { bookAssets: newBookAssets };
     });
-    
-    // If updating name, queue metadata update
-    if (updates.name !== undefined) {
-      documentMutationService.queueOperation({
-        op: 'UPDATE_METADATA',
-        assetId,
-        name: updates.name
-      });
+
+    // Phase 3 Integration: Track metadata changes
+    const state = useAssetStore.getState();
+    const bookId = state.getCurrentBookId();
+    if (bookId) {
+      const bookAssets = state.bookAssets[bookId] || {};
+      const asset = bookAssets[assetId];
+      if (asset) {
+        markAssetChanged(assetId, asset);
+      }
     }
-    
-    // If updating position-related fields, queue position update
-    if (updates.x !== undefined || updates.y !== undefined || updates.width !== undefined || updates.height !== undefined) {
+
+    // If updating position-related fields, track position changes (MASTER_PLAN.md state-based tracking)
+    if (updates.x !== undefined || updates.y !== undefined) {
       const state = useAssetStore.getState();
       const bookId = state.getCurrentBookId();
       if (bookId) {
         const bookAssets = state.bookAssets[bookId] || {};
         const asset = bookAssets[assetId];
         if (asset) {
-          documentMutationService.queueOperation({
-            op: 'UPDATE_POSITION',
+          documentMutationService.markPositionChanged(
             assetId,
-            x: updates.x ?? asset.x ?? 0,
-            y: updates.y ?? asset.y ?? 0,
-            width: updates.width ?? asset.width ?? 200,
-            height: updates.height ?? asset.height ?? 150,
-            zIndex: 0
-          });
+            updates.x ?? asset.x ?? 0,
+            updates.y ?? asset.y ?? 0,
+            0
+          );
         }
       }
     }
     
-    // If updating background config, queue background update
-    if (updates.backgroundConfig !== undefined) {
-      documentMutationService.queueOperation({
-        op: 'UPDATE_BACKGROUND_CONFIG',
-        assetId,
-        config: updates.backgroundConfig
-      });
-    }
+    // If updating background config, track metadata changes (MASTER_PLAN.md state-based tracking)
+    // Note: markAssetChanged is already called above for all updates
   },
 
   // Delete an asset and all its descendants recursively
@@ -475,15 +440,10 @@ export const useAssetStore = create<AssetStore>()(
       };
     });
     
-    // Queue DELETE_ASSET operations for all deleted assets
+    // Phase 3 Integration: Track deleted assets (MASTER_PLAN.md state-based tracking)
     // Delete children first, then parent
     idsToDelete.reverse().forEach(id => {
-      const deletedAsset = bookAssets[id];
-      documentMutationService.queueOperation({
-        op: 'DELETE_ASSET',
-        assetId: id,
-        parentId: deletedAsset?.parentId
-      });
+      documentMutationService.markAssetDeleted(id);
     });
   },
 

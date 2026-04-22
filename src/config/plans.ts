@@ -1,14 +1,11 @@
 /**
- * Canonical Plan Configuration - Single Source of Truth
- * 
- * This file defines all plan types, quotas, and feature flags.
- * Used by client, server functions, and edge handlers.
- * 
- * Plan IDs: guest, free, pro, lifetime
- * - guest: Not signed in session
- * - free: Signed-in free tier
- * - pro: Paid subscription
- * - lifetime: One-time purchase
+ * Canonical Plan Configuration - Client Side
+ *
+ * This file mirrors the server-side plans configuration from supabase/functions/shared/plans.ts
+ * Currency: ZAR (South African Rand) - native Paystack support for SA businesses
+ * Transaction fee: 2.9% + R1.00
+ *
+ * Plan IDs: guest, free, pro, lifetime, owner
  */
 
 export interface PlanConfig {
@@ -22,7 +19,7 @@ export interface PlanConfig {
   maxAssetSize: number; // bytes
   features: Record<string, any>;
   pricing?: {
-    priceCents?: number;
+    priceCents?: number; // Price in smallest currency unit (cents for ZAR)
     currency?: string;
     recurring?: boolean;
     skuId?: string;
@@ -46,7 +43,7 @@ export const PLANS_CONFIG: Record<string, PlanConfig> = {
       advancedFeatures: false
     }
   },
-  
+
   free: {
     id: 'free',
     label: 'Free',
@@ -62,11 +59,11 @@ export const PLANS_CONFIG: Record<string, PlanConfig> = {
       advancedFeatures: false
     }
   },
-  
+
   pro: {
     id: 'pro',
-    label: 'PAYG Monthly',
-    description: 'Pay-as-you-go monthly fee for advanced features',
+    label: 'Pro',
+    description: 'Professional subscription with premium features',
     quotaBytes: 10 * 1024 * 1024 * 1024, // 10GB
     maxBooks: -1, // Unlimited
     adsEnabled: false,
@@ -79,18 +76,18 @@ export const PLANS_CONFIG: Record<string, PlanConfig> = {
       prioritySupport: true
     },
     pricing: {
-      priceCents: 500, // $5 USD
-      currency: 'USD',
+      priceCents: 10000, // R100 ZAR
+      currency: 'ZAR',
       recurring: true,
-      skuId: 'payg_monthly',
-      paystackProductKey: 'PAYG_SUBSCRIPTION'
+      skuId: 'pro_monthly',
+      paystackProductKey: 'PRO_SUBSCRIPTION'
     }
   },
-  
+
   lifetime: {
     id: 'lifetime',
-    label: 'One-Time Fee',
-    description: 'Permanent access to the core visual tracking system',
+    label: 'Lifetime',
+    description: 'One-time purchase for lifetime access',
     quotaBytes: 15 * 1024 * 1024 * 1024, // 15GB
     maxBooks: -1, // Unlimited
     adsEnabled: false,
@@ -104,14 +101,14 @@ export const PLANS_CONFIG: Record<string, PlanConfig> = {
       lifetimeAccess: true
     },
     pricing: {
-      priceCents: 8000, // $80 USD
-      currency: 'USD',
+      priceCents: 150000, // R1500 ZAR
+      currency: 'ZAR',
       recurring: false,
       skuId: 'lifetime_once',
       paystackProductKey: 'LIFETIME'
     }
   },
-  
+
   owner: {
     id: 'owner',
     label: 'Owner',
@@ -147,18 +144,18 @@ export const STORAGE_ADDONS: Record<string, StorageAddonConfig> = {
     id: 'addon_10gb',
     label: '10GB Storage',
     quotaBytes: 10 * 1024 * 1024 * 1024, // 10GB
-    priceCents: 1000, // $10 USD
-    currency: 'USD',
+    priceCents: 10000, // R100 ZAR
+    currency: 'ZAR',
     skuId: 'storage_10gb',
     paystackProductKey: 'STORAGE_10GB'
   },
-  
+
   addon_50gb: {
     id: 'addon_50gb',
     label: '50GB Storage',
     quotaBytes: 50 * 1024 * 1024 * 1024, // 50GB
-    priceCents: 3000, // $30 USD
-    currency: 'USD',
+    priceCents: 25000, // R250 ZAR
+    currency: 'ZAR',
     skuId: 'storage_50gb',
     paystackProductKey: 'STORAGE_50GB'
   }

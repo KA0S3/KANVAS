@@ -92,7 +92,7 @@ export async function createTransaction(
       body: {
         email: user.email,
         amount: product.price,
-        currency: 'NGN',
+        currency: 'ZAR',
         metadata,
         callback_url: `${window.location.origin}/payment/success`
       }
@@ -181,12 +181,12 @@ export async function verifyTransaction(reference: string): Promise<VerifyTransa
  */
 function getPlanTypeFromProductKey(productKey: string): string {
   const productMapping: Record<string, string> = {
-    'PRO_SUBSCRIPTION': 'premium',
-    'LIFETIME': 'enterprise',
-    'STORAGE_10GB': 'basic',
-    'STORAGE_50GB': 'basic'
+    'PRO_SUBSCRIPTION': 'pro',
+    'LIFETIME': 'lifetime',
+    'STORAGE_10GB': 'free', // Storage add-ons don't change plan type
+    'STORAGE_50GB': 'free' // Storage add-ons don't change plan type
   }
-  return productMapping[productKey] || 'basic'
+  return productMapping[productKey] || 'free'
 }
 
 /**

@@ -67,20 +67,35 @@ const CLOUD_RETRY_CONFIG = {
 class DocumentMutationService {
   private static instance: DocumentMutationService;
   private subscribers: Set<(status: SyncStatus) => void> = new Set();
-  private pendingOperations: PendingOperation[] = [];
   private currentVersion: number = 1;
   private currentProjectId: string | null = null;
   private syncInProgress: boolean = false;
-  private offlineQueue: DocumentOperation[] = [];
+  private syncStartTime: number = 0;
+  private syncTimeoutMs: number = 30000; // 30 second timeout for sync operations
   private conflictResolver: ConflictResolver;
   private lastServerDocument: any = null;
   private conflictHistory: ConflictResolution[] = [];
+
+  // NOTE: Following MASTER_PLAN.md - state-based tracking (NO operation queue)
+  private changedAssets: Record<string, Asset> = {};
+  private changedPositions: Record<string, { x: number; y: number; z_index: number }> = {};
+  private autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  private positionSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  private isPositionSaveScheduled: boolean = false;
+  private readonly AUTO_SAVE_MS = 40000; // 40 seconds
+  private readonly MAX_BATCH_SIZE = 500; // Soft cap - flush if exceeded
+  private readonly POSITION_SAVE_THROTTLE = 2000; // 2 seconds minimum (CRITICAL)
 
   // Cloud sync retry tracking (Phase 10)
   private cloudRetryCounts: Map<string, { count: number; lastRetry: number }> = new Map();
   private cloudRetryInterval: number | null = null;
   private isCloudRetryRunning: boolean = false;
   private onlineHandler: (() => void) | null = null;
+
+  // RAM caching to reduce Supabase reads
+  private documentCache: Map<string, { data: any; timestamp: number; version: number }> = new Map();
+  private backgroundsCache: Map<string, { data: any; timestamp: number }> = new Map();
+  private readonly CACHE_TTL_MS = 60000; // 1 minute cache TTL
 
   private constructor() {
     // Initialize with server-wins strategy for MVP
@@ -149,22 +164,72 @@ class DocumentMutationService {
     this.conflictHistory = [];
   }
 
-  // Load document from server
+  /**
+   * Load document from Supabase with caching
+   * NOTE: Following MASTER_PLAN.md - use load_project + load_assets instead of load_project_document
+   * Reconstruct tree client-side using parent_id (NO giant JSON documents)
+   */
   async loadDocument(projectId: string): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
-      const { data, error } = await supabase
-        .rpc('load_project_document', { p_project_id: projectId });
-
-      if (error) throw error;
-      if (!data || data.length === 0) {
-        return { success: false, error: 'Project not found' };
+      // Check cache first
+      const cached = this.documentCache.get(projectId);
+      if (cached && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
+        console.log('[DocumentMutation] Cache hit for document:', projectId);
+        return { success: true, data: cached.data };
       }
 
-      const doc = data[0];
-      this.currentVersion = doc.version;
-      this.currentProjectId = projectId;
+      performanceMonitor.incrementDatabaseRequests();
 
-      return { success: true, data: doc };
+      // Load project metadata (MASTER_PLAN.md Rule 1)
+      const { data: projectData, error: projectError } = await supabase
+        .rpc('load_project', {
+          p_project_id: projectId
+        });
+
+      if (projectError || !projectData || projectData.length === 0) {
+        console.error('[DocumentMutation] Failed to load project:', projectError);
+        return { success: false, error: String(projectError) };
+      }
+
+      const project = projectData[0];
+      const assetCount = project.asset_count || 0;
+
+      // Load flat asset rows (MASTER_PLAN.md Rule 2)
+      const { data: assetsData, error: assetsError } = await supabase
+        .rpc('load_assets', {
+          p_project_id: projectId,
+          p_parent_id: null,
+          p_load_all: assetCount < 100 // Load all if small project
+        });
+
+      if (assetsError) {
+        console.error('[DocumentMutation] Failed to load assets:', assetsError);
+        return { success: false, error: String(assetsError) };
+      }
+
+      // Build result matching expected structure
+      const result = {
+        world_document: {
+          assets: assetsData || [],
+          backgrounds: project.backgrounds || {},
+          tags: project.tags_config || {}
+        },
+        version: project.last_version || 0,
+        cover_config: project.backgrounds || {},
+        updated_at: project.updated_at
+      };
+
+      // Cache the result
+      this.documentCache.set(projectId, {
+        data: result,
+        timestamp: Date.now(),
+        version: result.version
+      });
+
+      this.currentProjectId = projectId;
+      this.currentVersion = result.version;
+
+      return { success: true, data: result };
     } catch (error) {
       console.error('[DocumentMutation] Failed to load document:', error);
       return { success: false, error: String(error) };
@@ -229,71 +294,134 @@ class DocumentMutationService {
     return this.currentProjectId;
   }
 
-  // Queue operation for batching with compression
-  queueOperation(operation: DocumentOperation): void {
-    // Skip queuing if no project is loaded (e.g., creating assets on index page)
-    if (!this.currentProjectId) {
-      console.log('[DocumentMutation] Skipping operation queue - no project loaded');
-      return;
+  // NOTE: Following MASTER_PLAN.md - state-based tracking (NO operation queue)
+  // Mark asset as changed (metadata)
+  markAssetChanged(assetId: string, asset: Asset): void {
+    this.changedAssets[assetId] = asset;
+    this.notifySubscribers();
+  }
+
+  // Mark position changes (for hot updates) - TRUE THROTTLE (not debounce)
+  markPositionChanged(assetId: string, x: number, y: number, z_index: number = 0): void {
+    this.changedPositions[assetId] = { x, y, z_index };
+
+    if (!this.isPositionSaveScheduled) {
+      this.isPositionSaveScheduled = true;
+      this.positionSaveTimer = setTimeout(async () => {
+        try {
+          await this.savePositionChanges();
+        } finally {
+          this.isPositionSaveScheduled = false;
+          this.positionSaveTimer = null;
+        }
+      }, this.POSITION_SAVE_THROTTLE);
     }
 
-    // Compress operations: remove redundant operations on same asset
-    this.compressOperations(operation);
-    
-    this.offlineQueue.push(operation);
     this.notifySubscribers();
-    
-    // Auto-sync after debounce
-    this.scheduleSync();
   }
 
-  // Compress operations by removing redundant ones
-  private compressOperations(newOp: DocumentOperation): void {
-    const assetId = this.getOperationAssetId(newOp);
-    if (!assetId) return;
+  // Clear the change buffers
+  clearChanges(): void {
+    this.changedAssets = {};
+    this.changedPositions = {};
+  }
 
-    // Remove previous operations that would be overridden by this new operation
-    this.offlineQueue = this.offlineQueue.filter(existingOp => {
-      const existingAssetId = this.getOperationAssetId(existingOp);
-      
-      // If different asset, keep it
-      if (existingAssetId !== assetId) return true;
-      
-      // Same asset - check if we can compress
-      // If new op is DELETE, remove all previous ops on this asset
-      if (newOp.op === 'DELETE_ASSET') return false;
-      
-      // If new op is MOVE and existing is also MOVE, keep only the latest
-      if (newOp.op === 'MOVE_ASSET' && existingOp.op === 'MOVE_ASSET') return false;
-      
-      // If new op is UPDATE_POSITION, remove previous UPDATE_POSITION
-      if (newOp.op === 'UPDATE_POSITION' && existingOp.op === 'UPDATE_POSITION') return false;
-      
-      // If new op is UPDATE_METADATA with same asset, remove previous metadata updates
-      if (newOp.op === 'UPDATE_METADATA' && existingOp.op === 'UPDATE_METADATA') return false;
-      
-      // Keep other operations
+  // Mark asset as deleted (soft delete with deleted_at)
+  markAssetDeleted(assetId: string): void {
+    this.changedAssets[assetId] = {
+      id: assetId,
+      parentId: null,
+      name: '',
+      type: '',
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      zIndex: 0,
+      isExpanded: false,
+      deleted_at: new Date().toISOString()
+    } as any;
+    this.notifySubscribers();
+  }
+
+  // Handle global project operations (backgrounds, viewport, tags) directly
+  // NOTE: Following MASTER_PLAN.md - global operations use save_project RPC directly
+  async saveGlobalBackgrounds(backgrounds: Record<string, any>): Promise<boolean> {
+    if (!this.currentProjectId) return false;
+
+    try {
+      performanceMonitor.incrementDatabaseRequests();
+      const { error } = await supabase.rpc('save_project', {
+        p_project_id: this.currentProjectId,
+        p_backgrounds: backgrounds,
+        p_expected_version: this.currentVersion
+      });
+
+      if (error) {
+        console.error('[DocumentMutation] Failed to save global backgrounds:', error);
+        return false;
+      }
+
+      this.currentVersion += 1;
+      this.documentCache.delete(this.currentProjectId);
+      this.backgroundsCache.delete(this.currentProjectId);
+
       return true;
-    });
+    } catch (error) {
+      console.error('[DocumentMutation] Error saving global backgrounds:', error);
+      return false;
+    }
   }
 
-  // Extract asset ID from operation for compression
-  private getOperationAssetId(op: DocumentOperation): string | null {
-    switch (op.op) {
-      case 'CREATE_ASSET':
-      case 'DELETE_ASSET':
-      case 'MOVE_ASSET':
-      case 'UPDATE_POSITION':
-      case 'UPDATE_METADATA':
-      case 'UPDATE_BACKGROUND_CONFIG':
-      case 'UPDATE_ASSET_BACKGROUND':
-      case 'UPDATE_CUSTOM_FIELDS':
-        return op.assetId;
-      case 'UPDATE_VIEWPORT':
-      case 'UPDATE_GLOBAL_BACKGROUNDS':
-        return null; // These are not asset-specific
-      default:
-        return null;
+  async saveViewport(offsetX: number, offsetY: number, scale: number): Promise<boolean> {
+    if (!this.currentProjectId) return false;
+
+    try {
+      performanceMonitor.incrementDatabaseRequests();
+      const { error } = await supabase.rpc('save_project', {
+        p_project_id: this.currentProjectId,
+        p_viewport: { offset: { x: offsetX, y: offsetY }, scale },
+        p_expected_version: this.currentVersion
+      });
+
+      if (error) {
+        console.error('[DocumentMutation] Failed to save viewport:', error);
+        return false;
+      }
+
+      this.currentVersion += 1;
+      this.documentCache.delete(this.currentProjectId);
+
+      return true;
+    } catch (error) {
+      console.error('[DocumentMutation] Error saving viewport:', error);
+      return false;
+    }
+  }
+
+  async saveGlobalTags(tags: Record<string, any>): Promise<boolean> {
+    if (!this.currentProjectId) return false;
+
+    try {
+      performanceMonitor.incrementDatabaseRequests();
+      const { error } = await supabase.rpc('save_project', {
+        p_project_id: this.currentProjectId,
+        p_tags_config: tags,
+        p_expected_version: this.currentVersion
+      });
+
+      if (error) {
+        console.error('[DocumentMutation] Failed to save global tags:', error);
+        return false;
+      }
+
+      this.currentVersion += 1;
+      this.documentCache.delete(this.currentProjectId);
+
+      return true;
+    } catch (error) {
+      console.error('[DocumentMutation] Error saving global tags:', error);
+      return false;
     }
   }
 
@@ -317,12 +445,14 @@ class DocumentMutationService {
       console.log('[DocumentMutation] syncNow: no project loaded, skipping');
       return false;
     }
-    if (this.offlineQueue.length === 0) {
-      console.log('[DocumentMutation] syncNow: queue empty, nothing to sync');
+
+    const totalChanges = Object.keys(this.changedAssets).length + Object.keys(this.changedPositions).length;
+    if (totalChanges === 0) {
+      console.log('[DocumentMutation] syncNow: no changes, nothing to sync');
       return true;
     }
 
-    console.log(`[DocumentMutation] syncNow: syncing ${this.offlineQueue.length} operations`);
+    console.log(`[DocumentMutation] syncNow: syncing ${totalChanges} changes`);
     return this.performSync();
   }
 
@@ -334,20 +464,26 @@ class DocumentMutationService {
     }
 
     this.syncInProgress = true;
+    this.syncStartTime = Date.now();
     this.notifySubscribers();
 
+    // Set timeout to clear stuck sync flag
+    const syncTimeout = setTimeout(() => {
+      if (this.syncInProgress) {
+        console.warn('[DocumentMutation] Sync timeout - clearing stuck flag after', this.syncTimeoutMs, 'ms');
+        this.syncInProgress = false;
+        this.notifySubscribers();
+      }
+    }, this.syncTimeoutMs);
+
     try {
-      // Chunk operations into batches
-      const batches = this.chunkOperations(this.offlineQueue, MAX_BATCH_SIZE);
-      
-      for (const batch of batches) {
-        const success = await this.sendBatch(batch);
-        if (!success) {
-          // Batch failed, keep remaining operations
-          return false;
-        }
-        // Remove successfully sent operations
-        this.offlineQueue = this.offlineQueue.slice(batch.length);
+      // NOTE: Following MASTER_PLAN.md - save positions first (HOT updates), then metadata
+      if (Object.keys(this.changedPositions).length > 0) {
+        await this.savePositionChanges();
+      }
+
+      if (Object.keys(this.changedAssets).length > 0) {
+        await this.saveMetadataChanges();
       }
 
       this.notifySubscribers();
@@ -356,66 +492,98 @@ class DocumentMutationService {
       console.error('[DocumentMutation] Sync failed:', error);
       return false;
     } finally {
+      clearTimeout(syncTimeout);
       this.syncInProgress = false;
+      const syncDuration = Date.now() - this.syncStartTime;
+      console.log(`[DocumentMutation] Sync completed in ${syncDuration}ms`);
     }
   }
 
-  // Send batch to RPC with exponential backoff retry
-  private async sendBatch(operations: DocumentOperation[], retryAttempt: number = 0): Promise<boolean> {
-    try {
-      performanceMonitor.incrementDatabaseRequests();
-      
-      const { data, error } = await supabase
-        .rpc('save_document_operations', {
-          p_project_id: this.currentProjectId,
-          p_expected_version: this.currentVersion,
-          p_operations: operations
-        });
+  // Save position changes to Supabase (hot update - cheap)
+  private async savePositionChanges(): Promise<void> {
+    if (!this.currentProjectId || Object.keys(this.changedPositions).length === 0) return;
 
-      if (error) {
-        console.error('[DocumentMutation] RPC error details:', {
-          message: error.message,
-          code: error.code,
-          details: error.details,
-          hint: error.hint
-        });
+    const positions = Object.entries(this.changedPositions).map(([asset_id, pos]) => ({
+      asset_id,
+      x: pos.x,
+      y: pos.y,
+      z_index: pos.z_index
+    }));
+
+    const keysSaved = Object.keys(this.changedPositions);
+    keysSaved.forEach(key => delete this.changedPositions[key]);
+
+    performanceMonitor.incrementDatabaseRequests();
+    const { error } = await supabase.rpc('save_positions', {
+      p_project_id: this.currentProjectId,
+      p_positions: positions
+    });
+
+    if (error) {
+      console.error('[DocumentMutation] Failed to save position changes:', error);
+      throw error;
+    }
+  }
+
+  // Save metadata changes to Supabase (full upsert)
+  private async saveMetadataChanges(): Promise<void> {
+    if (!this.currentProjectId || Object.keys(this.changedAssets).length === 0) return;
+
+    const changes = Object.values(this.changedAssets).map(asset => {
+      const customFieldsObj: Record<string, any> = {
+        customFields: asset.customFields || [],
+        customFieldValues: asset.customFieldValues || [],
+        tags: asset.tags || [],
+        thumbnail: asset.thumbnail || null,
+        background: asset.background || null,
+        description: asset.description || null,
+        viewportDisplaySettings: asset.viewportDisplaySettings || {}
+      };
+
+      return {
+        asset_id: asset.id,
+        parent_id: asset.parentId || null,
+        name: asset.name,
+        type: asset.type,
+        x: asset.x,
+        y: asset.y,
+        width: asset.width,
+        height: asset.height,
+        z_index: 0,
+        is_expanded: asset.isExpanded || false,
+        content: asset.content || null,
+        background_config: asset.backgroundConfig || {},
+        viewport_config: asset.viewportConfig || {},
+        custom_fields: customFieldsObj
+      };
+    });
+
+    const keysSaved = Object.keys(this.changedAssets);
+    keysSaved.forEach(key => delete this.changedAssets[key]);
+
+    performanceMonitor.incrementDatabaseRequests();
+    const { error } = await supabase.rpc('save_assets', {
+      p_project_id: this.currentProjectId,
+      p_assets: changes,
+      p_expected_version: this.currentVersion
+    });
+
+    if (error) {
+      console.error('[DocumentMutation] Failed to save metadata changes:', error);
+      if (error.message?.includes('Version conflict')) {
+        await this.handleConflict();
         throw error;
       }
-      
-      const result = data[0];
-      
-      if (!result.success) {
-        if (result.error?.includes('CONFLICT')) {
-          // Version conflict - need to reload and replay
-          await this.handleConflict();
-          return false;
-        }
-        throw new Error(result.error);
-      }
+      throw error;
+    }
 
-      // Update version
-      this.currentVersion = result.new_version;
-      return true;
-    } catch (error) {
-      console.error(`[DocumentMutation] Batch failed (attempt ${retryAttempt + 1}/${MAX_RETRIES}):`, error);
-      
-      // Check if we should retry with exponential backoff
-      if (retryAttempt < MAX_RETRIES - 1) {
-        const isRetryable = this.isRetryableError(error);
-        
-        if (isRetryable) {
-          // Calculate exponential backoff delay: 1s, 2s, 4s, 8s, 16s
-          const delayMs = BASE_RETRY_DELAY_MS * Math.pow(2, retryAttempt);
-          console.log(`[DocumentMutation] Retrying in ${delayMs}ms...`);
-          
-          await this.sleep(delayMs);
-          return this.sendBatch(operations, retryAttempt + 1);
-        }
-      }
-      
-      // Max retries reached or non-retryable error
-      console.error('[DocumentMutation] Max retries exceeded or non-retryable error');
-      return false;
+    // Update local version
+    this.currentVersion += 1;
+
+    // Invalidate document cache on successful write
+    if (this.currentProjectId) {
+      this.documentCache.delete(this.currentProjectId);
+      this.backgroundsCache.delete(this.currentProjectId);
     }
   }
 
@@ -459,10 +627,11 @@ class DocumentMutationService {
 
   /**
    * Enhanced conflict handling with three-way merge
+   * NOTE: Following MASTER_PLAN.md - simplified conflict resolution with state-based tracking
    */
   private async handleConflict(): Promise<boolean> {
     console.log('[DocumentMutation] Resolving conflict...');
-    
+
     if (!this.currentProjectId) {
       console.error('[DocumentMutation] No project loaded for conflict resolution');
       return false;
@@ -477,67 +646,39 @@ class DocumentMutationService {
       }
 
       this.lastServerDocument = serverDoc.data;
-      
-      // 2. Get local operations that haven't synced
-      const pendingOps = [...this.offlineQueue];
-      
-      // 3. Resolve conflicts using ConflictResolver
-      const resolution = this.conflictResolver.resolve(
-        pendingOps,
-        serverDoc.data,
-        this.lastServerDocument
-      );
 
-      // Store conflict history
-      if (resolution.conflicts.length > 0) {
-        this.conflictHistory.push(resolution);
-        // Keep only last 50 conflicts
-        if (this.conflictHistory.length > 50) {
-          this.conflictHistory = this.conflictHistory.slice(-50);
-        }
-      }
-
-      // 4. Apply server document to local state
+      // 2. Apply server document to local state (server-wins strategy)
       await this.applyServerDocument(serverDoc.data);
-      
-      // 5. Update offline queue with resolved operations
-      this.offlineQueue = resolution.appliedOperations;
-      
-      // Log resolution details
-      console.log(`[DocumentMutation] Conflict resolved:`, {
-        strategy: resolution.strategy,
-        totalOps: pendingOps.length,
-        applied: resolution.appliedOperations.length,
-        discarded: resolution.discardedOperations.length,
-        conflicts: resolution.conflicts.length
+
+      // 3. Clear local changes (server-wins)
+      this.clearChanges();
+
+      // 4. Log resolution
+      const totalChanges = Object.keys(this.changedAssets).length + Object.keys(this.changedPositions).length;
+      console.log(`[DocumentMutation] Conflict resolved (server-wins): cleared ${totalChanges} local changes`);
+
+      // 5. Notify user/system
+      this.notifyConflictResolved({
+        strategy: 'server-wins',
+        appliedOperations: [],
+        discardedOperations: [],
+        conflicts: [],
+        resolved: true
       });
 
-      // Log discarded operations for debugging
-      if (resolution.discardedOperations.length > 0) {
-        console.warn('[DocumentMutation] Discarded operations:', 
-          resolution.discardedOperations.map(op => ({
-            op: op.op,
-            assetId: 'assetId' in op ? op.assetId : 'n/a'
-          }))
-        );
-      }
-      
-      // 6. Notify user/system
-      this.notifyConflictResolved(resolution);
-      
       return true;
     } catch (error) {
       console.error('[DocumentMutation] Conflict resolution failed:', error);
-      
+
       // Fallback: simple server-wins
       if (this.lastServerDocument) {
         await this.applyServerDocument(this.lastServerDocument);
-        this.offlineQueue = [];
+        this.clearChanges();
       }
-      
+
       // Notify of failure
       this.notifyConflictFailed(error);
-      
+
       return false;
     }
   }
@@ -618,11 +759,12 @@ class DocumentMutationService {
    * Notify that conflict resolution failed
    */
   private notifyConflictFailed(error: any): void {
+    const totalChanges = Object.keys(this.changedAssets).length + Object.keys(this.changedPositions).length;
     window.dispatchEvent(new CustomEvent('sync-conflict-failed', {
       detail: {
         error: String(error),
         projectId: this.currentProjectId,
-        pendingOperations: this.offlineQueue.length
+        pendingChanges: totalChanges
       }
     }));
   }
@@ -684,9 +826,20 @@ class DocumentMutationService {
     }
   }
 
-  // Load backgrounds from server document (Phase 7)
-  async loadBackgrounds(): Promise<Record<string, any> | null> {
+  // Load backgrounds from server document (Phase 7) with RAM caching
+  async loadBackgrounds(forceRefresh: boolean = false): Promise<Record<string, any> | null> {
     if (!this.currentProjectId) return null;
+
+    const cacheKey = this.currentProjectId;
+
+    // Check cache first
+    if (!forceRefresh) {
+      const cached = this.backgroundsCache.get(cacheKey);
+      if (cached && (Date.now() - cached.timestamp) < this.CACHE_TTL_MS) {
+        console.log('[DocumentMutation] Loading backgrounds from RAM cache:', cacheKey);
+        return cached.data;
+      }
+    }
 
     try {
       const { data, error } = await supabase
@@ -697,7 +850,21 @@ class DocumentMutationService {
       if (error) throw error;
       if (!data || data.length === 0) return null;
       
-      return data[0].backgrounds || {};
+      const backgrounds = data[0].backgrounds || {};
+
+      // Update cache
+      this.backgroundsCache.set(cacheKey, {
+        data: backgrounds,
+        timestamp: Date.now()
+      });
+
+      // Limit cache size
+      if (this.backgroundsCache.size > 10) {
+        const oldestKey = [...this.backgroundsCache.entries()].sort((a, b) => a[1].timestamp - b[1].timestamp)[0][0];
+        this.backgroundsCache.delete(oldestKey);
+      }
+
+      return backgrounds;
     } catch (error) {
       console.error('[DocumentMutation] Failed to load backgrounds:', error);
       return null;
@@ -1541,9 +1708,10 @@ class DocumentMutationService {
     if (this.syncTimeout) {
       window.clearTimeout(this.syncTimeout);
     }
+    // Increased from 1s to 2s to reduce Supabase call frequency
     this.syncTimeout = window.setTimeout(() => {
       this.syncNow();
-    }, 1000); // 1 second debounce
+    }, 2000); // 2 second debounce
   }
 
   // Subscribe to status changes
@@ -1562,17 +1730,18 @@ class DocumentMutationService {
     const { syncEnabled, quota } = useCloudStore.getState();
     const isOnline = connectivityService.isOnline();
     const { isAuthenticated } = useAuthStore.getState();
+    const totalChanges = Object.keys(this.changedAssets).length + Object.keys(this.changedPositions).length;
 
     return {
       lastSyncTime: this.syncInProgress ? null : new Date(),
       syncEnabled: isAuthenticated && syncEnabled,
-      pendingChanges: this.offlineQueue.length > 0,
+      pendingChanges: totalChanges > 0,
       onlineMode: isOnline,
       quotaExceeded: false,
       storageUsed: quota.used,
       storageLimit: quota.available,
       syncInProgress: this.syncInProgress,
-      queuedItems: this.offlineQueue.length,
+      queuedItems: totalChanges,
       documentVersion: this.currentVersion
     };
   }

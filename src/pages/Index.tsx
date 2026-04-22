@@ -385,15 +385,12 @@ const Index = () => {
       }
       
       // Sync any backgrounds that were saved locally before entering the book
-      // These weren't queued for cloud sync because no project was loaded at the time
+      // These weren't synced because no project was loaded at the time
       const backgroundStore = useBackgroundStore.getState();
       const allConfigs = backgroundStore.configs;
       if (Object.keys(allConfigs).length > 0) {
         console.log('[Index] Syncing', Object.keys(allConfigs).length, 'backgrounds to cloud');
-        documentMutationService.queueOperation({
-          op: 'UPDATE_GLOBAL_BACKGROUNDS',
-          backgrounds: allConfigs
-        });
+        documentMutationService.saveGlobalBackgrounds(allConfigs);
       }
     }
     

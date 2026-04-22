@@ -38,27 +38,27 @@ export interface PaystackVerifyResponse {
 export const PAYSTACK_PRODUCTS: Record<string, PaystackProduct> = {
   PRO_SUBSCRIPTION: {
     name: 'Pro Subscription',
-    price: 2000, // ₦20.00 in NGN kobo
+    price: 10000, // R100.00 in ZAR cents
     storage: '10GB',
     recurring: true
   },
   LIFETIME: {
     name: 'Lifetime',
-    price: 8000, // ₦80.00 in NGN kobo (launch price)
+    price: 150000, // R1500.00 in ZAR cents
     storage: '15GB',
     recurring: false
   },
   STORAGE_10GB: {
     name: 'Storage 10GB',
-    price: 100, // ₦1.00 in NGN kobo
+    price: 10000, // R100.00 in ZAR cents
     storage: '10GB',
-    recurring: true
+    recurring: false
   },
   STORAGE_50GB: {
     name: 'Storage 50GB',
-    price: 300, // ₦3.00 in NGN kobo
+    price: 25000, // R250.00 in ZAR cents
     storage: '50GB',
-    recurring: true
+    recurring: false
   }
 }
 
@@ -78,8 +78,8 @@ export class PaystackClient {
     const { data, error } = await supabase.functions.invoke('paystack-initialize', {
       body: {
         email,
-        amount: amount * 100, // Convert to kobo (subunits)
-        currency: 'NGN',
+        amount: amount * 100, // Convert to cents (subunits)
+        currency: 'ZAR',
         metadata,
         callback_url: `${window.location.origin}/payment/success`,
       },

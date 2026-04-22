@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Check, Star, ArrowRight, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -10,7 +10,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { PLANS_CONFIG, STORAGE_ADDONS } from '@/config/plans';
-import { formatPrice } from '@/lib/pricing';
+import { getPlanDisplayPrice, getStorageAddonDisplayPrice } from '@/lib/plans';
 import { useNavigate } from 'react-router-dom';
 
 interface PricingModalProps {
@@ -21,12 +21,50 @@ interface PricingModalProps {
 export function PricingModal({ isOpen, onClose }: PricingModalProps) {
   const navigate = useNavigate();
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [planPrices, setPlanPrices] = useState<Record<string, { basePrice: string; convertedPrice?: string; currency: string }>>({});
+  const [addonPrices, setAddonPrices] = useState<Record<string, { basePrice: string; convertedPrice?: string; currency: string }>>({});
 
   const plans = [
     PLANS_CONFIG.free,
     PLANS_CONFIG.pro,
     PLANS_CONFIG.lifetime,
   ];
+
+  // Fetch converted prices when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      const fetchPrices = async () => {
+        const planPricePromises = plans.map(async (plan) => {
+          if (plan.id === 'free') return null;
+          const price = await getPlanDisplayPrice(plan.id);
+          return { id: plan.id, price };
+        });
+
+        const addonPricePromises = Object.values(STORAGE_ADDONS).map(async (addon) => {
+          const price = await getStorageAddonDisplayPrice(addon.id);
+          return { id: addon.id, price };
+        });
+
+        const planResults = await Promise.all(planPricePromises);
+        const addonResults = await Promise.all(addonPricePromises);
+
+        const planPricesMap: Record<string, any> = {};
+        planResults.forEach((result) => {
+          if (result) planPricesMap[result.id] = result.price;
+        });
+
+        const addonPricesMap: Record<string, any> = {};
+        addonResults.forEach((result) => {
+          addonPricesMap[result.id] = result.price;
+        });
+
+        setPlanPrices(planPricesMap);
+        setAddonPrices(addonPricesMap);
+      };
+
+      fetchPrices();
+    }
+  }, [isOpen]);
 
   const handlePlanSelect = (planId: string) => {
     setSelectedPlan(planId);
@@ -79,8 +117,13 @@ export function PricingModal({ isOpen, onClose }: PricingModalProps) {
                     {plan.pricing ? (
                       <div className="space-y-1">
                         <div className="text-3xl font-bold text-primary">
-                          {formatPrice(plan.pricing.priceCents!, plan.pricing.currency)}
+                          {planPrices[plan.id]?.basePrice || 'Loading...'}
                         </div>
+                        {planPrices[plan.id]?.convertedPrice && (
+                          <div className="text-sm text-muted-foreground">
+                            ≈ {planPrices[plan.id].convertedPrice}
+                          </div>
+                        )}
                         <div className="text-sm text-muted-foreground">
                           {plan.pricing.recurring ? 'per month' : 'one-time payment'}
                         </div>
@@ -172,8 +215,13 @@ export function PricingModal({ isOpen, onClose }: PricingModalProps) {
                       </div>
                       <div className="text-right">
                         <div className="text-lg font-bold text-primary">
-                          {formatPrice(addon.priceCents, addon.currency)}
+                          {addonPrices[addon.id]?.basePrice || 'Loading...'}
                         </div>
+                        {addonPrices[addon.id]?.convertedPrice && (
+                          <div className="text-xs text-muted-foreground">
+                            ≈ {addonPrices[addon.id].convertedPrice}
+                          </div>
+                        )}
                         <div className="text-sm text-muted-foreground">one-time</div>
                       </div>
                     </div>

@@ -441,16 +441,13 @@ class HybridSyncService {
     };
 
     performanceMonitor.incrementDatabaseRequests();
+    // NOTE: Using save_project RPC instead of direct table upsert to maintain low-I/O design
     const { error } = await supabase
-      .from('projects')
-      .upsert({
-        id: bookId,
-        user_id: userId,
-        name: book?.title || worldData.bookTitle || 'Untitled Project',
-        description: JSON.stringify(metadata),
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'id'
+      .rpc('save_project', {
+        p_project_id: bookId,
+        p_name: book?.title || worldData.bookTitle || 'Untitled Project',
+        p_description: JSON.stringify(metadata),
+        p_expected_version: null
       });
 
     if (error) {
@@ -459,26 +456,14 @@ class HybridSyncService {
   }
 
   private async syncBackgroundData(userId: string, bookId: string, configs: any): Promise<void> {
-    // Generate a valid UUID for the background config record
-    // Use a deterministic UUID based on bookId to avoid duplicates
-    const backgroundId = this.generateDeterministicUUID(`${bookId}-backgrounds`);
-    
     performanceMonitor.incrementDatabaseRequests();
+    // NOTE: Using save_project RPC with backgrounds parameter instead of direct table upsert to maintain low-I/O design
+    // Backgrounds are stored in the projects.backgrounds JSONB field
     const { error } = await supabase
-      .from('assets')
-      .upsert({
-        id: backgroundId,
-        user_id: userId,
-        project_id: bookId,
-        name: 'Background Configurations',
-        file_path: `backgrounds/${bookId}.json`,
-        file_type: 'application/json',
-        file_size_bytes: JSON.stringify(configs).length,
-        mime_type: 'application/json',
-        metadata: { configs, type: 'background_configurations', bookId },
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'id'
+      .rpc('save_project', {
+        p_project_id: bookId,
+        p_backgrounds: configs,
+        p_expected_version: null
       });
 
     if (error) {

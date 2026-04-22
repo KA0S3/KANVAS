@@ -31,10 +31,10 @@ class AutosaveService {
   private visibilityChangeHandler: (() => void) | null = null;
   private subscribers: Set<(state: AutosaveState) => void> = new Set();
   
-  // Configurable intervals (in milliseconds)
-  private readonly DEBOUNCE_DELAY = 2000; // 2 seconds
-  private readonly AUTOSAVE_INTERVAL = 15000; // 15 seconds (reduced from 60)
-  private readonly MANUAL_SAVE_INTERVAL = 5000; // 5 seconds for manual saves
+  // Configurable intervals (in milliseconds) - optimized to reduce Supabase I/O
+  private readonly DEBOUNCE_DELAY = 5000; // 5 seconds (increased from 2s to reduce writes)
+  private readonly AUTOSAVE_INTERVAL = 30000; // 30 seconds (increased from 15s to reduce sync frequency)
+  private readonly MANUAL_SAVE_INTERVAL = 10000; // 10 seconds for manual saves
 
   static getInstance(): AutosaveService {
     if (!AutosaveService.instance) {
@@ -62,27 +62,41 @@ class AutosaveService {
   }
 
   private setupStoreSubscriptions(): void {
-    // Subscribe to asset store changes
+    // Subscribe to asset store changes with throttling
+    let lastAssetChange = 0;
+    const ASSET_THROTTLE_MS = 1000; // Throttle asset changes to 1 second
+    
     const unsubscribeAssets = useAssetStore.subscribe(
       (state) => state,
       (state, prevState) => {
         if (state.bookAssets !== prevState.bookAssets) {
-          this.queue.assets = true;
-          this.queue.worldData = true;
-          this.updateState({ pendingChanges: true });
-          this.debounceAutosave();
+          const now = Date.now();
+          if (now - lastAssetChange > ASSET_THROTTLE_MS) {
+            lastAssetChange = now;
+            this.queue.assets = true;
+            this.queue.worldData = true;
+            this.updateState({ pendingChanges: true });
+            this.debounceAutosave();
+          }
         }
       }
     );
 
-    // Subscribe to background store changes
+    // Subscribe to background store changes with throttling
+    let lastBackgroundChange = 0;
+    const BACKGROUND_THROTTLE_MS = 1000; // Throttle background changes to 1 second
+    
     const unsubscribeBackgrounds = useBackgroundStore.subscribe(
       (state) => state,
       (state, prevState) => {
         if (state.configs !== prevState.configs) {
-          this.queue.backgrounds = true;
-          this.updateState({ pendingChanges: true });
-          this.debounceAutosave();
+          const now = Date.now();
+          if (now - lastBackgroundChange > BACKGROUND_THROTTLE_MS) {
+            lastBackgroundChange = now;
+            this.queue.backgrounds = true;
+            this.updateState({ pendingChanges: true });
+            this.debounceAutosave();
+          }
         }
       }
     );
@@ -124,7 +138,7 @@ class AutosaveService {
     }, this.DEBOUNCE_DELAY);
   }
 
-  // Cloud-first autosave
+  // Cloud-first autosave with smart queuing
   private async performAutosave(): Promise<void> {
     const { isAuthenticated } = useAuthStore.getState();
     const { isOnline } = useCloudStore.getState();
@@ -151,6 +165,12 @@ class AutosaveService {
               pendingChanges: false,
               errorMessage: null,
             });
+            // Clear queue only after successful sync
+            this.queue = {
+              assets: false,
+              backgrounds: false,
+              worldData: false,
+            };
           } else {
             console.log('[AutosaveService] Cloud sync failed, data queued for retry');
             this.updateState({
@@ -159,6 +179,7 @@ class AutosaveService {
               pendingChanges: true,
               errorMessage: 'Cloud sync failed - data queued for retry',
             });
+            // Don't clear queue on failure - keep for retry
           }
         } else {
           console.log('[AutosaveService] User authenticated but offline, data queued');
@@ -178,14 +199,13 @@ class AutosaveService {
           pendingChanges: false,
           errorMessage: null,
         });
+        // Clear queue for guest users
+        this.queue = {
+          assets: false,
+          backgrounds: false,
+          worldData: false,
+        };
       }
-
-      // Clear queue after successful save
-      this.queue = {
-        assets: false,
-        backgrounds: false,
-        worldData: false,
-      };
 
       console.log('[AutosaveService] Autosave completed successfully');
 
@@ -251,46 +271,36 @@ class AutosaveService {
     // This method is kept for compatibility but now delegates to DocumentMutationService
     const assetStore = useAssetStore.getState();
     const assets = assetStore.getWorldData();
-    
-    // Queue all asset changes as operations
+
+    // Track all asset changes using state-based tracking (MASTER_PLAN.md)
     const bookAssets = assets.assets || {};
     Object.values(bookAssets).forEach((asset: any) => {
-      documentMutationService.queueOperation({
-        op: 'CREATE_ASSET',
-        assetId: asset.id,
-        parentId: asset.parentId,
-        name: asset.name,
-        type: asset.type,
-        position: {
-          x: asset.x || 0,
-          y: asset.y || 0,
-          width: asset.width || 200,
-          height: asset.height || 150,
-          zIndex: asset.zIndex || 0
-        },
-        isExpanded: asset.isExpanded ?? true,
-        customFields: asset.customFields || {}
-      });
+      documentMutationService.markAssetChanged(asset.id, asset);
     });
-    
+
     // Trigger immediate sync
     await documentMutationService.syncNow();
   }
 
   private async saveBackgroundData(userId: string, bookId: string, configs: any): Promise<void> {
     // DocumentMutationService handles saving via RPC - no direct table writes
-    // Background configs are now stored in world_document via UPDATE_BACKGROUND_CONFIG operations
-    Object.entries(configs).forEach(([assetId, config]: [string, any]) => {
-      if (assetId.startsWith('asset:')) {
-        const realAssetId = assetId.replace('asset:', '');
-        documentMutationService.queueOperation({
-          op: 'UPDATE_BACKGROUND_CONFIG',
-          assetId: realAssetId,
-          config: config
-        });
-      }
-    });
-    
+    // Background configs are now stored in world_document via state-based tracking (MASTER_PLAN.md)
+    const assetStore = useAssetStore.getState();
+    const currentBookId = assetStore.getCurrentBookId();
+    if (currentBookId) {
+      const bookAssets = assetStore.bookAssets[currentBookId] || {};
+      Object.entries(configs).forEach(([assetId, config]: [string, any]) => {
+        if (assetId.startsWith('asset:')) {
+          const realAssetId = assetId.replace('asset:', '');
+          const asset = bookAssets[realAssetId];
+          if (asset) {
+            const updatedAsset = { ...asset, backgroundConfig: config };
+            documentMutationService.markAssetChanged(realAssetId, updatedAsset);
+          }
+        }
+      });
+    }
+
     // Trigger immediate sync
     await documentMutationService.syncNow();
   }

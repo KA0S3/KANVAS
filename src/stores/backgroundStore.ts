@@ -10,6 +10,10 @@ console.log('[BackgroundStore] ============================================');
 console.log('[BackgroundStore] STORE INITIALIZING at', storeInitTime);
 console.log('[BackgroundStore] ============================================');
 
+// Debounce timers for background saves to prevent excessive writes
+const backgroundSaveDebouncers = new Map<string, number>();
+const BACKGROUND_DEBOUNCE_MS = 500; // 500ms debounce for background changes
+
 export const useBackgroundStore = create<BackgroundStore>()(
   subscribeWithSelector(
     (set, get) => {
@@ -73,7 +77,7 @@ export const useBackgroundStore = create<BackgroundStore>()(
 
             console.log(`[BackgroundStore] Setting background for ${assetId} (key: ${key}):`, clonedConfig.mode);
 
-            // Update in-memory store
+            // Update in-memory store immediately (no debounce needed for UI)
             set((state) => ({
               configs: {
                 ...state.configs,
@@ -81,25 +85,34 @@ export const useBackgroundStore = create<BackgroundStore>()(
               },
             }));
 
-            // Persist to localStorage immediately
-            setBackgroundToStorage(key, clonedConfig);
-            console.log(`[BackgroundStore] Saved background to localStorage for ${assetId}`);
-            
-            // Queue operation for DocumentMutationService using UPDATE_GLOBAL_BACKGROUNDS (Phase 7)
-            // This stores all background configs in world_document.backgrounds as single source of truth
-            // Only queue if a project is loaded (user has entered a book)
-            const updatedConfigs = {
-              ...get().configs,
-              [key]: clonedConfig
-            };
-            if (documentMutationService.getCurrentProjectId()) {
-              documentMutationService.queueOperation({
-                op: 'UPDATE_GLOBAL_BACKGROUNDS',
-                backgrounds: updatedConfigs
-              });
-            } else {
-              console.log('[BackgroundStore] Background saved locally - will sync when book is entered');
+            // Debounce localStorage and cloud sync to prevent excessive writes
+            // Clear existing timer for this asset
+            if (backgroundSaveDebouncers.has(key)) {
+              clearTimeout(backgroundSaveDebouncers.get(key)!);
             }
+
+            // Set new debounced timer
+            backgroundSaveDebouncers.set(key, window.setTimeout(() => {
+              // Persist to localStorage
+              setBackgroundToStorage(key, clonedConfig);
+              console.log(`[BackgroundStore] Saved background to localStorage for ${assetId}`);
+              
+              // Sync backgrounds using saveGlobalBackgrounds (MASTER_PLAN.md state-based tracking)
+              // This stores all background configs in world_document.backgrounds as single source of truth
+              // Only sync if a project is loaded (user has entered a book)
+              const updatedConfigs = {
+                ...get().configs,
+                [key]: clonedConfig
+              };
+              if (documentMutationService.getCurrentProjectId()) {
+                documentMutationService.saveGlobalBackgrounds(updatedConfigs);
+              } else {
+                console.log('[BackgroundStore] Background saved locally - will sync when book is entered');
+              }
+              
+              // Clean up timer
+              backgroundSaveDebouncers.delete(key);
+            }, BACKGROUND_DEBOUNCE_MS));
           },
 
           cloneConfig: (config: BackgroundConfig): BackgroundConfig => {

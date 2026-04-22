@@ -336,14 +336,14 @@ class HybridAutosaveService {
       globalCustomFields: assetStore.globalCustomFields,
     };
 
+    // NOTE: Using save_project RPC instead of direct table update to maintain low-I/O design
+    // Store structure_data in description field as JSON since projects table doesn't have structure_data column
     const { error } = await supabase
-      .from('projects')
-      .update({
-        structure_data: projectStructure,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', projectId)
-      .eq('user_id', userId);
+      .rpc('save_project', {
+        p_project_id: projectId,
+        p_description: JSON.stringify({ structure_data: projectStructure }),
+        p_expected_version: null
+      });
 
     if (error) {
       throw new Error(`Failed to sync project structure: ${error.message}`);
@@ -354,23 +354,30 @@ class HybridAutosaveService {
     if (!projectId) return;
 
     try {
-      // Load project structure from Supabase
+      // NOTE: Using load_project RPC instead of direct table select to maintain low-I/O design
       const { data: projectData, error } = await supabase
-        .from('projects')
-        .select('structure_data')
-        .eq('id', projectId)
-        .eq('user_id', userId)
-        .single();
+        .rpc('load_project', {
+          p_project_id: projectId
+        });
 
-      if (error) {
-        console.warn('[HybridAutosave] No cloud data found:', error.message);
+      if (error || !projectData || projectData.length === 0) {
+        console.warn('[HybridAutosave] No cloud data found:', error?.message);
         return;
       }
 
-      if (projectData?.structure_data) {
-        console.log('[HybridAutosave] Loaded project structure from cloud');
-        // Restore the structure to your stores here
-        // This would need to be implemented based on your store structure
+      // Extract structure_data from description field (where we stored it)
+      const description = projectData[0]?.description;
+      if (description) {
+        try {
+          const parsed = JSON.parse(description);
+          if (parsed.structure_data) {
+            console.log('[HybridAutosave] Loaded project structure from cloud');
+            // Restore the structure to your stores here
+            // This would need to be implemented based on your store structure
+          }
+        } catch (e) {
+          console.warn('[HybridAutosave] Failed to parse structure_data:', e);
+        }
       }
     } catch (error) {
       console.error('[HybridAutosave] Failed to load from cloud:', error);

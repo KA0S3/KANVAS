@@ -163,18 +163,22 @@ class OptimizedSyncService {
   }
 
   // Check if there are actual changes to avoid unnecessary writes
+  // NOTE: Using load_project RPC instead of direct table query to maintain low-I/O design
   private async hasActualChanges(bookId: string, userId: string): Promise<boolean> {
     try {
-      const { data: projectData } = await supabase
-        .from('projects')
-        .select('updated_at')
-        .eq('id', bookId)
-        .eq('user_id', userId)
-        .single();
+      const { data: projectData, error } = await supabase
+        .rpc('load_project', {
+          p_project_id: bookId
+        });
+
+      if (error || !projectData || projectData.length === 0) {
+        console.log('[OptimizedSync] Could not load project, assuming sync needed');
+        return true;
+      }
 
       const bookStore = useBookStore.getState();
       const localLastUpdate = bookStore.books[bookId]?.updatedAt || 0;
-      const cloudLastUpdate = projectData ? new Date(projectData.updated_at).getTime() : 0;
+      const cloudLastUpdate = projectData[0]?.updated_at ? new Date(projectData[0].updated_at).getTime() : 0;
 
       return localLastUpdate > cloudLastUpdate;
     } catch (error) {
@@ -292,6 +296,7 @@ class OptimizedSyncService {
   }
 
   // Optimized database operations with specific column selection
+  // NOTE: Using save_project RPC instead of direct table upsert to maintain low-I/O design
   private async optimizedSyncWorldData(userId: string, bookId: string, worldData: any): Promise<void> {
     const bookStore = useBookStore.getState();
     const book = bookStore.books[bookId];
@@ -309,15 +314,11 @@ class OptimizedSyncService {
     };
 
     const { error } = await supabase
-      .from('projects')
-      .upsert({
-        id: bookId,
-        user_id: userId,
-        name: book?.title || worldData.bookTitle || 'Untitled Project',
-        description: JSON.stringify(metadata),
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'id'
+      .rpc('save_project', {
+        p_project_id: bookId,
+        p_name: book?.title || worldData.bookTitle || 'Untitled Project',
+        p_description: JSON.stringify(metadata),
+        p_expected_version: null
       });
 
     if (error) {
@@ -326,23 +327,13 @@ class OptimizedSyncService {
   }
 
   private async optimizedSyncBackgroundData(userId: string, bookId: string, configs: any): Promise<void> {
-    const backgroundId = this.generateDeterministicUUID(`${bookId}-backgrounds`);
-    
+    // NOTE: Using save_project RPC with backgrounds parameter instead of direct table upsert to maintain low-I/O design
+    // Backgrounds are stored in the projects.backgrounds JSONB field
     const { error } = await supabase
-      .from('assets')
-      .upsert({
-        id: backgroundId,
-        user_id: userId,
-        project_id: bookId,
-        name: 'Background Configurations',
-        file_path: `backgrounds/${bookId}.json`,
-        file_type: 'application/json',
-        file_size_bytes: JSON.stringify(configs).length,
-        mime_type: 'application/json',
-        metadata: { configs, type: 'background_configurations', bookId },
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'id'
+      .rpc('save_project', {
+        p_project_id: bookId,
+        p_backgrounds: configs,
+        p_expected_version: null
       });
 
     if (error) {

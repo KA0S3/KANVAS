@@ -7,6 +7,7 @@ import { ConflictResolutionProvider } from "@/components/ConflictResolutionProvi
 import { useEffect } from "react";
 import { emergencySaveService } from "@/services/emergencySaveService";
 import { connectivityService } from "@/services/connectivityService";
+import { setupAuthListener, setupBeforeUnloadHandler, removeBeforeUnloadHandler } from "@/services/changeTrackingService";
 import Index from "./pages/Index";
 import AuthConfirm from "./pages/AuthConfirm";
 import AuthCallback from "./pages/AuthCallback";
@@ -24,8 +25,16 @@ const App = () => {
     emergencySaveService.initialize();
     connectivityService.startHeartbeat();
 
+    // Phase 3: Setup auth listener for token refresh and sign-out handling
+    setupAuthListener();
+
+    // Phase 3: Setup browser close warning for unsaved changes
+    setupBeforeUnloadHandler();
+
     return () => {
       connectivityService.stopHeartbeat();
+      // Cleanup browser close warning on unmount
+      removeBeforeUnloadHandler();
     };
   }, []);
 

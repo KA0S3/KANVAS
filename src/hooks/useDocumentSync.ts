@@ -40,15 +40,25 @@ export function useDocumentSync() {
     return result.success;
   };
 
-  const queueOperation = (operation: Parameters<typeof documentMutationService.queueOperation>[0]) => {
-    documentMutationService.queueOperation(operation);
-  };
+  // State-based tracking methods (MASTER_PLAN.md)
+  const markAssetChanged = documentMutationService.markAssetChanged.bind(documentMutationService);
+  const markPositionChanged = documentMutationService.markPositionChanged.bind(documentMutationService);
+  const markAssetDeleted = documentMutationService.markAssetDeleted.bind(documentMutationService);
+  const saveGlobalBackgrounds = documentMutationService.saveGlobalBackgrounds.bind(documentMutationService);
+  const saveViewport = documentMutationService.saveViewport.bind(documentMutationService);
+  const saveGlobalTags = documentMutationService.saveGlobalTags.bind(documentMutationService);
 
   return {
     syncStatus,
     triggerSync,
     loadFromCloud,
-    queueOperation,
+    // State-based tracking methods (MASTER_PLAN.md)
+    markAssetChanged,
+    markPositionChanged,
+    markAssetDeleted,
+    saveGlobalBackgrounds,
+    saveViewport,
+    saveGlobalTags,
     isAuthenticated,
     isOnline: syncStatus.onlineMode,
     lastSyncTime: syncStatus.lastSyncTime,
@@ -56,8 +66,8 @@ export function useDocumentSync() {
     quotaExceeded: syncStatus.quotaExceeded,
     storageUsed: syncStatus.storageUsed,
     storageLimit: syncStatus.storageLimit,
-    storagePercentage: syncStatus.storageLimit > 0 
-      ? (syncStatus.storageUsed / syncStatus.storageLimit) * 100 
+    storagePercentage: syncStatus.storageLimit > 0
+      ? (syncStatus.storageUsed / syncStatus.storageLimit) * 100
       : 0,
     documentVersion: syncStatus.documentVersion,
     pendingChanges: syncStatus.pendingChanges,

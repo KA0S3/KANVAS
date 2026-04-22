@@ -237,27 +237,19 @@ serve(async (req) => {
       )
     }
 
-    // Register the asset metadata
-    const { data: assetData, error: assetError } = await supabase
-      .from('assets')
-      .insert({
-        project_id,
-        user_id: user.id,
-        original_filename,
-        file_size,
-        mime_type,
-        cloud_path,
-        variants,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .select()
-      .single()
+    // Register the file in the files table using RPC
+    const { data: fileData, error: fileError } = await supabase.rpc('create_file', {
+      p_project_id: project_id,
+      p_asset_id: cloud_path, // Use cloud_path as asset_id reference
+      p_storage_key: cloud_path,
+      p_mime_type: mime_type,
+      p_size_bytes: totalAssetSize
+    })
 
-    if (assetError) {
-      console.error('Failed to register asset:', assetError)
+    if (fileError) {
+      console.error('Failed to register file:', fileError)
       
-      // Rollback pending bytes on asset registration failure
+      // Rollback pending bytes on file registration failure
       try {
         await supabase.rpc('rollback_pending_bytes', {
           p_user_id: user.id,
@@ -268,57 +260,32 @@ serve(async (req) => {
       }
       
       return new Response(
-        JSON.stringify({ error: 'Failed to register asset', details: assetError.message }),
+        JSON.stringify({ error: 'Failed to register file', details: fileError.message }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Atomically commit the pending bytes to total used
+    // Atomically commit pending bytes and increment asset count in single RPC
+    // This reduces write operations by 33% (Phase 5 I/O optimization)
     try {
-      const { error: commitError } = await supabase.rpc('commit_pending_bytes', {
+      const { error: registerError } = await supabase.rpc('register_file_upload_complete', {
         p_user_id: user.id,
         p_bytes: totalAssetSize
       })
 
-      if (commitError) {
-        console.error('Failed to commit pending bytes:', commitError)
+      if (registerError) {
+        console.error('Failed to register file upload complete:', registerError)
         // Don't fail the request since asset is registered, but log for manual reconciliation
       }
-    } catch (commitError) {
-      console.error('Error committing pending bytes:', commitError)
+    } catch (registerError) {
+      console.error('Error registering file upload complete:', registerError)
       // Don't fail the request since asset is registered, but log for manual reconciliation
-    }
-
-    // Update asset count (separate from bytes to avoid race conditions)
-    try {
-      if (storageData) {
-        await supabase
-          .from('storage_usage')
-          .update({
-            asset_count: currentUsage.asset_count + 1,
-            last_calculated_at: new Date().toISOString()
-          })
-          .eq('user_id', user.id)
-      } else {
-        await supabase
-          .from('storage_usage')
-          .insert({
-            user_id: user.id,
-            total_bytes_used: totalAssetSize,
-            pending_bytes: 0, // Should be 0 after commit
-            asset_count: 1,
-            last_calculated_at: new Date().toISOString()
-          })
-      }
-    } catch (countError) {
-      console.error('Failed to update asset count:', countError)
-      // Don't fail the request, but log for manual reconciliation
     }
 
     return new Response(
       JSON.stringify({ 
         success: true,
-        asset: assetData,
+        file_id: fileData,
         storage_usage: {
           total_bytes_used: Number(currentUsage.total_bytes_used + BigInt(totalAssetSize)),
           asset_count: currentUsage.asset_count + 1,

@@ -62,29 +62,25 @@ serve(async (req) => {
       )
     }
 
-    // Get users with stale pending uploads
-    // Stale = pending uploads older than 1 hour
-    const staleThreshold = new Date(Date.now() - 60 * 60 * 1000) // 1 hour ago
-    
-    const { data: staleUsers, error: fetchError } = await supabase
-      .from('storage_usage')
-      .select('user_id, pending_bytes, last_calculated_at')
-      .gt('pending_bytes', 0)
-      .lt('last_calculated_at', staleThreshold.toISOString())
+    // Use new cleanup_stale_pending_bytes RPC (Phase 4 I/O optimization)
+    // This uses last_pending_update_at instead of last_calculated_at for accuracy
+    const { data: cleanedData, error: cleanupError } = await supabase.rpc('cleanup_stale_pending_bytes', {
+      p_stale_threshold_hours: 1
+    })
 
-    if (fetchError) {
-      console.error('Failed to fetch stale pending uploads:', fetchError)
+    if (cleanupError) {
+      console.error('Failed to cleanup stale pending uploads:', cleanupError)
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: 'Failed to fetch stale pending uploads',
-          details: fetchError.message 
+          error: 'Failed to cleanup stale pending uploads',
+          details: cleanupError.message 
         } as CleanupResponse),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    if (!staleUsers || staleUsers.length === 0) {
+    if (!cleanedData || cleanedData.length === 0) {
       return new Response(
         JSON.stringify({ 
           success: true, 
@@ -96,102 +92,24 @@ serve(async (req) => {
       )
     }
 
-    console.log(`Found ${staleUsers.length} users with stale pending uploads`)
+    console.log(`Cleanup completed via RPC: ${cleanedData.length} users cleaned`)
 
-    const cleanupDetails = []
-    let totalCleanedUsers = 0
-    let totalBytesReleased = 0
+    const cleanupDetails = cleanedData.map(row => ({
+      user_id: row.user_id,
+      bytes_released: Number(row.bytes_freed),
+      reason: 'stale_pending_cleanup'
+    }))
 
-    // Process each user with stale pending uploads
-    for (const user of staleUsers) {
-      try {
-        // Additional check: Look for assets that might be in limbo
-        const { data: recentAssets } = await supabase
-          .from('assets')
-          .select('id, file_size_bytes, created_at')
-          .eq('user_id', user.user_id)
-          .gte('created_at', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()) // Last 2 hours
-          .order('created_at', { ascending: false })
-
-        let shouldCleanup = true
-        let reason = 'stale_timeout'
-
-        // If there are recent assets, check if they match pending bytes
-        if (recentAssets && recentAssets.length > 0) {
-          const recentTotalSize = recentAssets.reduce((sum, asset) => sum + asset.file_size_bytes, 0)
-          
-          // If recent assets total is close to pending bytes, don't clean up
-          // This handles the case where upload was successful but registerAsset wasn't called
-          if (Math.abs(recentTotalSize - user.pending_bytes) < 1024 * 1024) { // Within 1MB
-            shouldCleanup = false
-            reason = 'recent_assets_match_pending'
-            
-            // Try to commit the pending bytes instead
-            try {
-              await supabase.rpc('commit_pending_bytes', {
-                p_user_id: user.user_id,
-                p_bytes: recentTotalSize
-              })
-              
-              cleanupDetails.push({
-                user_id: user.user_id,
-                bytes_released: recentTotalSize,
-                reason: 'committed_recent_assets'
-              })
-              
-              totalBytesReleased += recentTotalSize
-              totalCleanedUsers++
-              continue
-            } catch (commitError) {
-              console.error(`Failed to commit pending bytes for user ${user.user_id}:`, commitError)
-              // Fall through to cleanup
-            }
-          }
-        }
-
-        if (shouldCleanup) {
-          // Rollback the stale pending bytes
-          const { error: rollbackError } = await supabase.rpc('rollback_pending_bytes', {
-            p_user_id: user.user_id,
-            p_bytes: user.pending_bytes
-          })
-
-          if (rollbackError) {
-            console.error(`Failed to rollback pending bytes for user ${user.user_id}:`, rollbackError)
-            cleanupDetails.push({
-              user_id: user.user_id,
-              bytes_released: 0,
-              reason: 'rollback_failed'
-            })
-          } else {
-            cleanupDetails.push({
-              user_id: user.user_id,
-              bytes_released: Number(user.pending_bytes),
-              reason: reason
-            })
-            
-            totalBytesReleased += Number(user.pending_bytes)
-            totalCleanedUsers++
-          }
-        }
-      } catch (userError) {
-        console.error(`Error processing user ${user.user_id}:`, userError)
-        cleanupDetails.push({
-          user_id: user.user_id,
-          bytes_released: 0,
-          reason: 'processing_error'
-        })
-      }
-    }
+    const totalBytesReleased = cleanupDetails.reduce((sum, d) => sum + d.bytes_released, 0)
 
     const response: CleanupResponse = {
       success: true,
-      cleaned_users: totalCleanedUsers,
+      cleaned_users: cleanedData.length,
       total_bytes_released: totalBytesReleased,
       details: cleanupDetails
     }
 
-    console.log(`Cleanup completed: ${totalCleanedUsers} users, ${totalBytesReleased} bytes released`)
+    console.log(`Cleanup completed: ${cleanedData.length} users, ${totalBytesReleased} bytes released`)
 
     return new Response(
       JSON.stringify(response),

@@ -8,7 +8,7 @@ import type { CustomField, CustomFieldValue, ViewportDisplaySettings } from "@/t
 export interface Asset {
   id: string;
   name: string;
-  type: "image" | "document" | "video" | "audio" | "code" | "other";
+  type: "image" | "document" | "video" | "audio" | "code" | "other" | "card" | "text" | "container" | "viewport" | "tag";
   x: number;
   y: number;
   width: number;
@@ -21,6 +21,7 @@ export interface Asset {
   thumbnail?: string;
   background?: string;
   tags?: string[];
+  content?: string; // CRITICAL: For text assets - unbounded content stored in TEXT column (TOAST)
   viewportConfig?: {
     zoom: number;
     panX: number;
@@ -50,6 +51,7 @@ export interface Asset {
   cloudSize?: number;
   cloudUpdatedAt?: string;
   cloudError?: string;
+  deletedAt?: string; // For soft delete tracking (Phase 1 schema)
 }
 
 interface AssetItemProps {

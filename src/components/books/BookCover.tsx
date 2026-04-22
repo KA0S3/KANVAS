@@ -3,6 +3,7 @@ import { X, Calendar, Tag, Image } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Book } from '@/types/book';
 import { useThemeStore } from '@/stores/themeStore';
+import { useTagStore } from '@/stores/tagStore';
 
 // Import book cover images
 import BlackBook from '@/assets/Book-Covers/Black_book.png';
@@ -36,6 +37,7 @@ const BookCover: React.FC<BookCoverProps> = ({
 
   try {
     const { theme } = useThemeStore();
+    const { tags } = useTagStore();
     const [isHovered, setIsHovered] = useState(false);
     const [isFlipped, setIsFlipped] = useState(false);
     const [showStats, setShowStats] = useState(false);
@@ -65,7 +67,6 @@ const BookCover: React.FC<BookCoverProps> = ({
 
       const assets = book.worldData.assets || {};
       const assetCount = Object.keys(assets).length;
-      const tags = book.worldData.tags || {};
       const tagCount = Object.keys(tags).length;
       
       // Calculate estimated storage size (rough approximation)
