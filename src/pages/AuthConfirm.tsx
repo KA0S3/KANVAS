@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { CheckCircle, XCircle, Loader2, Mail } from 'lucide-react'
-import { supabase, authUtils } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuthStore } from '@/stores/authStore'
@@ -192,8 +192,15 @@ export default function AuthConfirm() {
               </p>
               <div className="space-y-2">
                 <Button 
-                  onClick={handleRetrySignup}
+                  onClick={handleManualRedirect}
                   variant="outline"
+                  size="sm"
+                >
+                  Return to App
+                </Button>
+                <Button 
+                  onClick={handleRetrySignup}
+                  variant="ghost"
                   size="sm"
                 >
                   Try Signing Up Again
