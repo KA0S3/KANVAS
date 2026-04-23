@@ -75,9 +75,10 @@ const Index = () => {
       // Add a small delay to ensure auth state is fully settled
       const loadTimeout = setTimeout(async () => {
         try {
+          console.log('[Index] Calling listProjects()...');
           // Sync project metadata from Supabase to local bookStore
           const projects = await listProjects();
-          console.log(`[Index] Fetched ${projects.length} projects from Supabase`);
+          console.log(`[Index] Fetched ${projects.length} projects from Supabase:`, projects);
           
           if (projects.length === 0) {
             console.log('[Index] No projects found in Supabase for this user');
