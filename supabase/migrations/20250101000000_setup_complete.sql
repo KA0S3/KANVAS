@@ -494,35 +494,35 @@ BEGIN
 
   RETURN QUERY
   SELECT
-    asset_id,
-    parent_id,
-    name,
-    type,
-    x,
-    y,
-    width,
-    height,
-    z_index,
-    is_expanded,
-    content,
-    background_config,
-    viewport_config,
-    custom_fields,
-    updated_at
-  FROM assets
-  WHERE project_id = p_project_id
-  AND deleted_at IS NULL
+    a.asset_id,
+    a.parent_id,
+    a.name,
+    a.type,
+    a.x,
+    a.y,
+    a.width,
+    a.height,
+    a.z_index,
+    a.is_expanded,
+    a.content,
+    a.background_config,
+    a.viewport_config,
+    a.custom_fields,
+    a.updated_at
+  FROM assets a
+  WHERE a.project_id = p_project_id
+  AND a.deleted_at IS NULL
   -- CRITICAL FIX: Split NULL condition to avoid loading all rows
   -- CRITICAL FIX: Add p_load_all flag to bypass hierarchy check for small projects
   AND (
     p_load_all = TRUE
-    OR (p_parent_id IS NULL AND parent_id IS NULL)
-    OR (p_parent_id IS NOT NULL AND parent_id = p_parent_id)
+    OR (p_parent_id IS NULL AND a.parent_id IS NULL)
+    OR (p_parent_id IS NOT NULL AND a.parent_id = p_parent_id)
   )
   AND EXISTS (
-    SELECT 1 FROM projects
-    WHERE projects.id = assets.project_id
-    AND projects.user_id = auth.uid()
+    SELECT 1 FROM projects p
+    WHERE p.id = a.project_id
+    AND p.user_id = auth.uid()
   );
 END;
 $$;
@@ -544,13 +544,14 @@ BEGIN
   SET search_path = public;
 
   -- Use provided project_id if given, otherwise generate new UUID
+  -- CRITICAL FIX: Initialize last_version to 1 to match client expectation
   IF p_project_id IS NOT NULL THEN
-    INSERT INTO projects (id, user_id, name, description, backgrounds)
-    VALUES (p_project_id, auth.uid(), p_name, p_description, p_cover_config)
+    INSERT INTO projects (id, user_id, name, description, backgrounds, last_version)
+    VALUES (p_project_id, auth.uid(), p_name, p_description, p_cover_config, 1)
     RETURNING id INTO v_project_id;
   ELSE
-    INSERT INTO projects (user_id, name, description, backgrounds)
-    VALUES (auth.uid(), p_name, p_description, p_cover_config)
+    INSERT INTO projects (user_id, name, description, backgrounds, last_version)
+    VALUES (auth.uid(), p_name, p_description, p_cover_config, 1)
     RETURNING id INTO v_project_id;
   END IF;
 
