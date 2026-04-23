@@ -8,6 +8,8 @@
 
 import { supabase } from '@/lib/supabase';
 import type { Asset } from '@/components/AssetItem';
+import { loadProject as loadProjectService, clearLoadedNodesCache } from './assetLoadService';
+import { useAssetStore } from '@/stores/assetStore';
 
 // Track changed assets in memory
 let changedAssets: Record<string, Asset> = {};
@@ -283,6 +285,95 @@ export function setCurrentProjectVersion(version: number): void {
 }
 
 // =====================================================
+// VERSION CONFLICT HANDLING
+// =====================================================
+
+/**
+ * Reload project from server to get latest data
+ * This is called when a version conflict is detected
+ */
+async function reloadProject(): Promise<void> {
+  if (!projectId) {
+    console.error('[ChangeTracking] Cannot reload project - no project ID set');
+    return;
+  }
+
+  console.log('[ChangeTracking] Reloading project from server due to version conflict...');
+
+  try {
+    // Load fresh data from server
+    const { project, assets } = await loadProjectService(projectId);
+    
+    // Store the new version
+    currentProjectVersion = project.last_version || 0;
+    
+    // Reload assets into store
+    const assetStore = useAssetStore.getState();
+    const bookId = assetStore.getCurrentBookId();
+    
+    if (bookId) {
+      // Convert AssetNode[] back to flat Asset record
+      const flatAssets: Record<string, Asset> = {};
+      
+      function flattenAssets(nodes: any[]): void {
+        for (const node of nodes) {
+          flatAssets[node.id] = node;
+          if (node.children && node.children.length > 0) {
+            flattenAssets(node.children);
+          }
+        }
+      }
+      
+      flattenAssets(assets);
+      
+      // Update the store with fresh data
+      assetStore.loadWorldData({
+        assets: flatAssets,
+        globalCustomFields: []
+      });
+    }
+    
+    console.log('[ChangeTracking] Project reloaded successfully, new version:', currentProjectVersion);
+  } catch (error) {
+    console.error('[ChangeTracking] Failed to reload project:', error);
+    throw error;
+  }
+}
+
+/**
+ * Merge unsaved local changes with reloaded server data
+ * This preserves user's pending changes after a version conflict
+ */
+function mergeUnsavedChanges(): void {
+  console.log('[ChangeTracking] Merging unsaved changes with reloaded data...');
+  
+  // Re-apply all pending asset metadata changes
+  for (const [assetId, asset] of Object.entries(changedAssets)) {
+    const assetStore = useAssetStore.getState();
+    const existingAsset = assetStore.getAssetById(assetId);
+    
+    if (existingAsset) {
+      // Update the asset with our pending changes
+      assetStore.updateAsset(assetId, asset);
+      console.log(`[ChangeTracking] Re-applied metadata change for asset ${assetId}`);
+    }
+  }
+  
+  // Re-apply all pending position changes
+  for (const [assetId, position] of Object.entries(changedPositions)) {
+    const assetStore = useAssetStore.getState();
+    const existingAsset = assetStore.getAssetById(assetId);
+    
+    if (existingAsset) {
+      assetStore.updateAssetPosition(assetId, position.x, position.y);
+      console.log(`[ChangeTracking] Re-applied position change for asset ${assetId}`);
+    }
+  }
+  
+  console.log('[ChangeTracking] Unsaved changes merged successfully');
+}
+
+// =====================================================
 // RETRY LOGIC (Failure & Recovery)
 // =====================================================
 
@@ -319,12 +410,16 @@ async function saveWithRetry(fn: () => Promise<void>): Promise<void> {
       // Version conflict - special handling
       if (error.message?.includes('Version conflict')) {
         console.warn('Version conflict detected, reloading project...');
-        // TODO: Implement reloadProject and mergeUnsavedChanges
-        // For now, just retry after delay
+        
+        // Reload project from server to get latest data
+        await reloadProject();
+        
+        // Merge unsaved local changes with reloaded data
+        mergeUnsavedChanges();
+        
+        // Retry the save with updated version
         if (attempt < MAX_RETRIES - 1) {
-          const delay = RETRY_DELAY_BASE * Math.pow(2, attempt);
-          console.warn(`Retry ${attempt + 1}/${MAX_RETRIES} after ${delay}ms`);
-          await new Promise(resolve => setTimeout(resolve, delay));
+          console.log(`Retrying save after version conflict resolution (attempt ${attempt + 1}/${MAX_RETRIES})`);
           continue;
         }
       }

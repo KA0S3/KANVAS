@@ -50,7 +50,7 @@ class R2UploadService {
   constructor() {
     // R2 public endpoint for constructing public URLs
     // Format: https://pub-<hash>.r2.dev or https://<custom-domain>
-    this.r2PublicEndpoint = import.meta.env.VITE_R2_PUBLIC_ENDPOINT || '';
+    this.r2PublicEndpoint = import.meta.env.VITE_R2_PUBLIC_URL || '';
 
     // Listen for cloud retry events from DocumentMutationService (Phase 10)
     this.cloudRetryHandler = this.handleCloudRetryEvent.bind(this);
@@ -294,14 +294,12 @@ class R2UploadService {
   }
 
   /**
-   * Get public URL for an R2 object key
-   * 
-   * Requires VITE_R2_PUBLIC_ENDPOINT to be set
-   * Format: https://pub-<hash>.r2.dev or custom domain
+   * Get public URL for an R2 file
+   * Requires VITE_R2_PUBLIC_URL to be set
    */
   getPublicUrl(r2Key: string): string {
     if (!this.r2PublicEndpoint) {
-      console.warn('[R2Upload] VITE_R2_PUBLIC_ENDPOINT not set, returning empty URL');
+      console.warn('[R2Upload] VITE_R2_PUBLIC_URL not set, returning empty URL');
       return '';
     }
 
