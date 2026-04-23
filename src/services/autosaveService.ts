@@ -151,6 +151,20 @@ class AutosaveService {
     try {
       console.log('[AutosaveService] Starting cloud-first autosave cycle');
       
+      // CRITICAL FIX: Mark all current assets as changed before syncing
+      // This ensures manual saves actually save assets
+      if (this.queue.assets || this.queue.worldData) {
+        const assetStore = useAssetStore.getState();
+        const currentBookId = assetStore.getCurrentBookId();
+        if (currentBookId) {
+          const bookAssets = assetStore.bookAssets[currentBookId] || {};
+          Object.values(bookAssets).forEach((asset: any) => {
+            documentMutationService.markAssetChanged(asset.id, asset);
+          });
+          console.log(`[AutosaveService] Marked ${Object.keys(bookAssets).length} assets as changed`);
+        }
+      }
+      
       // For authenticated users: prioritize cloud sync
       if (isAuthenticated) {
         if (isOnline) {

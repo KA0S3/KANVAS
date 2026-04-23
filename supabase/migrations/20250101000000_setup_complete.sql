@@ -444,20 +444,20 @@ BEGIN
 
   RETURN QUERY
   SELECT
-    id,
-    user_id,
-    name,
-    description,
-    viewport,
-    backgrounds,
-    tags_config,
-    last_version,
-    (SELECT COUNT(*)::INT FROM assets WHERE assets.project_id = projects.id AND deleted_at IS NULL) AS asset_count,
-    updated_at
-  FROM projects
-  WHERE id = p_project_id
-  AND user_id = auth.uid()
-  AND deleted_at IS NULL;
+    p.id,
+    p.user_id,
+    p.name,
+    p.description,
+    p.viewport,
+    p.backgrounds,
+    p.tags_config,
+    p.last_version,
+    (SELECT COUNT(*)::INT FROM assets WHERE assets.project_id = p.id AND deleted_at IS NULL) AS asset_count,
+    p.updated_at
+  FROM projects p
+  WHERE p.id = p_project_id
+  AND p.user_id = auth.uid()
+  AND p.deleted_at IS NULL;
 END;
 $$;
 
