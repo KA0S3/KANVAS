@@ -26,6 +26,7 @@ import { useBookStore } from "@/stores/bookStoreSimple";
 import { audioEngine } from "@/services/AudioEngine";
 import { autosaveService } from '@/services/autosaveService';
 import { documentMutationService } from '@/services/DocumentMutationService';
+import { listProjects } from '@/services/ProjectService';
 import SplashScreen from "@/components/media/SplashScreen";
 import IntroVideo from "@/components/media/IntroVideo";
 import BookEntryAnimation from "@/components/media/BookEntryAnimation";
@@ -76,19 +77,50 @@ const Index = () => {
         return;
       }
       
-      console.log('[Index] User authenticated, loading books from cloud...');
+      console.log('[Index] User authenticated, loading projects from Supabase...');
       setIsCloudLoading(true);
       setLastCloudLoadTime(now);
       
       // Add a small delay to ensure auth state is fully settled
       const loadTimeout = setTimeout(async () => {
         try {
-          // Get current books to check for duplicates
+          // Fetch projects from Supabase
+          const projects = await listProjects();
+          console.log(`[Index] Fetched ${projects.length} projects from Supabase`);
+          
+          // Get current local books
           const currentBooks = getAllBooks();
           const existingBookIds = new Set(Object.keys(currentBooks));
           
-          // Load from cloud using DocumentMutationService
-          // Note: Book list loading happens separately - this is for world data
+          // Sync Supabase projects with local bookStore
+          let syncedCount = 0;
+          for (const project of projects) {
+            if (!existingBookIds.has(project.id)) {
+              // Create new book from project
+              const bookStore = useBookStore.getState();
+              bookStore.createBook({
+                title: project.name,
+                color: '#3b82f6', // Default blue color
+                coverPageSettings: project.backgrounds || {},
+                worldData: {
+                  assets: {},
+                  tags: project.tags_config || {},
+                  globalCustomFields: [],
+                  viewportOffset: { x: -45, y: -20 },
+                  viewportScale: 1,
+                },
+              });
+              syncedCount++;
+              console.log(`[Index] Synced new project to local book: ${project.name}`);
+            }
+          }
+          
+          console.log(`[Index] Synced ${syncedCount} new projects from Supabase`);
+          
+          // Get current books to check for duplicates
+          const updatedBooks = getAllBooks();
+          
+          // Load from cloud using DocumentMutationService for current book
           const currentBook = currentBookId;
           let success = false;
           
@@ -127,75 +159,6 @@ const Index = () => {
           
           if (success) {
             console.log('[Index] Books restored from cloud successfully');
-            
-            // Get updated books after cloud restore
-            const updatedBooks = getAllBooks();
-            console.log(`[Index] Loading world data for ${updatedBooks.length} books`);
-            
-            // Only load world data for new books to prevent duplicates
-            const newBooks = updatedBooks.filter(book => !existingBookIds.has(book.id));
-            
-            if (newBooks.length > 0) {
-              console.log(`[Index] Found ${newBooks.length} new books to load`);
-              
-              // Load new books sequentially with longer stagger to reduce load
-              const maxConcurrentLoads = 3;
-              const batches = [];
-              
-              for (let i = 0; i < newBooks.length; i += maxConcurrentLoads) {
-                batches.push(newBooks.slice(i, i + maxConcurrentLoads));
-              }
-              
-              // Process batches sequentially
-              for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-                const batch = batches[batchIndex];
-                
-                const batchPromises = batch.map((book, index) => {
-                  return new Promise<void>((resolve) => {
-                    setTimeout(() => {
-                      documentMutationService.loadDocument(book.id).then(({ success: bookSuccess, data }) => {
-                        if (bookSuccess && data) {
-                          loadWorldData(data.world_document);
-
-                          // Restore backgrounds for this book
-                          if (data.world_document?.backgrounds) {
-                            const backgroundStore = useBackgroundStore.getState();
-                            const backgrounds = data.world_document.backgrounds;
-                            console.log(`[Index] Restoring ${Object.keys(backgrounds).length} backgrounds for book: ${book.title}`);
-
-                            Object.entries(backgrounds).forEach(([key, config]) => {
-                              const clonedConfig = backgroundStore.cloneConfig(config as BackgroundConfig);
-                              backgroundStore.setBackground(key, clonedConfig);
-                            });
-                          }
-                        }
-                        if (bookSuccess) {
-                          console.log(`[Index] Loaded world data for new book: ${book.title}`);
-                        } else {
-                          console.warn(`[Index] Failed to load world data for new book: ${book.title}`);
-                        }
-                        resolve();
-                      }).catch(err => {
-                        console.error(`[Index] Error loading new book ${book.title}:`, err);
-                        resolve();
-                      });
-                    }, index * 200); // Stagger loads by 200ms within batch
-                  });
-                });
-                
-                // Wait for current batch to complete before starting next
-                await Promise.all(batchPromises);
-                
-                // Add delay between batches
-                if (batchIndex < batches.length - 1) {
-                  await new Promise(resolve => setTimeout(resolve, 500));
-                }
-              }
-              
-              console.log('[Index] All new book data loading completed');
-            } else {
-              console.log('[Index] No new books to load, all books already exist locally');
-            }
           } else {
             console.warn('[Index] Failed to restore books from cloud');
           }
