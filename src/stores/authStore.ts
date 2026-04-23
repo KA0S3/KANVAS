@@ -861,23 +861,17 @@ export const useAuthStore = create<AuthStore>()(
         password: 'invalid-password-for-checking-existence-only'
       });
       
-      if (signInError?.message === 'Invalid login credentials') {
-        console.log('[authStore] User exists but wrong password - could be Google or Email user');
-        // User exists, but we don't know which provider - return both to trigger conflict detection
-        return { 
-          exists: true, 
-          providers: ['email', 'google'], // Return both to trigger conflict UI
-          userId: undefined 
-        };
-      } else if (signInError?.message.includes('Email not confirmed')) {
+      if (signInError?.message.includes('Email not confirmed')) {
         console.log('[authStore] User exists but email not confirmed');
-        return { 
-          exists: true, 
-          providers: ['email'], 
-          userId: undefined 
+        return {
+          exists: true,
+          providers: ['email'],
+          userId: undefined
         };
-      } else if (signInError?.message.includes('Invalid login credentials')) {
-        console.log('[authStore] User does not exist');
+      } else {
+        // "Invalid login credentials" or any other error means we can't determine if user exists
+        // Assume user doesn't exist to allow sign up attempt
+        console.log('[authStore] Could not determine user existence, assuming false (error:', signInError?.message, ')');
         return { exists: false, providers: [] };
       }
       
