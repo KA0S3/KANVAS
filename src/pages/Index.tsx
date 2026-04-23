@@ -26,7 +26,6 @@ import { useBookStore } from "@/stores/bookStoreSimple";
 import { audioEngine } from "@/services/AudioEngine";
 import { autosaveService } from '@/services/autosaveService';
 import { documentMutationService } from '@/services/DocumentMutationService';
-import { listProjects } from '@/services/ProjectService';
 import SplashScreen from "@/components/media/SplashScreen";
 import IntroVideo from "@/components/media/IntroVideo";
 import BookEntryAnimation from "@/components/media/BookEntryAnimation";
@@ -65,7 +64,8 @@ const Index = () => {
     initializeAuth();
   }, [initializeAuth]);
 
-  // Load data from cloud when user authenticates - OPTIMIZED
+  // Load data from cloud when user authenticates - LOW I/O OPTIMIZED
+  // Only load current book data, not full project list (follows "Frontend is source of truth short-term")
   useEffect(() => {
     if (isAuthenticated && !isCloudLoading) {
       const now = Date.now();
@@ -77,50 +77,15 @@ const Index = () => {
         return;
       }
       
-      console.log('[Index] User authenticated, loading projects from Supabase...');
+      console.log('[Index] User authenticated, loading current book data from cloud...');
       setIsCloudLoading(true);
       setLastCloudLoadTime(now);
       
       // Add a small delay to ensure auth state is fully settled
       const loadTimeout = setTimeout(async () => {
         try {
-          // Fetch projects from Supabase
-          const projects = await listProjects();
-          console.log(`[Index] Fetched ${projects.length} projects from Supabase`);
-          
-          // Get current local books
-          const currentBooks = getAllBooks();
-          const existingBookIds = new Set(Object.keys(currentBooks));
-          
-          // Sync Supabase projects with local bookStore
-          let syncedCount = 0;
-          for (const project of projects) {
-            if (!existingBookIds.has(project.id)) {
-              // Create new book from project
-              const bookStore = useBookStore.getState();
-              bookStore.createBook({
-                title: project.name,
-                color: '#3b82f6', // Default blue color
-                coverPageSettings: project.backgrounds || {},
-                worldData: {
-                  assets: {},
-                  tags: project.tags_config || {},
-                  globalCustomFields: [],
-                  viewportOffset: { x: -45, y: -20 },
-                  viewportScale: 1,
-                },
-              });
-              syncedCount++;
-              console.log(`[Index] Synced new project to local book: ${project.name}`);
-            }
-          }
-          
-          console.log(`[Index] Synced ${syncedCount} new projects from Supabase`);
-          
-          // Get current books to check for duplicates
-          const updatedBooks = getAllBooks();
-          
-          // Load from cloud using DocumentMutationService for current book
+          // LOW I/O: Only load current book data, not full project list
+          // Frontend is source of truth short-term - DB is eventual consistency layer
           const currentBook = currentBookId;
           let success = false;
           
@@ -158,9 +123,9 @@ const Index = () => {
           }
           
           if (success) {
-            console.log('[Index] Books restored from cloud successfully');
+            console.log('[Index] Current book data loaded from cloud successfully');
           } else {
-            console.warn('[Index] Failed to restore books from cloud');
+            console.warn('[Index] Failed to load current book data from cloud');
           }
         } catch (err) {
           console.error('[Index] Cloud loading failed:', err);
