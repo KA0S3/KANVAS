@@ -165,7 +165,7 @@ const Index = () => {
         setIsCloudLoading(false);
       };
     }
-  }, [isAuthenticated, isCloudLoading]); // Removed lastCloudLoadTime dependency
+  }, [isAuthenticated]); // Only depend on isAuthenticated to prevent infinite loop
 
   // Initialize autosave service when authenticated
   // useEffect(() => {
