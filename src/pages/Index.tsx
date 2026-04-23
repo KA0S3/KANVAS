@@ -45,7 +45,6 @@ const Index = () => {
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isCloudLoading, setIsCloudLoading] = useState(false);
-  const [lastCloudLoadTime, setLastCloudLoadTime] = useState(0);
   const createWorldButtonRef = useRef<HTMLButtonElement>(null);
   const { currentActiveId, loadWorldData, isEditingBackground, setIsEditingBackground, currentViewportId, setActiveAsset, getCurrentBookAssets, setCurrentViewportId } = useAssetStore(); // Using getCurrentBookAssets method
   const { loadWorldData: loadTagWorldData } = useTagStore();
@@ -70,18 +69,8 @@ const Index = () => {
   // Full project data loads only when opening a specific project
   useEffect(() => {
     if (isAuthenticated && !isCloudLoading) {
-      const now = Date.now();
-      const debounceTime = 2000; // 2 second debounce for cloud loading
-      
-      // Prevent rapid successive cloud loads
-      if (now - lastCloudLoadTime < debounceTime) {
-        console.log('[Index] Cloud loading debounced, too soon since last load');
-        return;
-      }
-      
       console.log('[Index] User authenticated, syncing project metadata from Supabase...');
       setIsCloudLoading(true);
-      setLastCloudLoadTime(now);
       
       // Add a small delay to ensure auth state is fully settled
       const loadTimeout = setTimeout(async () => {
@@ -89,6 +78,10 @@ const Index = () => {
           // Sync project metadata from Supabase to local bookStore
           const projects = await listProjects();
           console.log(`[Index] Fetched ${projects.length} projects from Supabase`);
+          
+          if (projects.length === 0) {
+            console.log('[Index] No projects found in Supabase for this user');
+          }
           
           const currentBooks = getAllBooks();
           const existingBookIds = new Set(Object.keys(currentBooks));
@@ -171,7 +164,7 @@ const Index = () => {
         setIsCloudLoading(false);
       };
     }
-  }, [isAuthenticated, isCloudLoading, lastCloudLoadTime]); // Added loading dependencies
+  }, [isAuthenticated, isCloudLoading]); // Removed lastCloudLoadTime dependency
 
   // Initialize autosave service when authenticated
   // useEffect(() => {
