@@ -46,6 +46,7 @@ interface AuthStore {
   _authStateInitialized?: boolean; // Prevent multiple initializations
   _lastAuthStateChange?: number; // Track last auth state change for debouncing
   _authStateDebounceTime?: number; // Debounce time for auth state changes
+  _userExistsCache?: Map<string, { exists: boolean; providers: string[]; timestamp: number }>; // Cache for user existence checks
   
   // Methods
   initializeAuth: () => void;
@@ -90,6 +91,7 @@ export const useAuthStore = create<AuthStore>()(
       effectiveLimits: null,
       isVerificationPending: false,
       verificationEmail: null,
+      _userExistsCache: new Map(),
 
       // Initialize auth listener
       initializeAuth: () => {
@@ -100,7 +102,7 @@ export const useAuthStore = create<AuthStore>()(
         }
         
         console.log('[authStore] Initializing auth store');
-        set({ _authStateInitialized: true });
+        set({ _authStateInitialized: true, loading: true });
         
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (event, session) => {
@@ -825,60 +827,50 @@ export const useAuthStore = create<AuthStore>()(
   },
 
   // Enhanced auth methods for provider conflict resolution
-  
-  // Check if user exists and what providers they have
+
+  // Check if user exists and what providers they have (OPTIMIZED - minimal DB calls)
   checkUserExists: async (email: string) => {
     try {
+      const now = Date.now();
+      const CACHE_TTL = 5000; // 5 seconds
+
+      // Check cache first
+      const cached = get()._userExistsCache.get(email);
+      if (cached && now - cached.timestamp < CACHE_TTL) {
+        console.log('[authStore] Using cached user existence check');
+        return cached;
+      }
+
       console.log('[authStore] Checking if user exists:', email);
-      
-      // Method 1: Try to get user by email using admin API (if available)
-      // For now, we'll use a client-side approach by attempting sign-in methods
-      
-      // Check if user exists in auth.users by trying to sign in with a dummy password
-      // This is a workaround since we don't have direct admin access
-      
-      // Try to get current user info to see if email matches
+
+      // Only check current session - no extra DB calls
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (user?.email === email) {
         console.log('[authStore] User found in current session');
-        const providers = Array.isArray(user.app_metadata?.provider) 
-          ? user.app_metadata.provider 
-          : user.app_metadata?.provider 
-            ? [user.app_metadata.provider] 
+        const providers = Array.isArray(user.app_metadata?.provider)
+          ? user.app_metadata.provider
+          : user.app_metadata?.provider
+            ? [user.app_metadata.provider]
             : ['email'];
-        return { 
-          exists: true, 
-          providers,
-          userId: user.id 
-        };
-      }
-      
-      // Try to check via auth.signInWithPassword with a known invalid password
-      // This will tell us if the user exists (invalid credentials) vs doesn't exist
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password: 'invalid-password-for-checking-existence-only'
-      });
-      
-      if (signInError?.message.includes('Email not confirmed')) {
-        console.log('[authStore] User exists but email not confirmed');
-        return {
+
+        const result = {
           exists: true,
-          providers: ['email'],
-          userId: undefined
+          providers,
+          userId: user.id
         };
-      } else {
-        // "Invalid login credentials" or any other error means we can't determine if user exists
-        // Assume user doesn't exist to allow sign up attempt
-        console.log('[authStore] Could not determine user existence, assuming false (error:', signInError?.message, ')');
-        return { exists: false, providers: [] };
+
+        // Cache the result
+        get()._userExistsCache.set(email, { ...result, timestamp: now });
+        return result;
       }
-      
-      // Default fallback - assume user doesn't exist
-      console.log('[authStore] Could not determine user existence, assuming false');
-      return { exists: false, providers: [] };
-      
+
+      // Can't determine without extra DB calls - assume doesn't exist to allow sign up
+      console.log('[authStore] User not in current session, assuming doesn\'t exist');
+      const result = { exists: false, providers: [] };
+      get()._userExistsCache.set(email, { ...result, timestamp: now });
+      return result;
+
     } catch (error) {
       console.error('[authStore] Error checking user existence:', error);
       return { exists: false, providers: [] };
@@ -1027,6 +1019,7 @@ export const useAuthStore = create<AuthStore>()(
     }),
     {
       name: 'kanvas-auth',
+      version: 2, // Force reset to clear old _authStateInitialized
       // Use secure storage for sensitive authentication data
       storage: {
         getItem: (name) => secureStorage.getItem(name),

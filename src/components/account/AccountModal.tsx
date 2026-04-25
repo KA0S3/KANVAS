@@ -11,6 +11,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -429,6 +430,9 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
               <User className="w-5 h-5" />
               Account
             </DialogTitle>
+            <DialogDescription>
+              Loading your account information...
+            </DialogDescription>
           </DialogHeader>
           <div className="flex items-center justify-center py-8">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -446,6 +450,9 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
             <User className="w-5 h-5" />
             Account
           </DialogTitle>
+          <DialogDescription>
+            {isAuthenticated ? 'Manage your account settings and subscription' : 'Sign in to your account to sync your data'}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto pb-4">
