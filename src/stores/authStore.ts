@@ -1034,11 +1034,11 @@ export const useAuthStore = create<AuthStore>()(
         removeItem: (name) => secureStorage.removeItem(name),
       },
       // Only persist minimal state - authentication should be fresh each time
+      // Don't persist _authStateInitialized - it must always reset on page load
       partialize: (state) => ({
         plan: state.plan || 'guest',
         licenseInfo: state.licenseInfo,
         _lastFetchedUserId: state._lastFetchedUserId || '',
-        _authStateInitialized: state._authStateInitialized || false,
       } as any),
       // Don't persist authentication state to avoid sign out issues
       skipHydration: false,
