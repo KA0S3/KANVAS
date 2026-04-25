@@ -95,12 +95,27 @@ export const useAuthStore = create<AuthStore>()(
 
       // Initialize auth listener
       initializeAuth: () => {
+        // Clear old persisted _authStateInitialized if it exists in localStorage
+        try {
+          const stored = localStorage.getItem('kanvas-auth');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed.state?._authStateInitialized) {
+              console.log('[authStore] Clearing old persisted _authStateInitialized');
+              delete parsed.state._authStateInitialized;
+              localStorage.setItem('kanvas-auth', JSON.stringify(parsed));
+            }
+          }
+        } catch (e) {
+          // Ignore storage errors
+        }
+
         // Prevent multiple initializations
         if (get()._authStateInitialized) {
           console.log('[authStore] Auth store already initialized');
           return;
         }
-        
+
         console.log('[authStore] Initializing auth store');
         set({ _authStateInitialized: true, loading: true });
         
