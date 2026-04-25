@@ -493,7 +493,7 @@ export function setupBeforeUnloadHandler(): void {
     // Position-only changes should also trigger unsaved warning
     if (Object.keys(changedAssets).length > 0 || Object.keys(changedPositions).length > 0) {
       e.preventDefault();
-      e.returnValue = 'You have unsaved changes. Stay on page to save, or leave to lose changes.';
+      e.returnValue = 'SAVE CHANGES BEFORE EXITING TAB';
     }
   };
 

@@ -974,7 +974,7 @@ class DocumentMutationService {
     const handler = (e: BeforeUnloadEvent) => {
       if (this.hasUnsavedChanges()) {
         e.preventDefault();
-        e.returnValue = 'You have unsaved changes. Stay on page to save, or leave to lose changes.';
+        e.returnValue = 'SAVE CHANGES BEFORE EXITING TAB';
       }
     };
 

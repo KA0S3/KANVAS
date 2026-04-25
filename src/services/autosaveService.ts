@@ -37,7 +37,7 @@ class AutosaveService {
   
   // Configurable intervals (in milliseconds) - optimized to reduce Supabase I/O
   private readonly DEBOUNCE_DELAY = 5000; // 5 seconds (increased from 2s to reduce writes)
-  private readonly AUTOSAVE_INTERVAL = 30000; // 30 seconds (increased from 15s to reduce sync frequency)
+  private readonly AUTOSAVE_INTERVAL = 60000; // 60 seconds (1 minute - increased to minimize DB requests)
   private readonly MANUAL_SAVE_INTERVAL = 10000; // 10 seconds for manual saves
   private readonly LOCAL_STORAGE_KEY = 'kanvas_autosave';
 
@@ -68,6 +68,17 @@ class AutosaveService {
     this.setupVisibilityHandlers();
     // NOTE: Periodic autosave NOT started automatically to prevent idle DB requests
     // It will be started when there are pending changes
+  }
+
+  // Check if there are actual changes (both queue and DocumentMutationService)
+  private hasActualChanges(): boolean {
+    // Check autosave queue
+    const hasQueueChanges = this.queue.assets || this.queue.backgrounds || this.queue.worldData;
+    
+    // Check DocumentMutationService changes
+    const hasMutationChanges = documentMutationService.hasUnsavedChanges();
+    
+    return hasQueueChanges || hasMutationChanges;
   }
 
   private setupStoreSubscriptions(): void {
@@ -157,6 +168,12 @@ class AutosaveService {
     const { isAuthenticated, user } = useAuthStore.getState();
     const { isOnline } = useCloudStore.getState();
     const { currentBookId } = useBookStore.getState();
+    
+    // CRITICAL: Only save if there are actual changes to minimize I/O
+    if (!this.hasActualChanges()) {
+      console.log('[AutosaveService] No actual changes detected, skipping autosave');
+      return;
+    }
     
     this.updateState({ 
       status: 'local-saving', 
@@ -274,6 +291,12 @@ class AutosaveService {
   // Manual save with shorter interval
   async triggerManualSave(): Promise<boolean> {
     console.log('[AutosaveService] Manual save triggered');
+    
+    // CRITICAL: Only save if there are actual changes to minimize I/O
+    if (!this.hasActualChanges()) {
+      console.log('[AutosaveService] No actual changes detected, skipping save');
+      return true; // Return true since nothing needed saving
+    }
     
     // Temporarily use shorter interval for manual save
     const originalInterval = this.AUTOSAVE_INTERVAL;
