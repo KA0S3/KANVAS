@@ -97,6 +97,10 @@ class DocumentMutationService {
   private backgroundsCache: Map<string, { data: any; timestamp: number }> = new Map();
   private readonly CACHE_TTL_MS = 60000; // 1 minute cache TTL
 
+  // Compatibility layer fields
+  private beforeUnloadHandler: ((e: BeforeUnloadEvent) => void) | null = null;
+  private onSaveError: ((error: Error) => void) | null = null;
+
   private constructor() {
     // Initialize with server-wins strategy for MVP
     // Future: Make this configurable per-project or per-user
@@ -109,8 +113,8 @@ class DocumentMutationService {
     const handleOnline = () => {
       console.log('[DocumentMutation] Connection restored, triggering sync');
       this.syncNow();
-      // Also trigger cloud retry when back online
-      this.startCloudRetryPolling();
+      // NOTE: Cloud retry polling NOT started automatically to prevent idle DB requests
+      // It will be started only when there are failed uploads to retry
     };
     window.addEventListener('online', handleOnline);
 
@@ -359,6 +363,26 @@ class DocumentMutationService {
 
       if (error) {
         console.error('[DocumentMutation] Failed to save global backgrounds:', error);
+        // If error is "Unauthorized" or version conflict, try without version check
+        // This handles the case where project was just created and version is not synced
+        if (error.message?.includes('Unauthorized') || error.message?.includes('Version conflict')) {
+          console.log('[DocumentMutation] Retrying saveGlobalBackgrounds without version check');
+          const { error: retryError } = await supabase.rpc('save_project', {
+            p_project_id: this.currentProjectId,
+            p_backgrounds: backgrounds
+            // No p_expected_version - let server handle it
+          });
+          if (retryError) {
+            console.error('[DocumentMutation] Retry failed:', retryError);
+            return false;
+          }
+          // Reload version from server after successful save
+          const loadResult = await this.loadDocument(this.currentProjectId);
+          if (loadResult.success && loadResult.data) {
+            this.currentVersion = loadResult.data.version;
+          }
+          return true;
+        }
         return false;
       }
 
@@ -521,6 +545,27 @@ class DocumentMutationService {
 
     if (error) {
       console.error('[DocumentMutation] Failed to save position changes:', error);
+      // If error is "Unauthorized", the project might not exist yet
+      // Try to create it and retry
+      if (error.message?.includes('Unauthorized')) {
+        console.log('[DocumentMutation] Project might not exist, attempting to create...');
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const created = await this.createProject(this.currentProjectId, 'Untitled Project');
+          if (created) {
+            console.log('[DocumentMutation] Project created, retrying position save');
+            const { error: retryError } = await supabase.rpc('save_positions', {
+              p_project_id: this.currentProjectId,
+              p_positions: positions
+            });
+            if (retryError) {
+              console.error('[DocumentMutation] Retry failed:', retryError);
+              throw retryError;
+            }
+            return;
+          }
+        }
+      }
       throw error;
     }
   }
@@ -570,6 +615,33 @@ class DocumentMutationService {
 
     if (error) {
       console.error('[DocumentMutation] Failed to save metadata changes:', error);
+      // If error is "Unauthorized", the project might not exist yet
+      // Try to create it and retry
+      if (error.message?.includes('Unauthorized')) {
+        console.log('[DocumentMutation] Project might not exist, attempting to create...');
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const created = await this.createProject(this.currentProjectId, 'Untitled Project');
+          if (created) {
+            console.log('[DocumentMutation] Project created, retrying metadata save');
+            const { error: retryError } = await supabase.rpc('save_assets', {
+              p_project_id: this.currentProjectId,
+              p_assets: changes
+              // No p_expected_version - let server handle it
+            });
+            if (retryError) {
+              console.error('[DocumentMutation] Retry failed:', retryError);
+              throw retryError;
+            }
+            // Reload version from server after successful save
+            const loadResult = await this.loadDocument(this.currentProjectId);
+            if (loadResult.success && loadResult.data) {
+              this.currentVersion = loadResult.data.version;
+            }
+            return;
+          }
+        }
+      }
       if (error.message?.includes('Version conflict')) {
         await this.handleConflict();
         throw error;
@@ -823,6 +895,100 @@ class DocumentMutationService {
     } catch (error) {
       console.error('[DocumentMutation] Query failed:', error);
       return [];
+    }
+  }
+
+  // =====================================================
+  // COMPATIBILITY LAYER FOR changeTrackingService
+  // =====================================================
+  // These methods provide the same API as changeTrackingService
+  // to allow gradual migration without breaking existing code
+
+  /**
+   * Check if there are unsaved changes
+   */
+  hasUnsavedChanges(): boolean {
+    return Object.keys(this.changedAssets).length > 0 || Object.keys(this.changedPositions).length > 0;
+  }
+
+  /**
+   * Manual save trigger (flush immediately)
+   */
+  async manualSave(): Promise<void> {
+    await this.syncNow();
+  }
+
+  /**
+   * Set error callback for UI feedback on save failures
+   */
+  setOnErrorCallback(callback: (error: Error) => void): void {
+    this.onSaveError = callback;
+  }
+
+  /**
+   * Start auto-save with project ID
+   */
+  startAutoSave(projectId: string): void {
+    this.setProjectId(projectId);
+    // Auto-save is now handled by autosaveService which calls syncNow()
+    console.log('[DocumentMutation] Auto-save started for project:', projectId);
+  }
+
+  /**
+   * Set current project version (called after loading project)
+   */
+  setCurrentProjectVersion(version: number): void {
+    this.currentVersion = version;
+  }
+
+  /**
+   * Get current project version
+   */
+  getCurrentProjectVersion(): number {
+    return this.currentVersion;
+  }
+
+  /**
+   * Set up auth state listener to save before session expires
+   */
+  setupAuthListener(): void {
+    supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'TOKEN_REFRESHED') {
+        console.log('Auth token refreshed');
+      } else if (event === 'SIGNED_OUT') {
+        console.warn('User signed out, attempting to save unsaved changes before clearing');
+        try {
+          await this.manualSave();
+        } catch (error) {
+          console.error('Failed to save on sign-out:', error);
+        }
+        this.clearChanges();
+      }
+    });
+  }
+
+  /**
+   * Set up beforeunload handler for unsaved changes warning
+   */
+  setupBeforeUnloadHandler(): void {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (this.hasUnsavedChanges()) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Stay on page to save, or leave to lose changes.';
+      }
+    };
+
+    this.beforeUnloadHandler = handler;
+    window.addEventListener('beforeunload', handler);
+  }
+
+  /**
+   * Remove beforeunload handler
+   */
+  removeBeforeUnloadHandler(): void {
+    if (this.beforeUnloadHandler) {
+      window.removeEventListener('beforeunload', this.beforeUnloadHandler);
+      this.beforeUnloadHandler = null;
     }
   }
 

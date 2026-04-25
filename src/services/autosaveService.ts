@@ -5,15 +5,19 @@ import { useBackgroundStore } from '@/stores/backgroundStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useCloudStore } from '@/stores/cloudStore';
 import { documentMutationService, type SyncStatus } from './DocumentMutationService';
+import { r2UploadService } from './R2UploadService';
 
-export type AutosaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+export type AutosaveStatus = 'idle' | 'local-saving' | 'cloud-syncing' | 'saved' | 'error';
 export type { SyncStatus };
 
 interface AutosaveState {
   status: AutosaveStatus;
   lastSavedTime: Date | null;
+  lastLocalSave: Date | null;
+  lastCloudSync: Date | null;
   pendingChanges: boolean;
   errorMessage: string | null;
+  pendingCloudSyncs: number;
 }
 
 interface AutosaveQueue {
@@ -35,6 +39,7 @@ class AutosaveService {
   private readonly DEBOUNCE_DELAY = 5000; // 5 seconds (increased from 2s to reduce writes)
   private readonly AUTOSAVE_INTERVAL = 30000; // 30 seconds (increased from 15s to reduce sync frequency)
   private readonly MANUAL_SAVE_INTERVAL = 10000; // 10 seconds for manual saves
+  private readonly LOCAL_STORAGE_KEY = 'kanvas_autosave';
 
   static getInstance(): AutosaveService {
     if (!AutosaveService.instance) {
@@ -47,8 +52,11 @@ class AutosaveService {
     this.state = {
       status: 'idle',
       lastSavedTime: null,
+      lastLocalSave: null,
+      lastCloudSync: null,
       pendingChanges: false,
       errorMessage: null,
+      pendingCloudSyncs: 0,
     };
     this.queue = {
       assets: false,
@@ -58,7 +66,8 @@ class AutosaveService {
 
     this.setupStoreSubscriptions();
     this.setupVisibilityHandlers();
-    this.startPeriodicAutosave();
+    // NOTE: Periodic autosave NOT started automatically to prevent idle DB requests
+    // It will be started when there are pending changes
   }
 
   private setupStoreSubscriptions(): void {
@@ -136,48 +145,56 @@ class AutosaveService {
     this.debounceTimer = window.setTimeout(() => {
       this.performAutosave();
     }, this.DEBOUNCE_DELAY);
+
+    // Start periodic autosave when there are pending changes
+    if (!this.autosaveTimer && this.state.pendingChanges) {
+      this.startPeriodicAutosave();
+    }
   }
 
-  // Cloud-first autosave with smart queuing
+  // Cloud-first autosave with smart queuing and local backup
   private async performAutosave(): Promise<void> {
-    const { isAuthenticated } = useAuthStore.getState();
+    const { isAuthenticated, user } = useAuthStore.getState();
     const { isOnline } = useCloudStore.getState();
+    const { currentBookId } = useBookStore.getState();
     
     this.updateState({ 
-      status: 'saving', 
+      status: 'local-saving', 
       errorMessage: null 
     });
 
     try {
-      console.log('[AutosaveService] Starting cloud-first autosave cycle');
-      
-      // CRITICAL FIX: Mark all current assets as changed before syncing
-      // This ensures manual saves actually save assets
-      if (this.queue.assets || this.queue.worldData) {
-        const assetStore = useAssetStore.getState();
-        const currentBookId = assetStore.getCurrentBookId();
-        if (currentBookId) {
-          const bookAssets = assetStore.bookAssets[currentBookId] || {};
-          Object.values(bookAssets).forEach((asset: any) => {
-            documentMutationService.markAssetChanged(asset.id, asset);
-          });
-          console.log(`[AutosaveService] Marked ${Object.keys(bookAssets).length} assets as changed`);
-        }
+      console.log('[AutosaveService] Starting autosave cycle');
+
+      // Step 1: Always save to localStorage first (instant backup)
+      if (isAuthenticated && user) {
+        await this.performLocalSave(user.id, currentBookId);
       }
-      
-      // For authenticated users: prioritize cloud sync
+
+      // Step 2: Cloud sync for authenticated users
       if (isAuthenticated) {
+        this.updateState({ status: 'cloud-syncing' });
+        
         if (isOnline) {
           console.log('[AutosaveService] User authenticated and online, syncing to cloud');
+          
+          // Sync via DocumentMutationService
           const cloudSyncSuccess = await documentMutationService.syncNow();
+          
+          // Upload pending assets to R2
+          if (currentBookId) {
+            await this.syncPendingAssets(currentBookId);
+          }
           
           if (cloudSyncSuccess) {
             console.log('[AutosaveService] Cloud sync successful');
             this.updateState({
               status: 'saved',
               lastSavedTime: new Date(),
+              lastCloudSync: new Date(),
               pendingChanges: false,
               errorMessage: null,
+              pendingCloudSyncs: 0,
             });
             // Clear queue only after successful sync
             this.queue = {
@@ -185,6 +202,10 @@ class AutosaveService {
               backgrounds: false,
               worldData: false,
             };
+            // Stop periodic autosave when no pending changes
+            if (!this.state.pendingChanges) {
+              this.stopPeriodicAutosave();
+            }
           } else {
             console.log('[AutosaveService] Cloud sync failed, data queued for retry');
             this.updateState({
@@ -196,7 +217,7 @@ class AutosaveService {
             // Don't clear queue on failure - keep for retry
           }
         } else {
-          console.log('[AutosaveService] User authenticated but offline, data queued');
+          console.log('[AutosaveService] User authenticated but offline, local save only');
           this.updateState({
             status: 'saved',
             lastSavedTime: new Date(),
@@ -219,6 +240,10 @@ class AutosaveService {
           backgrounds: false,
           worldData: false,
         };
+        // Stop periodic autosave when no pending changes
+        if (!this.state.pendingChanges) {
+          this.stopPeriodicAutosave();
+        }
       }
 
       console.log('[AutosaveService] Autosave completed successfully');
@@ -319,10 +344,17 @@ class AutosaveService {
     await documentMutationService.syncNow();
   }
 
-  private startPeriodicAutosave(): void {
+  public startPeriodicAutosave(): void {
+    if (this.autosaveTimer) return; // Already running
     this.autosaveTimer = window.setInterval(() => {
       this.performPeriodicAutosave();
     }, this.AUTOSAVE_INTERVAL);
+  }
+
+  // Alias for backward compatibility with useAutosave hook
+  public startAutosave(): void {
+    // NOTE: This is a no-op now - periodic autosave starts automatically when there are pending changes
+    console.log('[AutosaveService] startAutosave called - periodic autosave now auto-starts on pending changes');
   }
 
   private async performPeriodicAutosave(): Promise<void> {
@@ -375,10 +407,13 @@ class AutosaveService {
 
   // Get save status for UI display
   getSaveStatus(): {
-    status: 'idle' | 'saving' | 'saved' | 'error';
+    status: 'idle' | 'local-saving' | 'cloud-syncing' | 'saved' | 'error';
     lastSavedTime: Date | null;
+    lastLocalSave: Date | null;
+    lastCloudSync: Date | null;
     errorMessage: string | null;
     pendingChanges: boolean;
+    pendingCloudSyncs: number;
     isOnline: boolean;
     isAuthenticated: boolean;
   } {
@@ -406,6 +441,151 @@ class AutosaveService {
     } catch {
       return false;
     }
+  }
+
+  // Local storage backup (from localAutosaveService)
+  private async performLocalSave(userId: string, projectId?: string): Promise<void> {
+    try {
+      const assetStore = useAssetStore.getState();
+      const backgroundStore = useBackgroundStore.getState();
+      const bookStore = useBookStore.getState();
+
+      const userData = {
+        userId,
+        projectId,
+        assets: assetStore.bookAssets[projectId || ''] || {},
+        backgrounds: backgroundStore.configs,
+        worldData: {
+          globalCustomFields: assetStore.bookGlobalCustomFields[projectId || ''] || [],
+          currentBook: bookStore.currentBookId,
+        },
+        screenPositions: this.extractScreenPositions(assetStore.bookAssets[projectId || ''] || {}),
+        lastLocalSave: new Date().toISOString(),
+        lastCloudSync: this.state.lastCloudSync?.toISOString(),
+      };
+
+      await this.saveToLocalStorage(userData);
+      
+      this.updateState({ 
+        lastLocalSave: new Date(),
+      });
+
+      console.log('[AutosaveService] Local save completed');
+    } catch (error) {
+      console.error('[AutosaveService] Local save failed:', error);
+      throw error;
+    }
+  }
+
+  private async saveToLocalStorage(userData: any): Promise<void> {
+    try {
+      const storageData = localStorage.getItem(this.LOCAL_STORAGE_KEY);
+      const allData: Record<string, any> = storageData ? JSON.parse(storageData) : {};
+      
+      const userKey = `${userData.userId}_${userData.projectId || 'default'}`;
+      allData[userKey] = userData;
+
+      localStorage.setItem(this.LOCAL_STORAGE_KEY, JSON.stringify(allData));
+    } catch (error) {
+      console.error('[AutosaveService] LocalStorage write failed:', error);
+      // Don't throw - local save failure shouldn't block cloud sync
+    }
+  }
+
+  // Load user data from localStorage on startup
+  async loadUserData(userId: string, projectId?: string): Promise<any | null> {
+    try {
+      const storageData = localStorage.getItem(this.LOCAL_STORAGE_KEY);
+      if (!storageData) return null;
+
+      const allData: Record<string, any> = JSON.parse(storageData);
+      const userKey = `${userId}_${projectId || 'default'}`;
+      
+      return allData[userKey] || null;
+    } catch (error) {
+      console.error('[AutosaveService] Failed to load user data:', error);
+      return null;
+    }
+  }
+
+  // R2 asset sync (from hybridAutosaveService)
+  private async syncPendingAssets(projectId: string): Promise<void> {
+    const assetStore = useAssetStore.getState();
+    const pendingUploads = this.getPendingUploads(assetStore.bookAssets[projectId] || {});
+    
+    if (pendingUploads.length > 0) {
+      console.log(`[AutosaveService] Syncing ${pendingUploads.length} assets to R2`);
+      this.updateState({ pendingCloudSyncs: pendingUploads.length });
+      
+      for (const assetId of pendingUploads) {
+        const asset = assetStore.bookAssets[projectId]?.[assetId];
+        if (asset.file && asset.cloudStatus !== 'synced') {
+          try {
+            await this.uploadAssetToCloud(asset, projectId);
+          } catch (error) {
+            console.error(`[AutosaveService] Failed to upload asset ${assetId}:`, error);
+          }
+        }
+      }
+    }
+  }
+
+  private async uploadAssetToCloud(asset: any, projectId: string): Promise<void> {
+    if (!asset.file) return;
+
+    try {
+      const result = await r2UploadService.uploadWithVariants(
+        asset.file,
+        asset.id,
+        projectId,
+        {
+          generateThumbnail: true,
+          generatePreview: true
+        },
+        (stage, progress) => {
+          console.log(`[AutosaveService] Asset ${asset.id} ${stage}: ${progress.percentage}%`);
+        }
+      );
+      
+      if (result.success) {
+        const assetStore = useAssetStore.getState();
+        assetStore.updateAsset(asset.id, {
+          cloudStatus: 'synced',
+          cloudPath: result.r2Key,
+          cloudSize: asset.file.size,
+          cloudUpdatedAt: new Date().toISOString(),
+          cloudError: undefined
+        });
+        
+        console.log(`[AutosaveService] Asset ${asset.id} uploaded to cloud: ${result.r2Key}`);
+      } else {
+        throw new Error(result.error || 'Upload failed');
+      }
+    } catch (error) {
+      console.error(`[AutosaveService] Asset upload failed: ${error.message}`);
+      throw error;
+    }
+  }
+
+  private getPendingUploads(assets: Record<string, any>): string[] {
+    return Object.values(assets)
+      .filter(asset => asset.file && asset.cloudStatus !== 'synced')
+      .map(asset => asset.id);
+  }
+
+  private extractScreenPositions(assets: Record<string, any>): Record<string, { x: number; y: number; width: number; height: number }> {
+    const positions: Record<string, { x: number; y: number; width: number; height: number }> = {};
+    
+    Object.values(assets).forEach((asset: any) => {
+      positions[asset.id] = {
+        x: asset.x || 0,
+        y: asset.y || 0,
+        width: asset.width || 200,
+        height: asset.height || 150,
+      };
+    });
+    
+    return positions;
   }
 }
 

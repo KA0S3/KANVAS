@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { localAutosaveService } from '@/services/localAutosaveService';
+import { autosaveService } from '@/services/autosaveService';
 import { useAuthStore } from '@/stores/authStore';
 import { useBookStore } from '@/stores/bookStoreSimple';
 
@@ -8,35 +8,29 @@ export function useLocalAutosave() {
   const { currentBookId } = useBookStore();
 
   useEffect(() => {
-    // Start autosave when user is authenticated
+    // Load existing data on mount
     if (isAuthenticated && user) {
-      console.log('[useLocalAutosave] Starting local autosave for user:', user.id);
+      console.log('[useLocalAutosave] Loading data for user:', user.id);
       
-      // Load existing data first
-      localAutosaveService.loadUserData(user.id, currentBookId).then((savedData) => {
+      autosaveService.loadUserData(user.id, currentBookId).then((savedData) => {
         if (savedData) {
-          console.log('[useLocalAutosave] Loaded saved data from:', savedData.lastSaved);
-          // Restore the saved data to your stores here
+          console.log('[useLocalAutosave] Loaded saved data from:', savedData.lastLocalSave);
+          // Restore the saved data to your stores here if needed
           // This would need to be implemented based on your store structure
         }
       });
-
-      // Start the autosave cycles
-      localAutosaveService.startAutosave();
     }
 
-    // Stop autosave when user logs out
-    return () => {
-      localAutosaveService.stopAutosave();
-    };
+    // NOTE: autosaveService automatically handles subscriptions and debouncing
+    // No need to start/stop - it runs on-demand when there are pending changes
   }, [isAuthenticated, user, currentBookId]);
 
   const triggerManualSave = () => {
-    return localAutosaveService.triggerManualSave();
+    return autosaveService.triggerManualSave();
   };
 
   const getStatus = () => {
-    return localAutosaveService.getStatus();
+    return autosaveService.getState().status;
   };
 
   return {

@@ -12,7 +12,7 @@
 
 import { supabase } from '@/lib/supabase';
 import type { Asset } from '@/components/AssetItem';
-import { startAutoSave, setCurrentProjectVersion } from './changeTrackingService';
+import { documentMutationService } from './DocumentMutationService';
 
 // =====================================================
 // TYPE DEFINITIONS
@@ -137,7 +137,7 @@ export async function loadProject(currentProjectId: string): Promise<{ project: 
   const project = projectData[0];
 
   // Store version for conflict detection
-  setCurrentProjectVersion(project.last_version || 0);
+  documentMutationService.setCurrentProjectVersion(project.last_version || 0);
 
   // CRITICAL FIX: Use asset_count from load_project to avoid redundant query
   const assetCount = project.asset_count || 0;
@@ -170,7 +170,7 @@ export async function loadProject(currentProjectId: string): Promise<{ project: 
   const assetTree = buildAssetTree(assets);
 
   // Start auto-save
-  startAutoSave(currentProjectId);
+  documentMutationService.startAutoSave(currentProjectId);
 
   return {
     project,

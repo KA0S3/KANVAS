@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
 import { RotateCw, Check, AlertCircle, Cloud, HardDrive } from 'lucide-react';
-import { hybridAutosaveService, type HybridAutosaveStatus } from '@/services/hybridAutosaveService';
+import { autosaveService, type AutosaveStatus } from '@/services/autosaveService';
 
 export function HybridAutosaveIndicator() {
-  const [status, setStatus] = useState<HybridAutosaveStatus>('idle');
+  const [status, setStatus] = useState<AutosaveStatus>('idle');
   const [lastLocalSave, setLastLocalSave] = useState<Date | null>(null);
   const [lastCloudSync, setLastCloudSync] = useState<Date | null>(null);
   const [pendingSyncs, setPendingSyncs] = useState(0);
 
   useEffect(() => {
-    const unsubscribe = hybridAutosaveService.subscribe((state) => {
+    const unsubscribe = autosaveService.subscribe((state) => {
       setStatus(state.status);
       setLastLocalSave(state.lastLocalSave);
       setLastCloudSync(state.lastCloudSync);

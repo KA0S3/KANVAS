@@ -1,44 +1,36 @@
 import { useEffect } from 'react';
-import { hybridAutosaveService } from '@/services/hybridAutosaveService';
+import { autosaveService } from '@/services/autosaveService';
 import { useAuthStore } from '@/stores/authStore';
 import { useBookStore } from '@/stores/bookStoreSimple';
-import { useAssetStore } from '@/stores/assetStore';
 
 export function useHybridAutosave() {
   const { user, isAuthenticated } = useAuthStore();
   const { currentBookId } = useBookStore();
-  const { assets } = useAssetStore();
 
   useEffect(() => {
-    // Start autosave when user is authenticated
+    // Load existing data on mount
     if (isAuthenticated && user) {
-      console.log('[useHybridAutosave] Starting hybrid autosave for user:', user.id);
+      console.log('[useHybridAutosave] Loading data for user:', user.id);
       
-      // Load existing data first (local + cloud)
-      hybridAutosaveService.loadUserData(user.id, currentBookId).then((savedData) => {
+      autosaveService.loadUserData(user.id, currentBookId).then((savedData) => {
         if (savedData) {
           console.log('[useHybridAutosave] Data loaded, restoring UI state');
-          // TODO: Restore the saved data to your stores here
+          // TODO: Restore the saved data to your stores here if needed
           // This would need to be implemented based on your store structure
         }
       });
-
-      // Start the hybrid autosave cycles
-      hybridAutosaveService.startAutosave();
     }
 
-    // Stop autosave when user logs out
-    return () => {
-      hybridAutosaveService.stopAutosave();
-    };
+    // NOTE: autosaveService automatically handles subscriptions and debouncing
+    // It performs local save + cloud sync (hybrid) in a single service
   }, [isAuthenticated, user, currentBookId]);
 
   const triggerManualSave = () => {
-    return hybridAutosaveService.triggerManualSave();
+    return autosaveService.triggerManualSave();
   };
 
   const getStatus = () => {
-    return hybridAutosaveService.getStatus();
+    return autosaveService.getState().status;
   };
 
   return {

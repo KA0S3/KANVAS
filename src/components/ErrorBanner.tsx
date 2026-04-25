@@ -7,7 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { AlertCircle, RefreshCw, X } from 'lucide-react';
-import { setOnErrorCallback, manualSave } from '@/services/changeTrackingService';
+import { documentMutationService } from '@/services/DocumentMutationService';
 import { Button } from '@/components/ui/button';
 
 export function ErrorBanner() {
@@ -15,19 +15,19 @@ export function ErrorBanner() {
 
   useEffect(() => {
     // Subscribe to save errors
-    setOnErrorCallback((err) => {
+    documentMutationService.setOnErrorCallback((err) => {
       setError(err);
     });
 
     // Cleanup: reset error callback on unmount
     return () => {
-      setOnErrorCallback(null);
+      documentMutationService.setOnErrorCallback(null);
     };
   }, []);
 
   const handleRetry = async () => {
     try {
-      await manualSave();
+      await documentMutationService.manualSave();
       setError(null);
     } catch (e) {
       // Error persists, banner stays visible

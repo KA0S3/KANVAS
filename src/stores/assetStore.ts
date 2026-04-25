@@ -5,9 +5,7 @@ import type { CustomField, CustomFieldValue, GlobalCustomField, ViewportDisplayS
 import { DEFAULT_VIEWPORT_DISPLAY_SETTINGS } from '@/types/extendedAsset';
 import { useBookStore } from './bookStoreSimple';
 import { supabase } from '@/lib/supabase';
-import { v4 as uuidv4 } from 'uuid';
 import { documentMutationService } from '@/services/DocumentMutationService';
-import { markPositionChanged, markAssetChanged } from '@/services/changeTrackingService';
 
 interface AssetStore {
   // Book-scoped asset registry for isolation
@@ -166,7 +164,7 @@ export const useAssetStore = create<AssetStore>()(
       });
 
       // Phase 3 Integration: Track metadata changes (MASTER_PLAN.md state-based tracking)
-      markAssetChanged(id, newAsset);
+      documentMutationService.markAssetChanged(id, newAsset);
 
       return id;
     } catch (error) {
@@ -221,7 +219,7 @@ export const useAssetStore = create<AssetStore>()(
 
     // Phase 3 Integration: Track metadata changes (MASTER_PLAN.md state-based tracking)
     const updatedAsset = { ...asset, parentId: newParentId };
-    markAssetChanged(assetId, updatedAsset);
+    documentMutationService.markAssetChanged(assetId, updatedAsset);
   },
 
   // Update asset position (fast - no mutation queueing, for drag operations)
@@ -248,7 +246,7 @@ export const useAssetStore = create<AssetStore>()(
     });
 
     // Phase 3 Integration: Track position changes for hot updates
-    markPositionChanged(assetId, x, y, 0);
+    documentMutationService.markPositionChanged(assetId, x, y, 0);
   },
 
   // Update asset position
@@ -321,7 +319,7 @@ export const useAssetStore = create<AssetStore>()(
       if (!asset) return;
 
       // Phase 3 Integration: Track metadata changes
-      markAssetChanged(assetId, asset);
+      documentMutationService.markAssetChanged(assetId, asset);
 
       // Phase 3 Integration: Track position changes (MASTER_PLAN.md state-based tracking)
       documentMutationService.markPositionChanged(assetId, asset.x || 0, asset.y || 0, 0);
@@ -360,7 +358,7 @@ export const useAssetStore = create<AssetStore>()(
       const bookAssets = state.bookAssets[bookId] || {};
       const asset = bookAssets[assetId];
       if (asset) {
-        markAssetChanged(assetId, asset);
+        documentMutationService.markAssetChanged(assetId, asset);
       }
     }
 

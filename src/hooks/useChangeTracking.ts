@@ -1,21 +1,15 @@
 /**
  * Change Tracking Hook - Phase 3/4 Integration
- * 
- * Integrates the change tracking service with the asset store
+ *
+ * Integrates DocumentMutationService with the asset store
  * Provides automatic change tracking for asset mutations
+ *
+ * CRITICAL: Unified to use DocumentMutationService to avoid duplicate tracking systems
  */
 
 import { useEffect } from 'react';
 import { useAssetStore } from '@/stores/assetStore';
-import {
-  markAssetChanged,
-  markPositionChanged,
-  startAutoSave,
-  stopAutoSave,
-  setCurrentProjectVersion,
-  hasUnsavedChanges,
-  manualSave
-} from '@/services/changeTrackingService';
+import { documentMutationService } from '@/services/DocumentMutationService';
 
 /**
  * Hook to integrate change tracking with asset store
@@ -26,22 +20,22 @@ export function useChangeTracking(projectId: string | null) {
 
   useEffect(() => {
     if (!projectId) {
-      stopAutoSave();
+      // Project unloaded - DocumentMutationService handles cleanup
       return;
     }
 
     // Start auto-save when project is loaded
-    startAutoSave(projectId);
+    documentMutationService.startAutoSave(projectId);
 
     return () => {
-      stopAutoSave();
+      // DocumentMutationService handles cleanup automatically
     };
   }, [projectId]);
 
   return {
-    hasUnsavedChanges,
-    manualSave,
-    setCurrentProjectVersion
+    hasUnsavedChanges: () => documentMutationService.hasUnsavedChanges(),
+    manualSave: () => documentMutationService.manualSave(),
+    setCurrentProjectVersion: (version: number) => documentMutationService.setCurrentProjectVersion(version)
   };
 }
 
@@ -53,12 +47,11 @@ export function usePositionTracking() {
   const { bookAssets } = useAssetStore();
 
   const trackPositionChange = (assetId: string, x: number, y: number, zIndex: number = 0) => {
-    markPositionChanged(assetId, x, y, zIndex);
+    documentMutationService.markPositionChanged(assetId, x, y, zIndex);
   };
 
   const flushPositionChanges = async () => {
-    const { onDragEnd } = await import('@/services/changeTrackingService');
-    await onDragEnd();
+    await documentMutationService.syncNow();
   };
 
   return {
@@ -78,7 +71,7 @@ export function useMetadataTracking() {
     const assets = getCurrentBookAssets();
     const asset = assets[assetId];
     if (asset) {
-      markAssetChanged(assetId, asset);
+      documentMutationService.markAssetChanged(assetId, asset);
     }
   };
 
@@ -99,8 +92,9 @@ export function useTypingTracking() {
     const asset = assets[assetId];
     if (!asset) return;
 
-    const { onTyping } = require('@/services/changeTrackingService');
-    onTyping(assetId, newValue, (id: string) => assets[id] || null);
+    // Update the asset content and mark as changed
+    const updatedAsset = { ...asset, content: newValue };
+    documentMutationService.markAssetChanged(assetId, updatedAsset);
   };
 
   return {

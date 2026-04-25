@@ -8,7 +8,7 @@
 import { useCallback } from 'react';
 import { useAssetStore } from '@/stores/assetStore';
 import { loadProject as loadProjectService, clearLoadedNodesCache } from '@/services/assetLoadService';
-import { setCurrentProjectVersion, startAutoSave } from '@/services/changeTrackingService';
+import { documentMutationService } from '@/services/DocumentMutationService';
 import type { DbProject } from '@/services/assetLoadService';
 
 interface LoadProjectResult {

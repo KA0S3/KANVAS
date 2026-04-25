@@ -51,8 +51,10 @@ export function AutosaveIndicator({ className = '', compact = false }: AutosaveI
 
   const getStatusIcon = () => {
     switch (status) {
-      case 'saving':
-        return <Loader2 className="w-4 h-4 animate-spin" />;
+      case 'local-saving':
+        return <Loader2 className="w-4 h-4 animate-spin text-blue-500" />;
+      case 'cloud-syncing':
+        return <Loader2 className="w-4 h-4 animate-spin text-green-500" />;
       case 'saved':
         return <CheckCircle className="w-4 h-4 text-green-500" />;
       case 'error':
@@ -66,8 +68,10 @@ export function AutosaveIndicator({ className = '', compact = false }: AutosaveI
     if (!isAuthenticated) return 'Sign in to save';
     
     switch (status) {
-      case 'saving':
-        return 'Saving...';
+      case 'local-saving':
+        return 'Saving locally...';
+      case 'cloud-syncing':
+        return 'Syncing to cloud...';
       case 'saved':
         return 'Saved';
       case 'error':
@@ -79,8 +83,10 @@ export function AutosaveIndicator({ className = '', compact = false }: AutosaveI
 
   const getStatusColor = () => {
     switch (status) {
-      case 'saving':
+      case 'local-saving':
         return 'text-blue-500';
+      case 'cloud-syncing':
+        return 'text-green-500';
       case 'saved':
         return 'text-green-500';
       case 'error':
@@ -137,7 +143,7 @@ export function AutosaveIndicator({ className = '', compact = false }: AutosaveI
         size="sm"
         onClick={handleManualSave}
         className={`flex items-center gap-2 h-auto py-1 px-2 ${getStatusColor()}`}
-        disabled={status === 'saving'}
+        disabled={status === 'local-saving' || status === 'cloud-syncing'}
       >
         {getStatusIcon()}
         <span className="text-xs">{getStatusText()}</span>

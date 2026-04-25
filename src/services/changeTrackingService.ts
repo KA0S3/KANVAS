@@ -208,29 +208,31 @@ async function saveChanges(): Promise<void> {
 export function startAutoSave(currentProjectId: string): void {
   projectId = currentProjectId;
 
-  if (autoSaveTimer) {
-    clearInterval(autoSaveTimer);
-  }
+  // NOTE: Auto-save polling removed to prevent idle DB requests
+  // Changes are now saved via autosaveService which only runs when there are pending changes
+  // if (autoSaveTimer) {
+  //   clearInterval(autoSaveTimer);
+  // }
 
-  autoSaveTimer = setInterval(async () => {
-    // Check if there are changes to save
-    const totalChanges = Object.keys(changedAssets).length + Object.keys(changedPositions).length;
-    if (totalChanges > 0) {
-      // Log warning if batch cap exceeded
-      if (totalChanges >= MAX_BATCH_SIZE) {
-        console.warn(`Batch size exceeded (${totalChanges}), flushing early`);
-      }
-      try {
-        await saveChanges();
-      } catch (error) {
-        console.error('Auto-save failed:', error);
-        // CRITICAL FIX: Notify UI of persistent save failure
-        if (onSaveError) {
-          onSaveError(error as Error);
-        }
-      }
-    }
-  }, AUTO_SAVE_MS);
+  // autoSaveTimer = setInterval(async () => {
+  //   // Check if there are changes to save
+  //   const totalChanges = Object.keys(changedAssets).length + Object.keys(changedPositions).length;
+  //   if (totalChanges > 0) {
+  //     // Log warning if batch cap exceeded
+  //     if (totalChanges >= MAX_BATCH_SIZE) {
+  //       console.warn(`Batch size exceeded (${totalChanges}), flushing early`);
+  //     }
+  //     try {
+  //       await saveChanges();
+  //     } catch (error) {
+  //       console.error('Auto-save failed:', error);
+  //       // CRITICAL FIX: Notify UI of persistent save failure
+  //       if (onSaveError) {
+  //         onSaveError(error as Error);
+  //       }
+  //     }
+  //   }
+  // }, AUTO_SAVE_MS);
 }
 
 /**

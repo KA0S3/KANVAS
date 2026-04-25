@@ -52,6 +52,7 @@ export interface Asset {
   cloudUpdatedAt?: string;
   cloudError?: string;
   deletedAt?: string; // For soft delete tracking (Phase 1 schema)
+  file?: File; // File object for cloud upload
 }
 
 interface AssetItemProps {

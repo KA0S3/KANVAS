@@ -54,14 +54,14 @@ export function AssetPortFixed({ assetId, viewportSize, className }: AssetPortPr
 
   // Check storage usage periodically
   useEffect(() => {
-    const checkInterval = setInterval(() => {
-      StorageCleanup.checkAndCleanup();
-    }, 30000); // Check every 30 seconds
-
-    // Initial check
+    // Initial check only - no polling to prevent idle CPU usage
     StorageCleanup.checkAndCleanup();
 
-    return () => clearInterval(checkInterval);
+    // NOTE: Polling removed - storage cleanup will run on component mount
+    // const checkInterval = setInterval(() => {
+    //   StorageCleanup.checkAndCleanup();
+    // }, 30000); // Check every 30 seconds
+    // return () => clearInterval(checkInterval);
   }, []);
 
   const currentAsset = assets[assetId];

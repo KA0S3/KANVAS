@@ -66,9 +66,11 @@ export function BackgroundControlsEnhanced({ assetId, onSave, onToggleSidebar }:
     };
     
     updateStorageInfo();
-    const interval = setInterval(updateStorageInfo, 5000); // Update every 5 seconds
+    // NOTE: Polling removed to prevent idle DB requests
+    // Storage info will update when component re-renders or on user interaction
+    // const interval = setInterval(updateStorageInfo, 5000); // Update every 5 seconds
     
-    return () => clearInterval(interval);
+    // return () => clearInterval(interval);
   }, [getStorageInfo]);
 
   // Initialize local config when background config changes

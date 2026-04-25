@@ -29,9 +29,11 @@ export function PerformanceMonitor() {
     };
 
     updateStats();
-    const interval = setInterval(updateStats, 2000); // Update every 2 seconds
+    // NOTE: Polling removed to prevent idle CPU usage
+    // Stats will update when user clicks "Reset Metrics" or component re-renders
+    // const interval = setInterval(updateStats, 2000); // Update every 2 seconds
 
-    return () => clearInterval(interval);
+    // return () => clearInterval(interval);
   }, []);
 
   const formatBytes = (bytes: number) => {

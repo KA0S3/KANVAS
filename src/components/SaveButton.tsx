@@ -7,7 +7,8 @@
 
 import { useState, useEffect } from 'react';
 import { Save } from 'lucide-react';
-import { hasUnsavedChanges, manualSave } from '@/services/changeTrackingService';
+import { documentMutationService } from '@/services/DocumentMutationService';
+import { autosaveService } from '@/services/autosaveService';
 import { Button } from '@/components/ui/button';
 
 export function SaveButton() {
@@ -15,20 +16,21 @@ export function SaveButton() {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    const checkUnsaved = () => {
-      // CRITICAL FIX: Check both changedAssets AND changedPositions
-      // Position-only changes should also trigger unsaved indicator
-      setHasUnsaved(hasUnsavedChanges());
-    };
+    // Subscribe to autosave service for reactive updates instead of polling
+    const unsubscribe = autosaveService.subscribe((state) => {
+      setHasUnsaved(state.pendingChanges);
+    });
 
-    const interval = setInterval(checkUnsaved, 1000);
-    return () => clearInterval(interval);
+    // Initial check
+    setHasUnsaved(documentMutationService.hasUnsavedChanges());
+
+    return () => unsubscribe();
   }, []);
 
   const handleManualSave = async () => {
     setIsSaving(true);
     try {
-      await manualSave();
+      await documentMutationService.manualSave();
     } catch (error) {
       console.error('Manual save failed:', error);
     } finally {

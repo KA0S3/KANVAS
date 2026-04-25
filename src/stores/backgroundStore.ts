@@ -4,6 +4,7 @@ import type { BackgroundConfig, BackgroundStore } from '@/types/background';
 import { DEFAULT_BACKGROUND_CONFIG, getAssetKey } from '@/types/background';
 import { getBackground as getBackgroundFromStorage, setBackground as setBackgroundToStorage, loadAllBackgrounds, loadAllBackgroundsAsync } from '@/utils/backgroundStorage';
 import { documentMutationService } from '@/services/DocumentMutationService';
+import { useAssetStore } from '@/stores/assetStore';
 
 const storeInitTime = Date.now();
 console.log('[BackgroundStore] ============================================');
@@ -106,6 +107,21 @@ export const useBackgroundStore = create<BackgroundStore>()(
               };
               if (documentMutationService.getCurrentProjectId()) {
                 documentMutationService.saveGlobalBackgrounds(updatedConfigs);
+                
+                // Also mark the asset as changed so the background gets saved to backgroundConfig
+                // Extract the actual asset ID from the key (remove "asset:" prefix if present)
+                const actualAssetId = key.startsWith('asset:') ? key.substring(6) : assetId;
+                const assetStore = useAssetStore.getState();
+                const asset = assetStore.getAssetById(actualAssetId);
+                if (asset) {
+                  // Update the asset's backgroundConfig field
+                  const updatedAsset = {
+                    ...asset,
+                    backgroundConfig: clonedConfig
+                  };
+                  documentMutationService.markAssetChanged(actualAssetId, updatedAsset);
+                  console.log(`[BackgroundStore] Marked asset ${actualAssetId} as changed with backgroundConfig`);
+                }
               } else {
                 console.log('[BackgroundStore] Background saved locally - will sync when book is entered');
               }

@@ -230,24 +230,6 @@ export const updateQuotaBasedOnPlan = () => {
   }
 };
 
-// Initialize connectivity detection
-if (typeof window !== 'undefined') {
-  const handleOnline = () => {
-    console.log('[cloudStore] Network connection restored');
-    useCloudStore.getState().setOnlineStatus(true);
-  };
-
-  const handleOffline = () => {
-    console.log('[cloudStore] Network connection lost');
-    useCloudStore.getState().setOnlineStatus(false);
-  };
-
-  window.addEventListener('online', handleOnline);
-  window.addEventListener('offline', handleOffline);
-
-  // Cleanup event listeners on page unload to prevent memory leaks
-  window.addEventListener('beforeunload', () => {
-    window.removeEventListener('online', handleOnline);
-    window.removeEventListener('offline', handleOffline);
-  });
-}
+// CRITICAL FIX: Removed duplicate online/offline event listeners
+// connectivityService already handles these events to avoid duplicate handlers
+// This reduces memory usage and prevents redundant state updates

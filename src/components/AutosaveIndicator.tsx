@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react';
-import { RotateCw, Check, AlertCircle } from 'lucide-react';
-import { localAutosaveService, type LocalAutosaveStatus } from '@/services/localAutosaveService';
+import { RotateCw, Check, AlertCircle, HardDrive, Cloud } from 'lucide-react';
+import { autosaveService, type AutosaveStatus } from '@/services/autosaveService';
 
 export function AutosaveIndicator() {
-  const [status, setStatus] = useState<LocalAutosaveStatus>('idle');
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [saveCount, setSaveCount] = useState(0);
+  const [status, setStatus] = useState<AutosaveStatus>('idle');
+  const [lastLocalSave, setLastLocalSave] = useState<Date | null>(null);
+  const [lastCloudSync, setLastCloudSync] = useState<Date | null>(null);
 
   useEffect(() => {
-    const unsubscribe = localAutosaveService.subscribe((state) => {
+    const unsubscribe = autosaveService.subscribe((state) => {
       setStatus(state.status);
-      setLastSaved(state.lastSavedTime);
-      setSaveCount(state.saveCount);
+      setLastLocalSave(state.lastLocalSave);
+      setLastCloudSync(state.lastCloudSync);
     });
 
     return unsubscribe;
@@ -19,8 +19,10 @@ export function AutosaveIndicator() {
 
   const getStatusIcon = () => {
     switch (status) {
-      case 'saving':
-        return <RotateCw className="w-4 h-4 animate-spin" />;
+      case 'local-saving':
+        return <HardDrive className="w-4 h-4 animate-spin text-blue-500" />;
+      case 'cloud-syncing':
+        return <Cloud className="w-4 h-4 animate-spin text-green-500" />;
       case 'saved':
         return <Check className="w-4 h-4 text-green-500" />;
       case 'error':
@@ -32,8 +34,10 @@ export function AutosaveIndicator() {
 
   const getStatusText = () => {
     switch (status) {
-      case 'saving':
-        return 'Saving...';
+      case 'local-saving':
+        return 'Saving locally...';
+      case 'cloud-syncing':
+        return 'Syncing to cloud...';
       case 'saved':
         return 'Saved';
       case 'error':
@@ -45,8 +49,10 @@ export function AutosaveIndicator() {
 
   const getStatusColor = () => {
     switch (status) {
-      case 'saving':
+      case 'local-saving':
         return 'text-blue-500';
+      case 'cloud-syncing':
+        return 'text-green-500';
       case 'saved':
         return 'text-green-500';
       case 'error':
@@ -60,12 +66,19 @@ export function AutosaveIndicator() {
     <div className={`flex items-center gap-2 px-3 py-1 rounded-full bg-glass/50 border border-glass-border/30 ${getStatusColor()}`}>
       {getStatusIcon()}
       <span className="text-sm font-medium">{getStatusText()}</span>
-      {lastSaved && (
-        <span className="text-xs opacity-70">
-          {saveCount > 0 && `#${saveCount} • `}
-          {lastSaved.toLocaleTimeString()}
-        </span>
-      )}
+      
+      <div className="flex items-center gap-1 text-xs opacity-70">
+        {lastLocalSave && (
+          <span title="Last local save">
+            💾 {lastLocalSave.toLocaleTimeString()}
+          </span>
+        )}
+        {lastCloudSync && (
+          <span title="Last cloud sync">
+            ☁️ {lastCloudSync.toLocaleTimeString()}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
