@@ -195,6 +195,30 @@ class AutosaveService {
         if (isOnline) {
           console.log('[AutosaveService] User authenticated and online, syncing to cloud');
           
+          // CRITICAL: Ensure project exists on server before syncing
+          if (currentBookId && documentMutationService.getCurrentProjectId() !== currentBookId) {
+            console.log('[AutosaveService] Setting project ID for sync:', currentBookId);
+            documentMutationService.setProjectId(currentBookId);
+            
+            // Try to load the document to ensure it exists
+            const loadResult = await documentMutationService.loadDocument(currentBookId);
+            if (!loadResult.success && loadResult.error === 'Project not found') {
+              console.log('[AutosaveService] Project not found, creating...');
+              const bookStore = useBookStore.getState();
+              const book = bookStore.books[currentBookId];
+              if (book) {
+                const created = await documentMutationService.createProject(
+                  currentBookId,
+                  book.title,
+                  book.coverPageSettings
+                );
+                if (created) {
+                  console.log('[AutosaveService] Created project for sync');
+                }
+              }
+            }
+          }
+          
           // Sync via DocumentMutationService
           const cloudSyncSuccess = await documentMutationService.syncNow();
           

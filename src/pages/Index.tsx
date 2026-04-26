@@ -301,10 +301,32 @@ const Index = () => {
     setBackgroundRefreshTrigger(prev => prev + 1);
   };
 
-  const handleBookSelect = (book: Book) => {
+  const handleBookSelect = async (book: Book) => {
     setCurrentBook(book.id);
     // Set project ID for DocumentMutationService so operations can sync
     documentMutationService.setProjectId(book.id);
+    
+    // Ensure project exists on server for authenticated users
+    const { isAuthenticated } = useAuthStore.getState();
+    if (isAuthenticated) {
+      try {
+        const result = await documentMutationService.loadDocument(book.id);
+        if (!result.success && result.error === 'Project not found') {
+          console.log('[Index] Book not found on server, creating project...');
+          const created = await documentMutationService.createProject(
+            book.id, 
+            book.title,
+            book.coverPageSettings
+          );
+          if (created) {
+            console.log('[Index] Created project on server for book:', book.title);
+          }
+        }
+      } catch (err) {
+        console.warn('[Index] Failed to ensure project exists:', err);
+      }
+    }
+    
     // Don't load world data here - only load when entering viewport from single view
     // Don't close library here - let user stay in book library
   };
@@ -387,10 +409,7 @@ const Index = () => {
     const newBook = allBooks.find(book => book.id === newBookId);
     
     if (newBook) {
-      // Select the new book and focus on it in single view mode
-      handleBookSelect(newBook);
-      
-      // Immediately create project on server for cloud sync
+      // Immediately create project on server for cloud sync BEFORE selecting
       const { isAuthenticated } = useAuthStore.getState();
       if (isAuthenticated) {
         console.log('[Index] Creating server project for new book:', newBook.title);
@@ -405,6 +424,10 @@ const Index = () => {
           console.warn('[Index] Failed to create server project for new book');
         }
       }
+      
+      // Select the new book and focus on it in single view mode
+      // This will set the project ID for DocumentMutationService
+      await handleBookSelect(newBook);
     }
   };
 
