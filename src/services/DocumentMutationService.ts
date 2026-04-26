@@ -355,6 +355,11 @@ class DocumentMutationService {
 
     try {
       performanceMonitor.incrementDatabaseRequests();
+      console.log('[DocumentMutation] saveGlobalBackgrounds - Sending to RPC:', {
+        p_project_id: this.currentProjectId,
+        p_backgrounds: backgrounds,
+        p_expected_version: this.currentVersion
+      });
       const { error } = await supabase.rpc('save_project', {
         p_project_id: this.currentProjectId,
         p_backgrounds: backgrounds,
@@ -363,6 +368,7 @@ class DocumentMutationService {
 
       if (error) {
         console.error('[DocumentMutation] Failed to save global backgrounds:', error);
+        console.error('[DocumentMutation] Error details:', JSON.stringify(error, null, 2));
         // If error is "Unauthorized" or version conflict, try without version check
         // This handles the case where project was just created and version is not synced
         if (error.message?.includes('Unauthorized') || error.message?.includes('Version conflict')) {
@@ -529,9 +535,9 @@ class DocumentMutationService {
 
     const positions = Object.entries(this.changedPositions).map(([asset_id, pos]) => ({
       asset_id,
-      x: pos.x,
-      y: pos.y,
-      z_index: pos.z_index
+      x: Math.round(pos.x || 0),
+      y: Math.round(pos.y || 0),
+      z_index: Math.round(pos.z_index || 0)
     }));
 
     const keysSaved = Object.keys(this.changedPositions);
@@ -590,10 +596,10 @@ class DocumentMutationService {
         parent_id: asset.parentId || null,
         name: asset.name,
         type: asset.type,
-        x: asset.x,
-        y: asset.y,
-        width: asset.width,
-        height: asset.height,
+        x: Math.round(asset.x || 0),
+        y: Math.round(asset.y || 0),
+        width: Math.round(asset.width || 0),
+        height: Math.round(asset.height || 0),
         z_index: 0,
         is_expanded: asset.isExpanded || false,
         content: asset.content || null,
@@ -607,6 +613,12 @@ class DocumentMutationService {
     keysSaved.forEach(key => delete this.changedAssets[key]);
 
     performanceMonitor.incrementDatabaseRequests();
+    console.log('[DocumentMutation] saveMetadataChanges - Sending to RPC:', {
+      p_project_id: this.currentProjectId,
+      p_assets_count: changes.length,
+      p_assets: changes,
+      p_expected_version: this.currentVersion
+    });
     const { error } = await supabase.rpc('save_assets', {
       p_project_id: this.currentProjectId,
       p_assets: changes,
@@ -615,6 +627,7 @@ class DocumentMutationService {
 
     if (error) {
       console.error('[DocumentMutation] Failed to save metadata changes:', error);
+      console.error('[DocumentMutation] Error details:', JSON.stringify(error, null, 2));
       // If error is "Unauthorized", the project might not exist yet
       // Try to create it and retry
       if (error.message?.includes('Unauthorized')) {
