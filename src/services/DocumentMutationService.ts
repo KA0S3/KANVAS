@@ -7,6 +7,7 @@ import { performanceMonitor } from '@/utils/performanceMonitor';
 import { ConflictResolver, type Conflict, type ConflictResolution, type ConflictStrategy } from './ConflictResolver';
 import type { Asset } from '@/components/AssetItem';
 import type { BackgroundConfig } from '@/types/background';
+import { compressBase64Thumbnail, isThumbnailTooLarge } from '@/utils/thumbnailCompression';
 
 // Document operation types
 export type DocumentOperation =
@@ -655,37 +656,55 @@ class DocumentMutationService {
   private async saveMetadataChanges(): Promise<void> {
     if (!this.currentProjectId || Object.keys(this.changedAssets).length === 0) return;
 
-    const changes = Object.values(this.changedAssets).map(asset => {
-      const customFieldsObj: Record<string, any> = {
-        customFields: asset.customFields || [],
-        customFieldValues: asset.customFieldValues || [],
-        tags: asset.tags || [],
-        thumbnail: asset.thumbnail || null,
-        background: asset.background || null,
-        description: asset.description || null,
-        viewportDisplaySettings: asset.viewportDisplaySettings || {}
-      };
+    // Process assets and compress thumbnails if needed
+    const processedAssets = await Promise.all(
+      Object.values(this.changedAssets).map(async (asset) => {
+        let thumbnail = asset.thumbnail || null;
+        
+        // Compress thumbnail if it's too large
+        if (thumbnail && isThumbnailTooLarge(thumbnail)) {
+          try {
+            thumbnail = await compressBase64Thumbnail(thumbnail);
+            console.log(`[DocumentMutation] Compressed thumbnail for asset ${asset.id} from ${asset.thumbnail?.length} to ${thumbnail.length} bytes`);
+          } catch (error) {
+            console.warn(`[DocumentMutation] Failed to compress thumbnail for asset ${asset.id}:`, error);
+            // Keep original thumbnail if compression fails
+          }
+        }
+        
+        const customFieldsObj: Record<string, any> = {
+          customFields: asset.customFields || [],
+          customFieldValues: asset.customFieldValues || [],
+          tags: asset.tags || [],
+          thumbnail,
+          background: asset.background || null,
+          description: asset.description || null,
+          viewportDisplaySettings: asset.viewportDisplaySettings || {}
+        };
 
-      // Migrate 'other' type to 'card' for database compatibility
-      const assetType = asset.type === 'other' ? 'card' : asset.type;
+        // Migrate 'other' type to 'card' for database compatibility
+        const assetType = asset.type === 'other' ? 'card' : asset.type;
 
-      return {
-        asset_id: asset.id,
-        parent_id: asset.parentId || null,
-        name: asset.name,
-        type: assetType,
-        x: Math.round(asset.x || 0),
-        y: Math.round(asset.y || 0),
-        width: Math.round(asset.width || 0),
-        height: Math.round(asset.height || 0),
-        z_index: 0,
-        is_expanded: asset.isExpanded || false,
-        content: asset.content || null,
-        background_config: asset.backgroundConfig || {},
-        viewport_config: asset.viewportConfig || {},
-        custom_fields: customFieldsObj
-      };
-    });
+        return {
+          asset_id: asset.id,
+          parent_id: asset.parentId || null,
+          name: asset.name,
+          type: assetType,
+          x: Math.round(asset.x || 0),
+          y: Math.round(asset.y || 0),
+          width: Math.round(asset.width || 0),
+          height: Math.round(asset.height || 0),
+          z_index: 0,
+          is_expanded: asset.isExpanded || false,
+          content: asset.content || null,
+          background_config: asset.backgroundConfig || {},
+          viewport_config: asset.viewportConfig || {},
+          custom_fields: customFieldsObj
+        };
+      })
+    );
+
+    const changes = processedAssets;
 
     performanceMonitor.incrementDatabaseRequests();
     console.log('[DocumentMutation] saveMetadataChanges - Sending to RPC:', {

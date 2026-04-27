@@ -34,6 +34,7 @@ import { calculateViewportCenterPosition, calculateChildAssetCenterPosition } fr
 import type { Asset } from '@/components/AssetItem';
 import type { CustomField, CustomFieldValue, ViewportDisplaySettings } from '@/types/extendedAsset';
 import { GeneratorParser, EXAMPLE_GENERATOR_DATA } from '@/services/generatorParser';
+import { compressImageToThumbnail } from '@/utils/thumbnailCompression';
 
 interface AssetCreationModalProps {
   isOpen: boolean;
@@ -241,15 +242,23 @@ export function AssetCreationModal({ isOpen, onClose, initialData, parentId, gen
     onClose();
   };
 
-  const handleImageUpload = (field: 'thumbnail', event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (field: 'thumbnail', event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
-        setFormData(prev => ({ ...prev, [field]: result }));
-      };
-      reader.readAsDataURL(file);
+      try {
+        // Compress the image to meet database size constraints
+        const compressedThumbnail = await compressImageToThumbnail(file);
+        setFormData(prev => ({ ...prev, [field]: compressedThumbnail }));
+      } catch (error) {
+        console.error('Failed to compress thumbnail:', error);
+        // Fallback to original method if compression fails
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const result = e.target?.result as string;
+          setFormData(prev => ({ ...prev, [field]: result }));
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 

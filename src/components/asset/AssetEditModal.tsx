@@ -30,6 +30,7 @@ import { ViewportDisplaySettingsManager } from './ViewportDisplaySettingsManager
 import { BackgroundMapEditor } from './BackgroundMapEditor';
 import type { Asset } from '@/components/AssetItem';
 import type { CustomField, CustomFieldValue, ViewportDisplaySettings } from '@/types/extendedAsset';
+import { compressImageToThumbnail } from '@/utils/thumbnailCompression';
 
 interface AssetEditModalProps {
   isOpen: boolean;
@@ -238,15 +239,23 @@ export function AssetEditModal({ isOpen, onClose, assetId, isNewAsset = false, v
     }
   };
 
-  const handleImageUpload = (field: 'thumbnail', event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (field: 'thumbnail', event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
-        setFormData(prev => ({ ...prev, [field]: result }));
-      };
-      reader.readAsDataURL(file);
+      try {
+        // Compress the image to meet database size constraints
+        const compressedThumbnail = await compressImageToThumbnail(file);
+        setFormData(prev => ({ ...prev, [field]: compressedThumbnail }));
+      } catch (error) {
+        console.error('Failed to compress thumbnail:', error);
+        // Fallback to original method if compression fails
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const result = e.target?.result as string;
+          setFormData(prev => ({ ...prev, [field]: result }));
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 
