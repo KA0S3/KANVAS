@@ -26,22 +26,18 @@ class PerformanceMonitor {
 
   incrementDatabaseRequests(): void {
     this.metrics.databaseRequests++;
-    console.log(`[Performance] DB requests: ${this.metrics.databaseRequests}`);
   }
 
   incrementAuthRequests(): void {
     this.metrics.authRequests++;
-    console.log(`[Performance] Auth requests: ${this.metrics.authRequests}`);
   }
 
   incrementSyncOperations(): void {
     this.metrics.syncOperations++;
-    console.log(`[Performance] Sync operations: ${this.metrics.syncOperations}`);
   }
 
   incrementBookCreations(): void {
     this.metrics.bookCreations++;
-    console.log(`[Performance] Book creations: ${this.metrics.bookCreations}`);
   }
 
   getMetrics(): PerformanceMetrics {

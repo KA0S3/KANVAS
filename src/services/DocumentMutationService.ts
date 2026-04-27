@@ -371,25 +371,33 @@ class DocumentMutationService {
       if (error) {
         console.error('[DocumentMutation] Failed to save global backgrounds:', error);
         console.error('[DocumentMutation] Error details:', JSON.stringify(error, null, 2));
-        // If error is "Unauthorized" or version conflict, try without version check
-        // This handles the case where project was just created and version is not synced
+        
+        // Invalidate cache on any error
+        this.documentCache.delete(this.currentProjectId);
+        this.backgroundsCache.delete(this.currentProjectId);
+        
+        // If error is "Unauthorized" or version conflict, reload and retry
         if (error.message?.includes('Unauthorized') || error.message?.includes('Version conflict')) {
-          console.log('[DocumentMutation] Retrying saveGlobalBackgrounds without version check');
-          const { error: retryError } = await supabase.rpc('save_project', {
-            p_project_id: this.currentProjectId,
-            p_backgrounds: backgrounds
-            // No p_expected_version - let server handle it
-          });
-          if (retryError) {
-            console.error('[DocumentMutation] Retry failed:', retryError);
-            return false;
-          }
-          // Reload version from server after successful save
+          console.log('[DocumentMutation] Version conflict detected, reloading document...');
           const loadResult = await this.loadDocument(this.currentProjectId);
           if (loadResult.success && loadResult.data) {
             this.currentVersion = loadResult.data.version;
+            console.log('[DocumentMutation] Reloaded version:', this.currentVersion);
+            
+            // Retry with correct version
+            console.log('[DocumentMutation] Retrying saveGlobalBackgrounds with correct version');
+            const { error: retryError } = await supabase.rpc('save_project', {
+              p_project_id: this.currentProjectId,
+              p_backgrounds: backgrounds,
+              p_expected_version: this.currentVersion
+            });
+            if (retryError) {
+              console.error('[DocumentMutation] Retry failed:', retryError);
+              return false;
+            }
+            this.currentVersion += 1;
+            return true;
           }
-          return true;
         }
         return false;
       }
@@ -418,6 +426,33 @@ class DocumentMutationService {
 
       if (error) {
         console.error('[DocumentMutation] Failed to save viewport:', error);
+        
+        // Invalidate cache on any error
+        this.documentCache.delete(this.currentProjectId);
+        this.backgroundsCache.delete(this.currentProjectId);
+        
+        // If version conflict, reload and retry
+        if (error.message?.includes('Version conflict')) {
+          console.log('[DocumentMutation] Version conflict detected, reloading document...');
+          const loadResult = await this.loadDocument(this.currentProjectId);
+          if (loadResult.success && loadResult.data) {
+            this.currentVersion = loadResult.data.version;
+            console.log('[DocumentMutation] Reloaded version:', this.currentVersion);
+            
+            // Retry with correct version
+            const { error: retryError } = await supabase.rpc('save_project', {
+              p_project_id: this.currentProjectId,
+              p_viewport: { offset: { x: offsetX, y: offsetY }, scale },
+              p_expected_version: this.currentVersion
+            });
+            if (retryError) {
+              console.error('[DocumentMutation] Retry failed:', retryError);
+              return false;
+            }
+            this.currentVersion += 1;
+            return true;
+          }
+        }
         return false;
       }
 
@@ -444,6 +479,33 @@ class DocumentMutationService {
 
       if (error) {
         console.error('[DocumentMutation] Failed to save global tags:', error);
+        
+        // Invalidate cache on any error
+        this.documentCache.delete(this.currentProjectId);
+        this.backgroundsCache.delete(this.currentProjectId);
+        
+        // If version conflict, reload and retry
+        if (error.message?.includes('Version conflict')) {
+          console.log('[DocumentMutation] Version conflict detected, reloading document...');
+          const loadResult = await this.loadDocument(this.currentProjectId);
+          if (loadResult.success && loadResult.data) {
+            this.currentVersion = loadResult.data.version;
+            console.log('[DocumentMutation] Reloaded version:', this.currentVersion);
+            
+            // Retry with correct version
+            const { error: retryError } = await supabase.rpc('save_project', {
+              p_project_id: this.currentProjectId,
+              p_tags_config: tags,
+              p_expected_version: this.currentVersion
+            });
+            if (retryError) {
+              console.error('[DocumentMutation] Retry failed:', retryError);
+              return false;
+            }
+            this.currentVersion += 1;
+            return true;
+          }
+        }
         return false;
       }
 
@@ -556,6 +618,11 @@ class DocumentMutationService {
 
     if (error) {
       console.error('[DocumentMutation] Failed to save position changes:', error);
+      
+      // Invalidate cache on any error
+      this.documentCache.delete(this.currentProjectId);
+      this.backgroundsCache.delete(this.currentProjectId);
+      
       // If error is "Unauthorized", the project might not exist yet
       // Try to create it and retry
       if (error.message?.includes('Unauthorized')) {
@@ -573,6 +640,9 @@ class DocumentMutationService {
               console.error('[DocumentMutation] Retry failed:', retryError);
               throw retryError;
             }
+            // Clear changes after successful save
+            const keysSaved = Object.keys(this.changedPositions);
+            keysSaved.forEach(key => delete this.changedPositions[key]);
             return;
           }
         }
@@ -639,6 +709,11 @@ class DocumentMutationService {
     if (error) {
       console.error('[DocumentMutation] Failed to save metadata changes:', error);
       console.error('[DocumentMutation] Error details:', JSON.stringify(error, null, 2));
+      
+      // Invalidate cache on any error
+      this.documentCache.delete(this.currentProjectId);
+      this.backgroundsCache.delete(this.currentProjectId);
+      
       // If error is "Unauthorized", the project might not exist yet
       // Try to create it and retry
       if (error.message?.includes('Unauthorized')) {
@@ -662,12 +737,37 @@ class DocumentMutationService {
             if (loadResult.success && loadResult.data) {
               this.currentVersion = loadResult.data.version;
             }
+            // Clear changes after successful save
+            const keysSaved = Object.keys(this.changedAssets);
+            keysSaved.forEach(key => delete this.changedAssets[key]);
             return;
           }
         }
       }
       if (error.message?.includes('Version conflict')) {
-        await this.handleConflict();
+        console.log('[DocumentMutation] Version conflict detected, reloading document...');
+        const loadResult = await this.loadDocument(this.currentProjectId);
+        if (loadResult.success && loadResult.data) {
+          this.currentVersion = loadResult.data.version;
+          console.log('[DocumentMutation] Reloaded version:', this.currentVersion);
+          
+          // Retry with correct version
+          console.log('[DocumentMutation] Retrying saveMetadataChanges with correct version');
+          const { error: retryError } = await supabase.rpc('save_assets', {
+            p_project_id: this.currentProjectId,
+            p_assets: changes,
+            p_expected_version: this.currentVersion
+          });
+          if (retryError) {
+            console.error('[DocumentMutation] Retry failed:', retryError);
+            throw retryError;
+          }
+          this.currentVersion += 1;
+          // Clear changes after successful save
+          const keysSaved = Object.keys(this.changedAssets);
+          keysSaved.forEach(key => delete this.changedAssets[key]);
+          return;
+        }
         throw error;
       }
       throw error;
