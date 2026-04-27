@@ -960,14 +960,32 @@ export const useAssetStore = create<AssetStore>()(
         console.warn('[AssetStore] Cannot load world data - no current book');
         return;
       }
-      
+
+      // Migrate 'other' type to 'card' for database compatibility
+      const assets = worldData.assets || {};
+      const migratedAssets: Record<string, any> = {};
+      let migratedCount = 0;
+
+      Object.entries(assets).forEach(([id, asset]: [string, any]) => {
+        if (asset.type === 'other') {
+          migratedAssets[id] = { ...asset, type: 'card' };
+          migratedCount++;
+        } else {
+          migratedAssets[id] = asset;
+        }
+      });
+
+      if (migratedCount > 0) {
+        console.log(`[AssetStore] Migrated ${migratedCount} assets from 'other' to 'card' type`);
+      }
+
       set((state) => {
         const newBookAssets = { ...state.bookAssets };
         const newBookGlobalCustomFields = { ...state.bookGlobalCustomFields };
-        
-        newBookAssets[bookId] = worldData.assets || {};
+
+        newBookAssets[bookId] = migratedAssets;
         newBookGlobalCustomFields[bookId] = worldData.globalCustomFields || [];
-        
+
         return {
           bookAssets: newBookAssets,
           currentActiveId: null,

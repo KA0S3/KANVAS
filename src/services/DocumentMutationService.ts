@@ -301,7 +301,9 @@ class DocumentMutationService {
   // NOTE: Following MASTER_PLAN.md - state-based tracking (NO operation queue)
   // Mark asset as changed (metadata)
   markAssetChanged(assetId: string, asset: Asset): void {
-    this.changedAssets[assetId] = asset;
+    // Migrate 'other' type to 'card' for database compatibility
+    const migratedAsset = asset.type === 'other' ? { ...asset, type: 'card' as const } : asset;
+    this.changedAssets[assetId] = migratedAsset;
     this.notifySubscribers();
   }
 
@@ -540,14 +542,17 @@ class DocumentMutationService {
       z_index: Math.round(pos.z_index || 0)
     }));
 
-    const keysSaved = Object.keys(this.changedPositions);
-    keysSaved.forEach(key => delete this.changedPositions[key]);
-
     performanceMonitor.incrementDatabaseRequests();
     const { error } = await supabase.rpc('save_positions', {
       p_project_id: this.currentProjectId,
       p_positions: positions
     });
+
+    // Only clear changes after successful save
+    if (!error) {
+      const keysSaved = Object.keys(this.changedPositions);
+      keysSaved.forEach(key => delete this.changedPositions[key]);
+    }
 
     if (error) {
       console.error('[DocumentMutation] Failed to save position changes:', error);
@@ -612,9 +617,6 @@ class DocumentMutationService {
       };
     });
 
-    const keysSaved = Object.keys(this.changedAssets);
-    keysSaved.forEach(key => delete this.changedAssets[key]);
-
     performanceMonitor.incrementDatabaseRequests();
     console.log('[DocumentMutation] saveMetadataChanges - Sending to RPC:', {
       p_project_id: this.currentProjectId,
@@ -627,6 +629,12 @@ class DocumentMutationService {
       p_assets: changes,
       p_expected_version: this.currentVersion
     });
+
+    // Only clear changes after successful save
+    if (!error) {
+      const keysSaved = Object.keys(this.changedAssets);
+      keysSaved.forEach(key => delete this.changedAssets[key]);
+    }
 
     if (error) {
       console.error('[DocumentMutation] Failed to save metadata changes:', error);
