@@ -29,7 +29,7 @@ export interface DbAsset {
   asset_id: string;
   parent_id: string | null;
   name: string;
-  type: 'card' | 'image' | 'text' | 'container' | 'viewport' | 'tag' | 'document' | 'video' | 'audio' | 'code' | 'other';
+  type: 'card' | 'image' | 'text' | 'container' | 'viewport' | 'tag' | 'document' | 'video' | 'audio' | 'code';
   x: number;
   y: number;
   width: number;

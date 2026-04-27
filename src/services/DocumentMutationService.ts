@@ -591,11 +591,14 @@ class DocumentMutationService {
         viewportDisplaySettings: asset.viewportDisplaySettings || {}
       };
 
+      // Migrate 'other' type to 'card' for database compatibility
+      const assetType = asset.type === 'other' ? 'card' : asset.type;
+
       return {
         asset_id: asset.id,
         parent_id: asset.parentId || null,
         name: asset.name,
-        type: asset.type,
+        type: assetType,
         x: Math.round(asset.x || 0),
         y: Math.round(asset.y || 0),
         width: Math.round(asset.width || 0),
