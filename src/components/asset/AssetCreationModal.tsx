@@ -83,7 +83,7 @@ export function AssetCreationModal({ isOpen, onClose, initialData, parentId, gen
     const calculatedPosition = getCalculatedPosition();
     return {
       name: initialData?.name || 'New Asset',
-      type: initialData?.type || 'other' as 'image' | 'document' | 'video' | 'audio' | 'code' | 'other',
+      type: initialData?.type || 'card' as 'image' | 'document' | 'video' | 'audio' | 'code' | 'card',
       x: calculatedPosition.x,
       y: calculatedPosition.y,
       width: initialData?.width || 200,
@@ -152,7 +152,7 @@ export function AssetCreationModal({ isOpen, onClose, initialData, parentId, gen
     try {
       const assetId = createNewAsset({
         name: formData.name,
-        type: formData.type as 'image' | 'document' | 'video' | 'audio' | 'code' | 'other',
+        type: formData.type as 'image' | 'document' | 'video' | 'audio' | 'code' | 'card',
         x: formData.x,
         y: formData.y,
         width: formData.width,
@@ -221,7 +221,7 @@ export function AssetCreationModal({ isOpen, onClose, initialData, parentId, gen
     
     setFormData({
       name: initialData?.name || 'New Asset',
-      type: initialData?.type || 'other' as 'image' | 'document' | 'video' | 'audio' | 'code' | 'other',
+      type: initialData?.type || 'card' as 'image' | 'document' | 'video' | 'audio' | 'code' | 'card',
       x: resetPosition.x,
       y: resetPosition.y,
       width: initialData?.width || 200,

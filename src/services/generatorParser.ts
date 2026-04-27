@@ -121,7 +121,7 @@ export class GeneratorParser {
     }
 
     const asset: Partial<ExtendedAsset> = {
-      type: 'other', // Default type for generated assets
+      type: 'card', // Default type for generated assets
       customFields: [],
       tags: defaultTags,
     };
