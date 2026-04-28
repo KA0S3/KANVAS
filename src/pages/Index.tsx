@@ -399,8 +399,8 @@ const Index = () => {
     setBookLibraryOpen(true);
   };
 
-  const handleDeleteWorld = (book: Book) => {
-    deleteBook(book.id);
+  const handleDeleteWorld = async (book: Book) => {
+    await deleteBook(book.id);
   };
 
   const handleWorldCreated = async (newBookId: string) => {

@@ -72,9 +72,9 @@ export function BookLibrary({ isOpen, onClose, onBookSelect }: BookLibraryProps)
     setDeleteModalOpen(true);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (bookToDelete) {
-      deleteBook(bookToDelete.id);
+      await deleteBook(bookToDelete.id);
       setBookToDelete(null);
       setDeleteModalOpen(false);
     }

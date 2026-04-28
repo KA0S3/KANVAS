@@ -3,6 +3,8 @@ import { persist } from 'zustand/middleware';
 import type { Book, BookViewMode, BookLibrarySettings, BookCoverPreset, LeatherColorPreset, WorldData } from '@/types/book';
 import { performanceMonitor } from '@/utils/performanceMonitor';
 import { hybridStorage } from '@/utils/compressedStorage';
+import { deleteProject } from '@/services/ProjectService';
+import { documentMutationService } from '@/services/DocumentMutationService';
 
 const defaultCoverPresets: BookCoverPreset[] = [
   { id: 'cosmic-blue', name: 'Cosmic Blue', color: '#3b82f6', gradient: 'linear-gradient(135deg, #3b82f6, #8b5cf6)' },
@@ -37,7 +39,7 @@ interface BookStore {
   
   createBook: (bookData: Omit<Book, 'id' | 'createdAt' | 'updatedAt'>) => string;
   updateBook: (bookId: string, updates: Partial<Book>) => void;
-  deleteBook: (bookId: string) => void;
+  deleteBook: (bookId: string) => Promise<void>;
   reorderBooks: (fromIndex: number, toIndex: number) => void;
   setCurrentBook: (bookId: string | null) => void;
   getCurrentBook: () => Book | null;
@@ -103,15 +105,8 @@ export const useBookStore = create<BookStore>()(
             return '';
           }
           
-          // Check for existing book with same title
-          const existingBook = Object.values(state.books).find(book => 
-            book.title.toLowerCase() === bookData.title.toLowerCase()
-          );
-          
-          if (existingBook) {
-            console.warn('[BookStore] Book with same title already exists:', existingBook.title);
-            return existingBook.id;
-          }
+          // Allow multiple books with same title - user wants this flexibility
+          // No longer checking for duplicate titles
           
           // Set creation protection
           set({ 
@@ -142,24 +137,69 @@ export const useBookStore = create<BookStore>()(
         },
 
         updateBook: (bookId, updates) => {
-          set((state) => {
-            const book = state.books[bookId];
-            if (!book) return state;
+          const state = get();
+          const book = state.books[bookId];
+          if (!book) return;
 
-            return {
-              books: {
-                ...state.books,
-                [bookId]: {
-                  ...book,
-                  ...updates,
-                  updatedAt: Date.now(),
-                },
+          // Update local state immediately (local-first philosophy)
+          set((state) => ({
+            books: {
+              ...state.books,
+              [bookId]: {
+                ...book,
+                ...updates,
+                updatedAt: Date.now(),
               },
-            };
-          });
+            },
+          }));
+
+          // NOTE: Per MASTER_PLAN.md low IO philosophy:
+          // - NO immediate Supabase saves (violates "NO per-action writes")
+          // - Metadata changes are batched by DocumentMutationService
+          // - Saves happen on 40-second timer OR manual save only
+          // - Project metadata (viewport, backgrounds, tags) syncs via DocumentMutationService.saveGlobalBackgrounds/saveViewport/saveGlobalTags
+          
+          // If this is the current book, trigger DocumentMutationService batching for metadata
+          const currentBookId = get().currentBookId;
+          if (bookId === currentBookId && documentMutationService.getCurrentProjectId() === bookId) {
+            // Sync cover page settings via global backgrounds
+            if (updates.coverPageSettings) {
+              documentMutationService.saveGlobalBackgrounds(updates.coverPageSettings);
+            }
+            
+            // Sync viewport settings
+            if (updates.worldData?.viewportOffset || updates.worldData?.viewportScale) {
+              documentMutationService.saveViewport(
+                updates.worldData.viewportOffset?.x || book.worldData?.viewportOffset?.x || 0,
+                updates.worldData.viewportOffset?.y || book.worldData?.viewportOffset?.y || 0,
+                updates.worldData.viewportScale || book.worldData?.viewportScale || 1
+              );
+            }
+            
+            // Sync tags config
+            if (updates.worldData?.tags) {
+              documentMutationService.saveGlobalTags(updates.worldData.tags);
+            }
+          }
         },
 
-        deleteBook: (bookId) => {
+        deleteBook: async (bookId) => {
+          const state = get();
+          const book = state.books[bookId];
+          
+          // Delete from Supabase if this is a synced project (has valid UUID format)
+          if (book && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(bookId)) {
+            try {
+              console.log('[BookStore] Deleting project from Supabase:', bookId);
+              await deleteProject(bookId);
+              console.log('[BookStore] Successfully deleted project from Supabase');
+            } catch (error) {
+              console.error('[BookStore] Failed to delete project from Supabase:', error);
+              // Continue with local deletion even if remote fails
+            }
+          }
+          
+          // Always delete from local storage
           set((state) => {
             const newBooks = { ...state.books };
             delete newBooks[bookId];
@@ -171,6 +211,8 @@ export const useBookStore = create<BookStore>()(
               currentBookId: newCurrentBookId,
             };
           });
+          
+          console.log('[BookStore] Deleted book locally:', book?.title || bookId);
         },
 
         reorderBooks: (fromIndex, toIndex) => {
