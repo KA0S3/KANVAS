@@ -380,19 +380,26 @@ class DocumentMutationService {
       if (error) {
         console.error('[DocumentMutation] Failed to save global backgrounds:', error);
         console.error('[DocumentMutation] Error details:', JSON.stringify(error, null, 2));
-        
+
         // Invalidate cache on any error
         this.documentCache.delete(this.currentProjectId);
         this.backgroundsCache.delete(this.currentProjectId);
-        
-        // If error is "Unauthorized" or version conflict, reload and retry
-        if (error.message?.includes('Unauthorized') || error.message?.includes('Version conflict')) {
+
+        // If error is "Unauthorized", the project may have been deleted - don't retry
+        if (error.message?.includes('Unauthorized')) {
+          console.log('[DocumentMutation] Project may have been deleted, clearing currentProjectId');
+          this.currentProjectId = null;
+          return false;
+        }
+
+        // If version conflict, reload and retry
+        if (error.message?.includes('Version conflict')) {
           console.log('[DocumentMutation] Version conflict detected, reloading document...');
           const loadResult = await this.loadDocument(this.currentProjectId);
           if (loadResult.success && loadResult.data) {
             this.currentVersion = loadResult.data.version;
             console.log('[DocumentMutation] Reloaded version:', this.currentVersion);
-            
+
             // Retry with correct version
             console.log('[DocumentMutation] Retrying saveGlobalBackgrounds with correct version');
             const { error: retryError } = await supabase.rpc('save_project', {
@@ -443,11 +450,18 @@ class DocumentMutationService {
 
       if (error) {
         console.error('[DocumentMutation] Failed to save viewport:', error);
-        
+
         // Invalidate cache on any error
         this.documentCache.delete(this.currentProjectId);
         this.backgroundsCache.delete(this.currentProjectId);
-        
+
+        // If error is "Unauthorized", the project may have been deleted - don't retry
+        if (error.message?.includes('Unauthorized')) {
+          console.log('[DocumentMutation] Project may have been deleted, clearing currentProjectId');
+          this.currentProjectId = null;
+          return false;
+        }
+
         // If version conflict, reload and retry
         if (error.message?.includes('Version conflict')) {
           console.log('[DocumentMutation] Version conflict detected, reloading document...');
@@ -455,7 +469,7 @@ class DocumentMutationService {
           if (loadResult.success && loadResult.data) {
             this.currentVersion = loadResult.data.version;
             console.log('[DocumentMutation] Reloaded version:', this.currentVersion);
-            
+
             // Retry with correct version
             const { error: retryError } = await supabase.rpc('save_project', {
               p_project_id: this.currentProjectId,
@@ -504,11 +518,18 @@ class DocumentMutationService {
 
       if (error) {
         console.error('[DocumentMutation] Failed to save global tags:', error);
-        
+
         // Invalidate cache on any error
         this.documentCache.delete(this.currentProjectId);
         this.backgroundsCache.delete(this.currentProjectId);
-        
+
+        // If error is "Unauthorized", the project may have been deleted - don't retry
+        if (error.message?.includes('Unauthorized')) {
+          console.log('[DocumentMutation] Project may have been deleted, clearing currentProjectId');
+          this.currentProjectId = null;
+          return false;
+        }
+
         // If version conflict, reload and retry
         if (error.message?.includes('Version conflict')) {
           console.log('[DocumentMutation] Version conflict detected, reloading document...');
@@ -516,7 +537,7 @@ class DocumentMutationService {
           if (loadResult.success && loadResult.data) {
             this.currentVersion = loadResult.data.version;
             console.log('[DocumentMutation] Reloaded version:', this.currentVersion);
-            
+
             // Retry with correct version
             const { error: retryError } = await supabase.rpc('save_project', {
               p_project_id: this.currentProjectId,

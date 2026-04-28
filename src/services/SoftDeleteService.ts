@@ -118,6 +118,11 @@ class SoftDeleteService {
       });
 
       if (error) {
+        // If project not found or already deleted, that's okay - continue with local deletion
+        if (error.message?.includes('not found') || error.message?.includes('unauthorized')) {
+          console.log('[SoftDeleteService] Project not found or already deleted in Supabase, continuing with local deletion');
+          return;
+        }
         console.error('[SoftDeleteService] Failed to soft delete project:', error);
         throw error;
       }

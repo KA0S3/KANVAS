@@ -233,6 +233,12 @@ export const useBookStore = create<BookStore>()(
               currentBookId: newCurrentBookId,
             };
           });
+
+          // Clear DocumentMutationService's currentProjectId if it matches the deleted book
+          if (documentMutationService.getCurrentProjectId() === bookId) {
+            documentMutationService.setProjectId(null);
+            console.log('[BookStore] Cleared DocumentMutationService currentProjectId for deleted book:', bookId);
+          }
           
           console.log('[BookStore] Deleted book locally:', book.title);
         },
