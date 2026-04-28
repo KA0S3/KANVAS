@@ -86,7 +86,7 @@ const Index = () => {
           }
           
           const currentBooks = getAllBooks();
-          const existingBookIds = new Set(Object.keys(currentBooks));
+          const existingBookIds = new Set(currentBooks.map(book => book.id));
           
           // Sync only metadata - create local book entries for projects that don't exist locally
           let syncedCount = 0;
