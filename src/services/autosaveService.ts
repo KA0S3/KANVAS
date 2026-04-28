@@ -201,19 +201,21 @@ class AutosaveService {
             documentMutationService.setProjectId(currentBookId);
             
             // Try to load the document to ensure it exists
-            const loadResult = await documentMutationService.loadDocument(currentBookId);
-            if (!loadResult.success && loadResult.error === 'Project not found') {
-              console.log('[AutosaveService] Project not found, creating...');
-              const bookStore = useBookStore.getState();
-              const book = bookStore.books[currentBookId];
-              if (book) {
-                const created = await documentMutationService.createProject(
-                  currentBookId,
-                  book.title,
-                  book.coverPageSettings
-                );
-                if (created) {
-                  console.log('[AutosaveService] Created project for sync');
+            if (currentBookId && currentBookId !== 'null') {
+              const loadResult = await documentMutationService.loadDocument(currentBookId);
+              if (!loadResult.success && loadResult.error === 'Project not found') {
+                console.log('[AutosaveService] Project not found, creating...');
+                const bookStore = useBookStore.getState();
+                const book = bookStore.books[currentBookId];
+                if (book) {
+                  const created = await documentMutationService.createProject(
+                    currentBookId,
+                    book.title,
+                    book.coverPageSettings
+                  );
+                  if (created) {
+                    console.log('[AutosaveService] Created project for sync');
+                  }
                 }
               }
             }

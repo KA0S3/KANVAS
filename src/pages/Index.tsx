@@ -15,6 +15,7 @@ import "@/components/books/leather-styles.css";
 import SideAdBanner from "@/components/SideAdBanner";
 import { QuotaWarningBar } from "@/components/QuotaWarningBar";
 import { EnhancedAccountModal } from "@/components/account/EnhancedAccountModal";
+import { UndoStatus } from "@/components/UndoStatus";
 import { useAssetStore } from "@/stores/assetStore";
 import { useAuthStore } from '@/stores/authStore';
 import { useTagStore } from "@/stores/tagStore";
@@ -115,7 +116,7 @@ const Index = () => {
           const currentBook = currentBookId;
           let success = false;
           
-          if (currentBook) {
+          if (currentBook && currentBook !== 'null') {
             const result = await documentMutationService.loadDocument(currentBook);
             success = result.success;
             if (result.success && result.data) {
@@ -609,6 +610,9 @@ const Index = () => {
 
       {/* Onboarding Helper Popup */}
       <OnboardingPopup anchorElement={createWorldButtonRef.current} />
+
+      {/* Undo Status Indicator */}
+      <UndoStatus />
 
     </div>
   );

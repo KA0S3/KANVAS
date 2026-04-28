@@ -6,6 +6,7 @@ import { DEFAULT_VIEWPORT_DISPLAY_SETTINGS } from '@/types/extendedAsset';
 import { useBookStore } from './bookStoreSimple';
 import { supabase } from '@/lib/supabase';
 import { documentMutationService } from '@/services/DocumentMutationService';
+import { undoService } from '@/services/UndoService';
 
 interface AssetStore {
   // Book-scoped asset registry for isolation
@@ -166,6 +167,9 @@ export const useAssetStore = create<AssetStore>()(
       // Phase 3 Integration: Track metadata changes (MASTER_PLAN.md state-based tracking)
       documentMutationService.markAssetChanged(id, newAsset);
 
+      // Record for undo
+      undoService.recordAction('create', 'asset', newAsset);
+
       return id;
     } catch (error) {
       console.error('[AssetStore] Failed to create asset:', error);
@@ -220,6 +224,9 @@ export const useAssetStore = create<AssetStore>()(
     // Phase 3 Integration: Track metadata changes (MASTER_PLAN.md state-based tracking)
     const updatedAsset = { ...asset, parentId: newParentId };
     documentMutationService.markAssetChanged(assetId, updatedAsset);
+
+    // Record for undo
+    undoService.recordAction('update', 'asset', updatedAsset, asset);
   },
 
   // Update asset position (fast - no mutation queueing, for drag operations)
@@ -318,8 +325,13 @@ export const useAssetStore = create<AssetStore>()(
       const asset = bookAssets[assetId];
       if (!asset) return;
 
+      const updates = { width, height };
+
       // Phase 3 Integration: Track metadata changes
       documentMutationService.markAssetChanged(assetId, asset);
+
+      // Record for undo
+      undoService.recordAction('update', 'asset', asset, { ...asset, width: updates.width, height: updates.height });
 
       // Phase 3 Integration: Track position changes (MASTER_PLAN.md state-based tracking)
       documentMutationService.markPositionChanged(assetId, asset.x || 0, asset.y || 0, 0);
@@ -359,6 +371,8 @@ export const useAssetStore = create<AssetStore>()(
       const asset = bookAssets[assetId];
       if (asset) {
         documentMutationService.markAssetChanged(assetId, asset);
+        // Record for undo
+        undoService.recordAction('update', 'asset', { ...asset, ...updates }, asset);
       }
     }
 
@@ -441,6 +455,10 @@ export const useAssetStore = create<AssetStore>()(
     // Phase 3 Integration: Track deleted assets (MASTER_PLAN.md state-based tracking)
     // Delete children first, then parent
     idsToDelete.reverse().forEach(id => {
+      const deletedAsset = bookAssets[id];
+      if (deletedAsset) {
+        undoService.recordAction('delete', 'asset', deletedAsset, deletedAsset);
+      }
       documentMutationService.markAssetDeleted(id);
     });
   },

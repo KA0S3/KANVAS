@@ -5,6 +5,8 @@ import { performanceMonitor } from '@/utils/performanceMonitor';
 import { hybridStorage } from '@/utils/compressedStorage';
 import { deleteProject } from '@/services/ProjectService';
 import { documentMutationService } from '@/services/DocumentMutationService';
+import { undoService } from '@/services/UndoService';
+import { softDeleteService } from '@/services/SoftDeleteService';
 
 const defaultCoverPresets: BookCoverPreset[] = [
   { id: 'cosmic-blue', name: 'Cosmic Blue', color: '#3b82f6', gradient: 'linear-gradient(135deg, #3b82f6, #8b5cf6)' },
@@ -98,9 +100,11 @@ export const useBookStore = create<BookStore>()(
           
           // Check for recent creation of same title (prevent duplicates)
           const timeSinceLastCreation = now - state._lastCreationTime;
-          const debounceTime = 1000; // 1 second debounce
+          const debounceTime = 200; // Reduced to 200ms for better sync performance
           
-          if (timeSinceLastCreation < debounceTime && state._pendingCreationTitle === bookData.title) {
+          if (timeSinceLastCreation < debounceTime && 
+              state._pendingCreationTitle === bookData.title &&
+              state._isCreating) {
             console.warn('[BookStore] Duplicate book creation detected, ignoring request');
             return '';
           }
@@ -133,6 +137,10 @@ export const useBookStore = create<BookStore>()(
           }));
 
           console.log('[BookStore] Created new book:', newBook.title);
+          
+          // Record for undo
+          undoService.recordAction('create', 'book', newBook);
+          
           return id;
         },
 
@@ -141,6 +149,9 @@ export const useBookStore = create<BookStore>()(
           const book = state.books[bookId];
           if (!book) return;
 
+          // Record previous state for undo before updating
+          const previousState = { ...book };
+          
           // Update local state immediately (local-first philosophy)
           set((state) => ({
             books: {
@@ -152,6 +163,9 @@ export const useBookStore = create<BookStore>()(
               },
             },
           }));
+          
+          // Record for undo
+          undoService.recordAction('update', 'book', { ...state.books[bookId] }, previousState);
 
           // NOTE: Per MASTER_PLAN.md low IO philosophy:
           // - NO immediate Supabase saves (violates "NO per-action writes")
@@ -187,24 +201,27 @@ export const useBookStore = create<BookStore>()(
           const state = get();
           const book = state.books[bookId];
           
-          // Delete from Supabase if this is a synced project (has valid UUID format)
-          if (book && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(bookId)) {
+          if (!book) {
+            console.warn('[BookStore] Attempted to delete non-existent book:', bookId);
+            return;
+          }
+
+          // Record for undo before deletion
+          undoService.recordAction('delete', 'book', book, book);
+          
+          // Use soft delete service for proper Supabase deletion (follows low IO philosophy)
+          if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(bookId)) {
             try {
-              console.log('[BookStore] Deleting project from Supabase:', bookId);
-              await deleteProject(bookId);
-              console.log('[BookStore] Successfully deleted project from Supabase');
+              console.log('[BookStore] Soft deleting project from Supabase:', bookId);
+              await softDeleteService.softDeleteProject(bookId);
+              console.log('[BookStore] Successfully soft deleted project from Supabase');
             } catch (error: any) {
-              // If project doesn't exist in Supabase, that's okay - it might be local-only
-              if (error.message && error.message.includes('not found or unauthorized')) {
-                console.log('[BookStore] Project not found in Supabase (local-only), skipping remote deletion');
-              } else {
-                console.error('[BookStore] Failed to delete project from Supabase:', error);
-              }
+              console.error('[BookStore] Failed to soft delete project from Supabase:', error);
               // Continue with local deletion even if remote fails
             }
           }
           
-          // Always delete from local storage
+          // Always delete from local storage immediately
           set((state) => {
             const newBooks = { ...state.books };
             delete newBooks[bookId];
@@ -217,7 +234,7 @@ export const useBookStore = create<BookStore>()(
             };
           });
           
-          console.log('[BookStore] Deleted book locally:', book?.title || bookId);
+          console.log('[BookStore] Deleted book locally:', book.title);
         },
 
         reorderBooks: (fromIndex, toIndex) => {

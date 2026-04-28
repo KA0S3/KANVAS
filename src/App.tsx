@@ -8,6 +8,7 @@ import { useEffect } from "react";
 import { emergencySaveService } from "@/services/emergencySaveService";
 import { connectivityService } from "@/services/connectivityService";
 import { documentMutationService } from "@/services/DocumentMutationService";
+import { useUndoKeyboard } from "@/hooks/useUndoKeyboard";
 import Index from "./pages/Index";
 import AuthConfirm from "./pages/AuthConfirm";
 import AuthCallback from "./pages/AuthCallback";
@@ -20,6 +21,9 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 const App = () => {
+  // Initialize undo keyboard shortcuts
+  useUndoKeyboard();
+  
   // Initialize services on app mount
   useEffect(() => {
     emergencySaveService.initialize();
