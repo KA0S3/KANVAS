@@ -356,6 +356,14 @@ class DocumentMutationService {
   async saveGlobalBackgrounds(backgrounds: Record<string, any>): Promise<boolean> {
     if (!this.currentProjectId) return false;
 
+    // Check if the current book still exists locally (might have been deleted)
+    const bookStore = useBookStore.getState();
+    if (!bookStore.books[this.currentProjectId]) {
+      console.log('[DocumentMutation] Project no longer exists locally, skipping save');
+      this.currentProjectId = null;
+      return false;
+    }
+
     try {
       performanceMonitor.incrementDatabaseRequests();
       console.log('[DocumentMutation] saveGlobalBackgrounds - Sending to RPC:', {
@@ -417,6 +425,14 @@ class DocumentMutationService {
   async saveViewport(offsetX: number, offsetY: number, scale: number): Promise<boolean> {
     if (!this.currentProjectId) return false;
 
+    // Check if the current book still exists locally (might have been deleted)
+    const bookStore = useBookStore.getState();
+    if (!bookStore.books[this.currentProjectId]) {
+      console.log('[DocumentMutation] Project no longer exists locally, skipping save');
+      this.currentProjectId = null;
+      return false;
+    }
+
     try {
       performanceMonitor.incrementDatabaseRequests();
       const { error } = await supabase.rpc('save_project', {
@@ -469,6 +485,14 @@ class DocumentMutationService {
 
   async saveGlobalTags(tags: Record<string, any>): Promise<boolean> {
     if (!this.currentProjectId) return false;
+
+    // Check if the current book still exists locally (might have been deleted)
+    const bookStore = useBookStore.getState();
+    if (!bookStore.books[this.currentProjectId]) {
+      console.log('[DocumentMutation] Project no longer exists locally, skipping save');
+      this.currentProjectId = null;
+      return false;
+    }
 
     try {
       performanceMonitor.incrementDatabaseRequests();

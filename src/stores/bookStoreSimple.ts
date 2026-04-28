@@ -193,8 +193,13 @@ export const useBookStore = create<BookStore>()(
               console.log('[BookStore] Deleting project from Supabase:', bookId);
               await deleteProject(bookId);
               console.log('[BookStore] Successfully deleted project from Supabase');
-            } catch (error) {
-              console.error('[BookStore] Failed to delete project from Supabase:', error);
+            } catch (error: any) {
+              // If project doesn't exist in Supabase, that's okay - it might be local-only
+              if (error.message && error.message.includes('not found or unauthorized')) {
+                console.log('[BookStore] Project not found in Supabase (local-only), skipping remote deletion');
+              } else {
+                console.error('[BookStore] Failed to delete project from Supabase:', error);
+              }
               // Continue with local deletion even if remote fails
             }
           }
