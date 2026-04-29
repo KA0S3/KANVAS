@@ -181,6 +181,25 @@ export const useBookStore = create<BookStore>()(
               documentMutationService.saveGlobalBackgrounds(updates.coverPageSettings);
             }
             
+            // Sync cover-related fields via saveProject
+            const coverFields = {
+              color: updates.color,
+              gradient: updates.gradient,
+              leatherColor: updates.leatherColor,
+              isLeatherMode: updates.isLeatherMode,
+              coverImage: updates.coverImage,
+              coverPageSettings: updates.coverPageSettings
+            };
+            
+            // Only call saveProject if cover fields changed
+            if (Object.keys(coverFields).some(key => coverFields[key as keyof typeof coverFields] !== undefined)) {
+              import('@/services/ProjectService').then(({ saveProject }) => {
+                saveProject(bookId, coverFields).catch(err => {
+                  console.error('[BookStore] Failed to save cover fields:', err);
+                });
+              });
+            }
+            
             // Sync viewport settings
             if (updates.worldData?.viewportOffset || updates.worldData?.viewportScale) {
               documentMutationService.saveViewport(

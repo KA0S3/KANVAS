@@ -158,21 +158,21 @@ export function setBackground(assetId: string, config: BackgroundConfig): void {
     console.log(`[BackgroundStorage] Saving background for ${assetId} to key ${storageKey}`);
     const configToStore = JSON.parse(JSON.stringify(config));
 
-    // If there's a large base64 image, trigger async IndexedDB storage
-    if (configToStore.imageUrl?.startsWith('data:') && configToStore.imageUrl.length > 50000) {
-      // Store metadata without the large image for now
-      configToStore.imageUrl = '[INDEXEDDB-PENDING]';
-      localStorage.setItem(storageKey, JSON.stringify(configToStore));
-      console.log(`[BackgroundStorage] Stored metadata (large image pending IndexedDB) for ${assetId}`);
-
-      // Async store the image
-      setBackgroundAsync(assetId, config).catch(err => {
-        console.error(`[BackgroundStorage] Async image storage failed:`, err);
-      });
-    } else {
-      localStorage.setItem(storageKey, JSON.stringify(configToStore));
-      console.log(`[BackgroundStorage] Successfully saved background for ${assetId} to ${storageKey}`);
+    // CRITICAL FIX: Don't store large base64 images in localStorage/IndexedDB
+    // Images should be uploaded to R2 and referenced by URL only
+    // This follows low-IO principles and prevents localStorage bloat
+    if (configToStore.imageUrl?.startsWith('data:')) {
+      if (configToStore.imageUrl.length > 2048) {
+        console.log(`[BackgroundStorage] Excluding large base64 image (${configToStore.imageUrl.length} bytes) - should be uploaded to R2`);
+        configToStore.imageUrl = null;
+      } else {
+        // Only keep small base64 images (< 2KB)
+        console.log(`[BackgroundStorage] Keeping small base64 image (${configToStore.imageUrl.length} bytes)`);
+      }
     }
+
+    localStorage.setItem(storageKey, JSON.stringify(configToStore));
+    console.log(`[BackgroundStorage] Successfully saved background for ${assetId} to ${storageKey}`);
   } catch (error) {
     console.error(`[BackgroundStorage] Error saving background config for ${assetId}:`, error);
   }

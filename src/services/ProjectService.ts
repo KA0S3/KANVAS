@@ -19,6 +19,12 @@ export interface Project {
   viewport: any;
   backgrounds: any;
   tags_config: any;
+  cover_image: string | null;
+  color: string;
+  gradient: string | null;
+  leather_color: string | null;
+  is_leather_mode: boolean;
+  cover_page_settings: any;
   last_version: number;
   asset_count: number;
   updated_at: string;
@@ -261,7 +267,7 @@ export async function createProject(
 /**
  * save_project - Save Project-Level Configuration
  * 
- * Saves project-level configuration (viewport, backgrounds, tags_config, name, description).
+ * Saves project-level configuration (viewport, backgrounds, tags_config, name, description, cover settings).
  * Includes version checking and bumps version on success.
  * 
  * @param projectId - The project UUID
@@ -270,6 +276,12 @@ export async function createProject(
  * @param tagsConfig - Optional tags configuration
  * @param name - Optional new name
  * @param description - Optional new description
+ * @param coverImage - Optional cover image URL
+ * @param color - Optional cover color
+ * @param gradient - Optional cover gradient
+ * @param leatherColor - Optional leather color
+ * @param isLeatherMode - Optional leather mode flag
+ * @param coverPageSettings - Optional cover page settings JSONB
  * @param expectedVersion - Optional version for optimistic locking
  */
 export async function saveProject(
@@ -280,6 +292,12 @@ export async function saveProject(
     tagsConfig?: any;
     name?: string;
     description?: string;
+    coverImage?: string;
+    color?: string;
+    gradient?: string;
+    leatherColor?: string;
+    isLeatherMode?: boolean;
+    coverPageSettings?: any;
     expectedVersion?: number;
   } = {}
 ): Promise<void> {
@@ -290,6 +308,12 @@ export async function saveProject(
     p_tags_config: options.tagsConfig || null,
     p_name: options.name || null,
     p_description: options.description || null,
+    p_cover_image: options.coverImage || null,
+    p_color: options.color || null,
+    p_gradient: options.gradient || null,
+    p_leather_color: options.leatherColor || null,
+    p_is_leather_mode: options.isLeatherMode || null,
+    p_cover_page_settings: options.coverPageSettings || null,
     p_expected_version: options.expectedVersion || null
   });
 

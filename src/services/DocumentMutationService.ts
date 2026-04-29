@@ -716,17 +716,18 @@ class DocumentMutationService {
     // Process assets and compress thumbnails if needed
     const processedAssets = await Promise.all(
       Object.values(this.changedAssets).map(async (asset) => {
-        let thumbnail = asset.thumbnail || null;
+        // CRITICAL FIX: Store R2 path instead of base64 thumbnail
+        // Images should be in R2, Supabase only stores the path reference
+        let thumbnail = null;
         
-        // Compress thumbnail if it's too large
-        if (thumbnail && isThumbnailTooLarge(thumbnail)) {
-          try {
-            thumbnail = await compressBase64Thumbnail(thumbnail);
-            console.log(`[DocumentMutation] Compressed thumbnail for asset ${asset.id} from ${asset.thumbnail?.length} to ${thumbnail.length} bytes`);
-          } catch (error) {
-            console.warn(`[DocumentMutation] Failed to compress thumbnail for asset ${asset.id}:`, error);
-            // Keep original thumbnail if compression fails
-          }
+        // If asset has cloudPath (R2), use that as thumbnail reference
+        if (asset.cloudPath) {
+          thumbnail = asset.cloudPath;
+        } else if (asset.thumbnail && !isThumbnailTooLarge(asset.thumbnail)) {
+          // Only keep small base64 thumbnails (< 2048 bytes)
+          thumbnail = asset.thumbnail;
+        } else if (asset.thumbnail) {
+          console.log(`[DocumentMutation] Excluding large thumbnail from DB save for asset ${asset.id} (${asset.thumbnail.length} bytes > 2048 limit)`);
         }
         
         const customFieldsObj: Record<string, any> = {

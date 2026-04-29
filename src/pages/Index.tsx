@@ -96,8 +96,12 @@ const Index = () => {
               bookStore.createBook({
                 id: project.id, // Use Supabase project ID instead of generating new one
                 title: project.name,
-                color: '#3b82f6',
-                coverPageSettings: project.backgrounds || {},
+                color: project.color || '#3b82f6',
+                gradient: project.gradient || undefined,
+                leatherColor: project.leather_color || undefined,
+                isLeatherMode: project.is_leather_mode || false,
+                coverImage: project.cover_image || undefined,
+                coverPageSettings: project.cover_page_settings || {},
                 worldData: {
                   assets: {},
                   tags: project.tags_config || {},

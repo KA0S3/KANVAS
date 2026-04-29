@@ -218,37 +218,45 @@ class AssetUploadService {
   }
 
   /**
-   * Register asset metadata in Supabase
+   * Register file metadata in Supabase files table
+   * CRITICAL: This stores file upload metadata (R2 paths, sizes) in the files table
+   * Asset metadata (position, type, content) is stored separately in the assets table via save_assets RPC
    */
-  async registerAsset(metadata: Omit<CloudAssetMetadata, 'id' | 'user_id' | 'created_at' | 'updated_at'>): Promise<CloudAssetMetadata> {
+  async registerFileMetadata(metadata: {
+    project_id: string;
+    asset_id: string;
+    original_filename: string;
+    file_size: number;
+    mime_type: string;
+    cloud_path: string;
+    variants: Array<{ type: string; path: string; size: number }>;
+  }): Promise<void> {
     const authStore = useAuthStore.getState();
     if (!authStore.user || !authStore.isAuthenticated) {
       throw new Error('User not authenticated');
     }
 
-    const { data, error } = await supabase
-      .from('assets')
+    // Insert into files table (for file upload metadata)
+    const { error } = await supabase
+      .from('files')
       .insert({
-        ...metadata,
-        user_id: authStore.user.id,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .select()
-      .single();
+        project_id: metadata.project_id,
+        asset_id: metadata.asset_id,
+        storage_key: metadata.cloud_path,
+        mime_type: metadata.mime_type,
+        size_bytes: metadata.file_size
+      });
 
     if (error) {
-      console.error('Failed to register asset:', error);
-      throw new Error(`Failed to register asset: ${error.message}`);
+      console.error('Failed to register file metadata:', error);
+      throw new Error(`Failed to register file metadata: ${error.message}`);
     }
-
-    return data;
   }
 
   /**
    * Complete upload flow
    */
-  async uploadAsset(request: UploadRequest): Promise<{ success: boolean; cloudMetadata?: CloudAssetMetadata; error?: string }> {
+  async uploadAsset(request: UploadRequest): Promise<{ success: boolean; cloudPath?: string; error?: string }> {
     try {
       // 1. Check quota
       const totalBytes = request.variants.reduce((sum, variant) => sum + variant.size, 0);
@@ -264,7 +272,7 @@ class AssetUploadService {
       // 2. Get upload URLs
       const uploadUrls = await this.getUploadUrls(request.assetId, request.variants, request.projectId);
 
-      // 3. Upload all variants
+      // 3. Upload all variants to R2
       const uploadPromises = request.variants.map(async (variant) => {
         const uploadInfo = uploadUrls.uploadUrls.find(url => url.asset_id === `${request.assetId}-${variant.type}`);
         if (!uploadInfo) {
@@ -281,14 +289,15 @@ class AssetUploadService {
 
       const uploadedVariants = await Promise.all(uploadPromises);
 
-      // 4. Register asset metadata
+      // 4. Register file metadata in files table (R2 paths, sizes)
       const originalVariant = request.variants.find(v => v.type === 'original');
       if (!originalVariant) {
         throw new Error('Original variant not found');
       }
 
-      const cloudMetadata = await this.registerAsset({
+      await this.registerFileMetadata({
         project_id: request.projectId,
+        asset_id: request.assetId,
         original_filename: originalVariant.blob instanceof File ? originalVariant.blob.name : `asset-${request.assetId}`,
         file_size: originalVariant.size,
         mime_type: originalVariant.mimeType,
@@ -303,7 +312,7 @@ class AssetUploadService {
         cloudStore.quota.available
       );
 
-      return { success: true, cloudMetadata };
+      return { success: true, cloudPath: uploadedVariants.find(v => v.type === 'original')?.path };
 
     } catch (error) {
       console.error('Upload failed:', error);
