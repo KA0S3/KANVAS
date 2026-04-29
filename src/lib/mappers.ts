@@ -13,6 +13,21 @@ import type { DbAsset, DbAssetInput, DbPositionInput } from '@/types/database';
  * Maps snake_case DB columns to camelCase frontend properties
  */
 export function dbAssetToAsset(dbAsset: DbAsset): Asset {
+  // CRITICAL FIX: Extract thumbnail from content field if present
+  // Thumbnails are stored in content (unbounded TEXT) to avoid 2KB custom_fields limit
+  let content = dbAsset.content || undefined;
+  let thumbnail = dbAsset.custom_fields?.thumbnail || undefined;
+  
+  // Check if content contains embedded thumbnail
+  if (content && typeof content === 'string' && content.includes('__THUMBNAIL__')) {
+    const thumbnailMatch = content.match(/__THUMBNAIL__(.+?)__END_THUMBNAIL__/);
+    if (thumbnailMatch) {
+      thumbnail = thumbnailMatch[1];
+      // Remove thumbnail from content
+      content = content.replace(/__THUMBNAIL__.+?__END_THUMBNAIL__/, '').trim() || undefined;
+    }
+  }
+  
   return {
     id: dbAsset.asset_id,
     parentId: dbAsset.parent_id,
@@ -22,19 +37,18 @@ export function dbAssetToAsset(dbAsset: DbAsset): Asset {
     y: dbAsset.y,
     width: dbAsset.width,
     height: dbAsset.height,
-    zIndex: dbAsset.z_index,
     isExpanded: dbAsset.is_expanded,
-    content: dbAsset.content || undefined,
+    content,
     backgroundConfig: dbAsset.background_config || {},
     viewportConfig: dbAsset.viewport_config || {},
     customFields: dbAsset.custom_fields || [],
     customFieldValues: [], // Will be populated from custom_fields if needed
     // Preserve existing fields with defaults
     children: [], // Will be reconstructed client-side from parent_id
-    thumbnail: undefined,
-    background: undefined,
+    thumbnail,
+    background: dbAsset.custom_fields?.background || undefined,
     tags: dbAsset.custom_fields?.tags || [],
-    viewportDisplaySettings: undefined,
+    viewportDisplaySettings: dbAsset.custom_fields?.viewportDisplaySettings || undefined,
     createdAt: new Date(dbAsset.created_at).getTime(),
     updatedAt: new Date(dbAsset.updated_at).getTime(),
     isLocked: false,
@@ -47,6 +61,7 @@ export function dbAssetToAsset(dbAsset: DbAsset): Asset {
  * Convert frontend Asset to database input format
  * Maps camelCase frontend properties to snake_case DB columns
  * Used for save_assets RPC
+ * NOTE: zIndex is calculated dynamically, not stored in Asset interface
  */
 export function assetToDbAssetInput(asset: Asset): DbAssetInput {
   return {
@@ -58,7 +73,7 @@ export function assetToDbAssetInput(asset: Asset): DbAssetInput {
     y: asset.y,
     width: asset.width,
     height: asset.height,
-    z_index: asset.zIndex,
+    z_index: 0, // zIndex is calculated dynamically, default to 0
     is_expanded: asset.isExpanded || false,
     content: asset.content || null,
     background_config: asset.backgroundConfig || {},
@@ -66,7 +81,7 @@ export function assetToDbAssetInput(asset: Asset): DbAssetInput {
     custom_fields: {
       ...asset.customFields,
       tags: asset.tags,
-    } || {},
+    },
   };
 }
 
@@ -105,6 +120,12 @@ export function dbProjectToFrontend(dbProject: any): any {
     viewport: dbProject.viewport,
     backgrounds: dbProject.backgrounds,
     tagsConfig: dbProject.tags_config,
+    coverImage: dbProject.cover_image,
+    color: dbProject.color,
+    gradient: dbProject.gradient,
+    leatherColor: dbProject.leather_color,
+    isLeatherMode: dbProject.is_leather_mode,
+    coverPageSettings: dbProject.cover_page_settings,
     createdAt: new Date(dbProject.created_at).getTime(),
     updatedAt: new Date(dbProject.updated_at).getTime(),
     lastVersion: dbProject.last_version,

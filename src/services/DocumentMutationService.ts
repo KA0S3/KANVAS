@@ -220,7 +220,14 @@ class DocumentMutationService {
           tags: project.tags_config || {}
         },
         version: project.last_version || 0,
-        cover_config: project.backgrounds || {},
+        cover_config: {
+          coverImage: project.cover_image,
+          color: project.color,
+          gradient: project.gradient,
+          leatherColor: project.leather_color,
+          isLeatherMode: project.is_leather_mode,
+          coverPageSettings: project.cover_page_settings
+        },
         updated_at: project.updated_at
       };
 
@@ -716,25 +723,31 @@ class DocumentMutationService {
     // Process assets and compress thumbnails if needed
     const processedAssets = await Promise.all(
       Object.values(this.changedAssets).map(async (asset) => {
-        // CRITICAL FIX: Store R2 path instead of base64 thumbnail
-        // Images should be in R2, Supabase only stores the path reference
+        // CRITICAL FIX: Store thumbnail in content field (TEXT, unbounded via TOAST)
+        // custom_fields has 2KB limit, content is unbounded
+        let content = asset.content || null;
         let thumbnail = null;
         
-        // If asset has cloudPath (R2), use that as thumbnail reference
+        // If asset has cloudPath (R2), use that as thumbnail reference in custom_fields
         if (asset.cloudPath) {
           thumbnail = asset.cloudPath;
-        } else if (asset.thumbnail && !isThumbnailTooLarge(asset.thumbnail)) {
-          // Only keep small base64 thumbnails (< 2048 bytes)
-          thumbnail = asset.thumbnail;
         } else if (asset.thumbnail) {
-          console.log(`[DocumentMutation] Excluding large thumbnail from DB save for asset ${asset.id} (${asset.thumbnail.length} bytes > 2048 limit)`);
+          // Store base64 thumbnail in content field (unbounded TEXT via TOAST)
+          // This avoids the 2KB custom_fields constraint
+          if (!content) {
+            content = asset.thumbnail;
+          } else {
+            // If content already exists, prepend thumbnail with delimiter
+            content = `__THUMBNAIL__${asset.thumbnail}__END_THUMBNAIL__${content}`;
+          }
         }
         
+        // custom_fields should only contain lightweight metadata (< 2KB)
         const customFieldsObj: Record<string, any> = {
           customFields: asset.customFields || [],
           customFieldValues: asset.customFieldValues || [],
           tags: asset.tags || [],
-          thumbnail,
+          thumbnail, // Only R2 path reference, never base64
           background: asset.background || null,
           description: asset.description || null,
           viewportDisplaySettings: asset.viewportDisplaySettings || {}
@@ -754,7 +767,7 @@ class DocumentMutationService {
           height: Math.round(asset.height || 0),
           z_index: 0,
           is_expanded: asset.isExpanded || false,
-          content: asset.content || null,
+          content,
           background_config: asset.backgroundConfig || {},
           viewport_config: asset.viewportConfig || {},
           custom_fields: customFieldsObj

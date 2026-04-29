@@ -432,6 +432,12 @@ RETURNS TABLE (
   viewport JSONB,
   backgrounds JSONB,
   tags_config JSONB,
+  cover_image TEXT,
+  color TEXT,
+  gradient TEXT,
+  leather_color TEXT,
+  is_leather_mode BOOLEAN,
+  cover_page_settings JSONB,
   last_version INT,
   asset_count INT,
   updated_at TIMESTAMPTZ
@@ -451,6 +457,12 @@ BEGIN
     p.viewport,
     p.backgrounds,
     p.tags_config,
+    p.cover_image,
+    p.color,
+    p.gradient,
+    p.leather_color,
+    p.is_leather_mode,
+    p.cover_page_settings,
     p.last_version,
     (SELECT COUNT(*)::INT FROM assets WHERE assets.project_id = p.id AND deleted_at IS NULL) AS asset_count,
     p.updated_at
@@ -560,7 +572,7 @@ END;
 $$;
 
 -- Function: save_project (Project-level config updates)
--- Use this to save viewport, backgrounds, and tags_config. Includes ownership check and version bump.
+-- Use this to save viewport, backgrounds, tags_config, and cover settings. Includes ownership check and version bump.
 CREATE OR REPLACE FUNCTION save_project(
   p_project_id UUID,
   p_viewport JSONB DEFAULT NULL,
@@ -568,6 +580,12 @@ CREATE OR REPLACE FUNCTION save_project(
   p_tags_config JSONB DEFAULT NULL,
   p_name TEXT DEFAULT NULL,
   p_description TEXT DEFAULT NULL,
+  p_cover_image TEXT DEFAULT NULL,
+  p_color TEXT DEFAULT NULL,
+  p_gradient TEXT DEFAULT NULL,
+  p_leather_color TEXT DEFAULT NULL,
+  p_is_leather_mode BOOLEAN DEFAULT NULL,
+  p_cover_page_settings JSONB DEFAULT NULL,
   p_expected_version INT DEFAULT NULL
 )
 RETURNS VOID
@@ -615,6 +633,12 @@ BEGIN
     tags_config = COALESCE(p_tags_config, tags_config),
     name = COALESCE(p_name, name),
     description = COALESCE(p_description, description),
+    cover_image = COALESCE(p_cover_image, cover_image),
+    color = COALESCE(p_color, color),
+    gradient = COALESCE(p_gradient, gradient),
+    leather_color = COALESCE(p_leather_color, leather_color),
+    is_leather_mode = COALESCE(p_is_leather_mode, is_leather_mode),
+    cover_page_settings = COALESCE(p_cover_page_settings, cover_page_settings),
     last_version = last_version + 1,
     updated_at = now()
   WHERE id = p_project_id;
