@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { Book } from '@/types/book';
 import LeatherColorPicker from './LeatherColorPicker';
+import { uploadFile } from '@/services/ProjectService';
+import { useAuthStore } from '@/stores/authStore';
 
 interface BookCoverSettings {
   scale: number;
@@ -28,6 +30,7 @@ const EditableBook: React.FC<EditableBookProps> = ({
     offsetX: 0,
     offsetY: 0
   });
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -49,20 +52,41 @@ const EditableBook: React.FC<EditableBookProps> = ({
     localStorage.setItem(`book-cover-${book.id}`, JSON.stringify(coverSettings));
   }, [coverSettings, book.id]);
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const imageUrl = e.target?.result as string;
+      setIsUploadingCover(true);
+      try {
+        const authStore = useAuthStore.getState();
+        if (!authStore.user || !authStore.isAuthenticated) {
+          throw new Error('User not authenticated');
+        }
+
+        // Upload to Cloudflare R2 via ProjectService
+        const { r2Url } = await uploadFile(book.id, `cover-${book.id}`, file);
         const updatedBook = {
           ...book,
-          coverImage: imageUrl,
+          coverImage: r2Url,
           updatedAt: Date.now()
         };
         onUpdate?.(updatedBook);
-      };
-      reader.readAsDataURL(file);
+      } catch (error) {
+        console.error('Failed to upload cover image:', error);
+        // Fallback to base64 if upload fails
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const imageUrl = e.target?.result as string;
+          const updatedBook = {
+            ...book,
+            coverImage: imageUrl,
+            updatedAt: Date.now()
+          };
+          onUpdate?.(updatedBook);
+        };
+        reader.readAsDataURL(file);
+      } finally {
+        setIsUploadingCover(false);
+      }
     }
   };
 

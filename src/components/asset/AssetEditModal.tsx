@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { X, Save, Upload } from 'lucide-react';
+import { X, Save, Upload, Loader2 } from 'lucide-react';
 import { useAssetStore } from '@/stores/assetStore';
 import { useTagStore } from '@/stores/tagStore';
+import { useAuthStore } from '@/stores/authStore';
+import { useBookStore } from '@/stores/bookStoreSimple';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -31,6 +33,7 @@ import { BackgroundMapEditor } from './BackgroundMapEditor';
 import type { Asset } from '@/components/AssetItem';
 import type { CustomField, CustomFieldValue, ViewportDisplaySettings } from '@/types/extendedAsset';
 import { compressImageToThumbnail } from '@/utils/thumbnailCompression';
+import { uploadFile } from '@/services/ProjectService';
 
 interface AssetEditModalProps {
   isOpen: boolean;
@@ -78,6 +81,7 @@ export function AssetEditModal({ isOpen, onClose, assetId, isNewAsset = false, v
     thumbnail: true,
     portraitBlur: 0,
   });
+  const [isUploadingThumbnail, setIsUploadingThumbnail] = useState(false);
   const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] = useState(false);
   const [backgroundEditorOpen, setBackgroundEditorOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -242,19 +246,42 @@ export function AssetEditModal({ isOpen, onClose, assetId, isNewAsset = false, v
   const handleImageUpload = async (field: 'thumbnail', event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      setIsUploadingThumbnail(true);
       try {
-        // Compress the image to meet database size constraints
-        const compressedThumbnail = await compressImageToThumbnail(file);
-        setFormData(prev => ({ ...prev, [field]: compressedThumbnail }));
+        const authStore = useAuthStore.getState();
+        const bookStore = useBookStore.getState();
+        
+        if (!authStore.user || !authStore.isAuthenticated) {
+          throw new Error('User not authenticated');
+        }
+
+        const currentBookId = bookStore.currentBookId;
+        if (!currentBookId) {
+          throw new Error('No current book found');
+        }
+
+        // Upload to Cloudflare R2 via ProjectService
+        const assetIdForUpload = assetId || `temp-${crypto.randomUUID()}`;
+        const { r2Url } = await uploadFile(currentBookId, `thumbnail-${assetIdForUpload}`, file);
+        setFormData(prev => ({ ...prev, [field]: r2Url }));
       } catch (error) {
-        console.error('Failed to compress thumbnail:', error);
-        // Fallback to original method if compression fails
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const result = e.target?.result as string;
-          setFormData(prev => ({ ...prev, [field]: result }));
-        };
-        reader.readAsDataURL(file);
+        console.error('Failed to upload thumbnail:', error);
+        // Fallback to compression if upload fails
+        try {
+          const compressedThumbnail = await compressImageToThumbnail(file);
+          setFormData(prev => ({ ...prev, [field]: compressedThumbnail }));
+        } catch (compressionError) {
+          console.error('Failed to compress thumbnail:', compressionError);
+          // Final fallback to base64
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const result = e.target?.result as string;
+            setFormData(prev => ({ ...prev, [field]: result }));
+          };
+          reader.readAsDataURL(file);
+        }
+      } finally {
+        setIsUploadingThumbnail(false);
       }
     }
   };
@@ -391,16 +418,28 @@ export function AssetEditModal({ isOpen, onClose, assetId, isNewAsset = false, v
                       type="file"
                       accept="image/*"
                       onChange={(e) => handleImageUpload('thumbnail', e)}
+                      disabled={isUploadingThumbnail}
                       className="hidden"
                       id="thumbnail-upload"
                     />
                     <label
                       htmlFor="thumbnail-upload"
-                      className="flex flex-col items-center justify-center cursor-pointer hover:text-muted-foreground transition-colors"
+                      className={`flex flex-col items-center justify-center cursor-pointer hover:text-muted-foreground transition-colors ${
+                        isUploadingThumbnail ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
                     >
-                      <Upload className="w-8 h-8 mb-2" />
-                      <span className="text-sm">Click to upload thumbnail</span>
-                      <span className="text-xs text-muted-foreground">PNG, JPG, GIF up to 10MB</span>
+                      {isUploadingThumbnail ? (
+                        <>
+                          <Loader2 className="w-8 h-8 mb-2 animate-spin" />
+                          <span className="text-sm">Uploading to Cloudflare R2...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-8 h-8 mb-2" />
+                          <span className="text-sm">Click to upload thumbnail</span>
+                          <span className="text-xs text-muted-foreground">PNG, JPG, GIF up to 10MB</span>
+                        </>
+                      )}
                     </label>
                   </div>
                 )}

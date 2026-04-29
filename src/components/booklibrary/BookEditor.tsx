@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { X, Upload, Palette } from 'lucide-react';
+import { X, Upload, Palette, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,8 +12,10 @@ import {
 } from '@/components/ui/dialog';
 import { useBookStore } from '@/stores/bookStoreSimple';
 import { useCanCreateBook } from '@/lib/limits';
+import { useAuthStore } from '@/stores/authStore';
 import { UpgradePromptModal } from '@/components/UpgradePromptModal';
 import type { Book } from '@/types/book';
+import { uploadFile } from '@/services/ProjectService';
 
 interface BookEditorProps {
   isOpen: boolean;
@@ -38,6 +40,7 @@ export function BookEditor({ isOpen, onClose, book }: BookEditorProps) {
     book ? coverPresets.find(p => p.color === book.color) : coverPresets[0]
   );
 
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -77,15 +80,31 @@ export function BookEditor({ isOpen, onClose, book }: BookEditorProps) {
     }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const dataUrl = event.target?.result as string;
-        setFormData(prev => ({ ...prev, coverImage: dataUrl }));
-      };
-      reader.readAsDataURL(file);
+      setIsUploadingCover(true);
+      try {
+        const authStore = useAuthStore.getState();
+        if (!authStore.user || !authStore.isAuthenticated) {
+          throw new Error('User not authenticated');
+        }
+
+        // Upload to Cloudflare R2 via ProjectService
+        const { r2Url } = await uploadFile(book?.id || 'temp', `cover-${book?.id || 'temp'}`, file);
+        setFormData(prev => ({ ...prev, coverImage: r2Url }));
+      } catch (error) {
+        console.error('Failed to upload cover image:', error);
+        // Fallback to base64 if upload fails
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const dataUrl = event.target?.result as string;
+          setFormData(prev => ({ ...prev, coverImage: dataUrl }));
+        };
+        reader.readAsDataURL(file);
+      } finally {
+        setIsUploadingCover(false);
+      }
     }
   };
 

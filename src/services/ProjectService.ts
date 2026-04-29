@@ -271,16 +271,18 @@ export async function createProject(
  * Includes version checking and bumps version on success.
  * 
  * @param projectId - The project UUID
- * @param viewport - Optional viewport configuration
- * @param backgrounds - Optional backgrounds configuration
+ * @param options - Optional project metadata
+ * @param viewport - Optional viewport settings
+ * @param backgrounds - Optional background configurations
  * @param tagsConfig - Optional tags configuration
- * @param name - Optional new name
- * @param description - Optional new description
+ * @param name - Optional project name
+ * @param description - Optional project description
  * @param coverImage - Optional cover image URL
  * @param color - Optional cover color
  * @param gradient - Optional cover gradient
  * @param leatherColor - Optional leather color
  * @param isLeatherMode - Optional leather mode flag
+ * @param coverPresetId - Optional cover preset ID
  * @param coverPageSettings - Optional cover page settings JSONB
  * @param expectedVersion - Optional version for optimistic locking
  */
@@ -297,6 +299,7 @@ export async function saveProject(
     gradient?: string;
     leatherColor?: string;
     isLeatherMode?: boolean;
+    coverPresetId?: string;
     coverPageSettings?: any;
     expectedVersion?: number;
   } = {}
@@ -313,6 +316,7 @@ export async function saveProject(
     p_gradient: options.gradient || null,
     p_leather_color: options.leatherColor || null,
     p_is_leather_mode: options.isLeatherMode || null,
+    p_cover_preset_id: options.coverPresetId || null,
     p_cover_page_settings: options.coverPageSettings || null,
     p_expected_version: options.expectedVersion || null
   });

@@ -7,12 +7,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronUp, Type, Palette, Settings } from "lucide-react";
+import { ChevronDown, ChevronUp, Type, Palette, Settings, Loader2 } from "lucide-react";
 import { useBookStore } from "@/stores/bookStoreSimple";
 import { useThemeStore } from "@/stores/themeStore";
+import { useAuthStore } from "@/stores/authStore";
 import LeatherColorPicker from "./books/LeatherColorPicker";
 import type { LeatherColorPreset } from "@/types/book";
 import type { Book } from "@/types/book";
+import { uploadFile } from "@/services/ProjectService";
 
 interface BookEditDialogProps {
   book: Book | null;
@@ -30,7 +32,9 @@ const BookEditDialog = ({ book, open, onOpenChange, onBookUpdated }: BookEditDia
   const [selectedColor, setSelectedColor] = useState('#8B4513');
   const [isLeatherMode, setIsLeatherMode] = useState(true);
   const [selectedLeatherColor, setSelectedLeatherColor] = useState<LeatherColorPreset | null>(null);
+  const [selectedCoverPreset, setSelectedCoverPreset] = useState<string | null>(null);
   const [customCoverImage, setCustomCoverImage] = useState<string | null>(null);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [activeTab, setActiveTab] = useState('cover');
   const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState(false);
   
@@ -89,12 +93,13 @@ const BookEditDialog = ({ book, open, onOpenChange, onBookUpdated }: BookEditDia
       setSelectedColor(book.color || '#8B4513');
       setIsLeatherMode(book.isLeatherMode || false);
       setSelectedLeatherColor(book.leatherColor ? leatherPresets.find(p => p.color === book.leatherColor) || null : null);
+      setSelectedCoverPreset(book.coverPresetId || null);
       setCustomCoverImage(book.coverImage || null);
-      
+
       // Load cover page settings if available
       if (book.coverPageSettings) {
         const settings = book.coverPageSettings;
-        
+
         // Title settings
         if (settings.title) {
           setTitlePosition(settings.title.position || { x: 50, y: 40 });
@@ -105,7 +110,7 @@ const BookEditDialog = ({ book, open, onOpenChange, onBookUpdated }: BookEditDia
           setTitleOutlineThickness([settings.title.style?.outlineThickness || 0]);
           setTitleShadowEnabled(settings.title.style?.shadowEnabled || false);
         }
-        
+
         // Subheading settings
         if (settings.subheading) {
           setSubheadingPosition(settings.subheading.position || { x: 50, y: 60 });
@@ -120,26 +125,43 @@ const BookEditDialog = ({ book, open, onOpenChange, onBookUpdated }: BookEditDia
     }
   }, [book, open, leatherPresets]);
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setCustomCoverImage(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (file && book) {
+      setIsUploadingCover(true);
+      try {
+        const authStore = useAuthStore.getState();
+        if (!authStore.user || !authStore.isAuthenticated) {
+          throw new Error('User not authenticated');
+        }
+
+        // Upload to Cloudflare R2 via ProjectService
+        const { r2Url } = await uploadFile(book.id, `cover-${book.id}`, file);
+        setCustomCoverImage(r2Url);
+      } catch (error) {
+        console.error('Failed to upload cover image:', error);
+        // Fallback to base64 if upload fails
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setCustomCoverImage(e.target?.result as string);
+        };
+        reader.readAsDataURL(file);
+      } finally {
+        setIsUploadingCover(false);
+      }
     }
   };
 
   const handleRemoveImage = () => {
     setCustomCoverImage(null);
+    setSelectedCoverPreset(null);
   };
 
   const handleSaveChanges = () => {
     if (!book) return;
 
     try {
-      const updatedBook = updateBook(book.id, {
+      updateBook(book.id, {
         title,
         subheading,
         description,
@@ -147,6 +169,7 @@ const BookEditDialog = ({ book, open, onOpenChange, onBookUpdated }: BookEditDia
         gradient: isLeatherMode ? undefined : colorOptions.find(c => c.value === selectedColor)?.gradient,
         leatherColor: isLeatherMode ? selectedLeatherColor?.color : undefined,
         isLeatherMode,
+        coverPresetId: customCoverImage ? undefined : selectedCoverPreset, // Only save preset if no custom image
         coverImage: customCoverImage || undefined,
         coverPageSettings: {
           showCoverPage: true,
@@ -182,9 +205,9 @@ const BookEditDialog = ({ book, open, onOpenChange, onBookUpdated }: BookEditDia
       });
 
       if (onBookUpdated) {
-        onBookUpdated(updatedBook);
+        onBookUpdated(book);
       }
-      
+
       onOpenChange(false);
     } catch (error) {
       console.error('Error updating world:', error);
@@ -456,22 +479,33 @@ const BookEditDialog = ({ book, open, onOpenChange, onBookUpdated }: BookEditDia
                             type="file"
                             accept="image/*"
                             onChange={handleImageUpload}
+                            disabled={isUploadingCover}
                             className="hidden"
                             id="edit-cover-image-upload"
                           />
-                          <label 
+                          <label
                             htmlFor="edit-cover-image-upload"
                             className={`cursor-pointer transition-colors ${
-                              theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-black'
+                              isUploadingCover ? 'opacity-50 cursor-not-allowed' : ''
+                            } ${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-black'
                             }`}
                           >
-                            <div className="text-3xl mb-2">📷</div>
-                            <div className="text-sm">Click to upload image</div>
-                            <div className={`text-xs mt-1 ${
-                              theme === 'dark' ? 'text-gray-500' : 'text-gray-400'
-                            }`}>
-                              Recommended size: 192x288px (2:3 ratio)
-                            </div>
+                            {isUploadingCover ? (
+                              <div className="flex flex-col items-center">
+                                <Loader2 className="w-8 h-8 mb-2 animate-spin" />
+                                <div className="text-sm">Uploading to Cloudflare R2...</div>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="text-3xl mb-2">📷</div>
+                                <div className="text-sm">Click to upload image</div>
+                                <div className={`text-xs mt-1 ${
+                                  theme === 'dark' ? 'text-gray-500' : 'text-gray-400'
+                                }`}>
+                                  Recommended size: 192x288px (2:3 ratio)
+                                </div>
+                              </>
+                            )}
                           </label>
                         </div>
                         <p className={`text-xs ${

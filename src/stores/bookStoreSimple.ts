@@ -187,10 +187,11 @@ export const useBookStore = create<BookStore>()(
               gradient: updates.gradient,
               leatherColor: updates.leatherColor,
               isLeatherMode: updates.isLeatherMode,
+              coverPresetId: updates.coverPresetId,
               coverImage: updates.coverImage,
               coverPageSettings: updates.coverPageSettings
             };
-            
+
             // Only call saveProject if cover fields changed
             if (Object.keys(coverFields).some(key => coverFields[key as keyof typeof coverFields] !== undefined)) {
               import('@/services/ProjectService').then(({ saveProject }) => {

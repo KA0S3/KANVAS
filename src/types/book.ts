@@ -8,6 +8,7 @@ export interface Book {
   gradient?: string;
   leatherColor?: string;
   isLeatherMode?: boolean;
+  coverPresetId?: string; // Track which preset cover is being used
   order?: number;
   createdAt: number;
   updatedAt: number;

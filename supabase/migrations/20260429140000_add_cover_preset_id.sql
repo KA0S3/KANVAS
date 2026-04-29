@@ -1,10 +1,14 @@
--- Migration: Update project RPC functions to include cover columns
--- This updates save_project and load_project to handle cover-related fields
+-- Add cover_preset_id column to projects table
+-- This column tracks which preset cover is being used for a project
 
--- Drop old save_project function to avoid function overloading
-DROP FUNCTION IF EXISTS save_project(UUID, JSONB, JSONB, JSONB, TEXT, TEXT, INTEGER);
+-- Add the column
+ALTER TABLE projects
+ADD COLUMN IF NOT EXISTS cover_preset_id TEXT;
 
--- Update save_project function to include cover columns
+-- Add index for efficient querying
+CREATE INDEX IF NOT EXISTS idx_projects_cover_preset ON projects(user_id, cover_preset_id) WHERE cover_preset_id IS NOT NULL;
+
+-- Update save_project function to include cover_preset_id
 CREATE OR REPLACE FUNCTION save_project(
   p_project_id UUID,
   p_viewport JSONB DEFAULT NULL,
@@ -17,6 +21,7 @@ CREATE OR REPLACE FUNCTION save_project(
   p_gradient TEXT DEFAULT NULL,
   p_leather_color TEXT DEFAULT NULL,
   p_is_leather_mode BOOLEAN DEFAULT NULL,
+  p_cover_preset_id TEXT DEFAULT NULL,
   p_cover_page_settings JSONB DEFAULT NULL,
   p_expected_version INT DEFAULT NULL
 )
@@ -57,7 +62,7 @@ BEGIN
     END IF;
   END IF;
 
-  -- Update only provided fields
+  -- Update project with provided values
   UPDATE projects
   SET
     viewport = COALESCE(p_viewport, viewport),
@@ -70,20 +75,18 @@ BEGIN
     gradient = COALESCE(p_gradient, gradient),
     leather_color = COALESCE(p_leather_color, leather_color),
     is_leather_mode = COALESCE(p_is_leather_mode, is_leather_mode),
+    cover_preset_id = COALESCE(p_cover_preset_id, cover_preset_id),
     cover_page_settings = COALESCE(p_cover_page_settings, cover_page_settings),
     last_version = last_version + 1,
     updated_at = now()
-  WHERE id = p_project_id;
+  WHERE id = p_project_id
+  AND user_id = auth.uid()
+  AND deleted_at IS NULL;
 END;
 $$;
 
--- Drop old load_project function to avoid function overloading
-DROP FUNCTION IF EXISTS load_project(UUID);
-
--- Update load_project function to return cover columns
-CREATE OR REPLACE FUNCTION load_project(
-  p_project_id UUID
-)
+-- Update load_project function to return cover_preset_id
+CREATE OR REPLACE FUNCTION load_project(p_project_id UUID)
 RETURNS TABLE (
   id UUID,
   user_id UUID,
@@ -97,6 +100,7 @@ RETURNS TABLE (
   gradient TEXT,
   leather_color TEXT,
   is_leather_mode BOOLEAN,
+  cover_preset_id TEXT,
   cover_page_settings JSONB,
   last_version INT,
   asset_count INT,
@@ -122,6 +126,7 @@ BEGIN
     p.gradient,
     p.leather_color,
     p.is_leather_mode,
+    p.cover_preset_id,
     p.cover_page_settings,
     p.last_version,
     (SELECT COUNT(*)::INT FROM assets WHERE assets.project_id = p.id AND deleted_at IS NULL) AS asset_count,

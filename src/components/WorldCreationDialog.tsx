@@ -7,14 +7,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronUp, Type, Palette, Settings, ImageIcon } from "lucide-react";
+import { ChevronDown, ChevronUp, Type, Palette, Settings, ImageIcon, Loader2 } from "lucide-react";
 import { useBookStore } from "@/stores/bookStoreSimple";
 import { useThemeStore } from "@/stores/themeStore";
 import { useCanCreateBook } from "@/lib/limits";
+import { useAuthStore } from "@/stores/authStore";
 import LeatherColorPicker from "./books/LeatherColorPicker";
 import { UpgradePromptModal } from "@/components/UpgradePromptModal";
 import { toast } from "sonner";
 import type { LeatherColorPreset } from "@/types/book";
+import { uploadFile } from "@/services/ProjectService";
 
 interface WorldCreationDialogProps {
   children: React.ReactNode;
@@ -30,12 +32,15 @@ const WorldCreationDialog = ({ children, onWorldCreated }: WorldCreationDialogPr
   const [selectedColor, setSelectedColor] = useState('#00D9FF');
   const [isLeatherMode, setIsLeatherMode] = useState(true);
   const [selectedLeatherColor, setSelectedLeatherColor] = useState<LeatherColorPreset | null>(null);
+  const [selectedCoverPreset, setSelectedCoverPreset] = useState<string | null>(null);
   const [customCoverImage, setCustomCoverImage] = useState<string | null>(null);
+  const [coverImageFile, setCoverImageFile] = useState<File | null>(null);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   const [activeTab, setActiveTab] = useState('cover');
   const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const { createBook, leatherPresets } = useBookStore();
+  const { createBook, leatherPresets, updateBook } = useBookStore();
   const { canCreate: canCreateNewBook, reason, upgradePrompt } = useCanCreateBook();
   
   // Typography settings for title
@@ -74,6 +79,8 @@ const WorldCreationDialog = ({ children, onWorldCreated }: WorldCreationDialogPr
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      setCoverImageFile(file);
+      // Also set a preview URL for display
       const reader = new FileReader();
       reader.onload = (e) => {
         setCustomCoverImage(e.target?.result as string);
@@ -84,6 +91,8 @@ const WorldCreationDialog = ({ children, onWorldCreated }: WorldCreationDialogPr
 
   const handleRemoveImage = () => {
     setCustomCoverImage(null);
+    setCoverImageFile(null);
+    setSelectedCoverPreset(null);
   };
 
   const handleCreateWorld = async () => {
@@ -98,6 +107,7 @@ const WorldCreationDialog = ({ children, onWorldCreated }: WorldCreationDialogPr
     setIsCreating(true);
 
     try {
+      // Create the book first without the cover image (will upload to R2 after)
       const worldId = createBook({
         title,
         subheading,
@@ -106,7 +116,8 @@ const WorldCreationDialog = ({ children, onWorldCreated }: WorldCreationDialogPr
         gradient: isLeatherMode ? undefined : colorOptions.find(c => c.value === selectedColor)?.gradient,
         leatherColor: isLeatherMode ? selectedLeatherColor?.color : undefined,
         isLeatherMode,
-        coverImage: customCoverImage || undefined,
+        coverPresetId: coverImageFile ? undefined : selectedCoverPreset, // Only save preset if no custom image
+        coverImage: undefined, // Will upload to R2 after creation
         worldData: {
           assets: {},
           tags: {},
@@ -118,7 +129,7 @@ const WorldCreationDialog = ({ children, onWorldCreated }: WorldCreationDialogPr
         coverPageSettings: {
           showCoverPage: true,
           baseStyle: isLeatherMode ? 'leather' : 'gradient',
-          coverImageData: customCoverImage || undefined,
+          coverImageData: undefined, // Will upload to R2 after creation
           title: {
             text: title,
             position: titlePosition,
@@ -153,6 +164,61 @@ const WorldCreationDialog = ({ children, onWorldCreated }: WorldCreationDialogPr
         toast.error('A world with this title already exists or creation is in progress.');
         setIsCreating(false);
         return;
+      }
+
+      // Upload cover image to R2 if a file was selected
+      if (coverImageFile && worldId) {
+        try {
+          setIsUploadingCover(true);
+          const authStore = useAuthStore.getState();
+          if (!authStore.user || !authStore.isAuthenticated) {
+            throw new Error('User not authenticated');
+          }
+
+          const { r2Url } = await uploadFile(worldId, `cover-${worldId}`, coverImageFile);
+          
+          // Update the book with the R2 URL
+          updateBook(worldId, {
+            coverImage: r2Url,
+            coverPageSettings: {
+              showCoverPage: true,
+              baseStyle: isLeatherMode ? 'leather' : 'gradient',
+              coverImageData: r2Url,
+              title: {
+                text: title,
+                position: titlePosition,
+                style: {
+                  type: titleFontFamily as any,
+                  color: titleTextColor,
+                  size: 'large',
+                  sizePx: titleFontSize[0],
+                  outlineColor: titleOutlineColor,
+                  outlineThickness: titleOutlineThickness[0],
+                  shadowEnabled: titleShadowEnabled,
+                },
+              },
+              subheading: subheading ? {
+                text: subheading,
+                position: subheadingPosition,
+                style: {
+                  type: subheadingFontFamily as any,
+                  color: subheadingTextColor,
+                  size: 'medium',
+                  sizePx: subheadingFontSize[0],
+                  outlineColor: subheadingOutlineColor,
+                  outlineThickness: subheadingOutlineThickness[0],
+                  shadowEnabled: subheadingShadowEnabled,
+                },
+              } : undefined,
+            },
+          });
+        } catch (uploadError) {
+          console.error('Failed to upload cover image to R2:', uploadError);
+          toast.error('Failed to upload cover image. Using default cover.');
+          // Continue with the book creation even if upload fails
+        } finally {
+          setIsUploadingCover(false);
+        }
       }
 
       // Wait a moment for the state to update
@@ -439,22 +505,33 @@ const WorldCreationDialog = ({ children, onWorldCreated }: WorldCreationDialogPr
                           type="file"
                           accept="image/*"
                           onChange={handleImageUpload}
+                          disabled={isCreating || isUploadingCover}
                           className="hidden"
                           id="create-cover-image-upload"
                         />
-                        <label 
+                        <label
                           htmlFor="create-cover-image-upload"
                           className={`cursor-pointer transition-colors ${
-                            theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-black'
+                            (isCreating || isUploadingCover) ? 'opacity-50 cursor-not-allowed' : ''
+                          } ${theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-black'
                           }`}
                         >
-                          <div className="text-3xl mb-2">📷</div>
-                          <div className="text-sm">Click to upload image</div>
-                          <div className={`text-xs mt-1 ${
-                            theme === 'dark' ? 'text-gray-500' : 'text-gray-400'
-                          }`}>
-                            Recommended size: 192x288px (2:3 ratio)
-                          </div>
+                          {(isCreating || isUploadingCover) ? (
+                            <div className="flex flex-col items-center">
+                              <Loader2 className="w-8 h-8 mb-2 animate-spin" />
+                              <div className="text-sm">{isUploadingCover ? 'Uploading to Cloudflare R2...' : 'Creating world...'}</div>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="text-3xl mb-2">📷</div>
+                              <div className="text-sm">Click to upload image</div>
+                              <div className={`text-xs mt-1 ${
+                                theme === 'dark' ? 'text-gray-500' : 'text-gray-400'
+                              }`}>
+                                Recommended size: 192x288px (2:3 ratio)
+                              </div>
+                            </>
+                          )}
                         </label>
                       </div>
                       <p className={`text-xs ${
