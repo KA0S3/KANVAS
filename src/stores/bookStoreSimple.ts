@@ -39,7 +39,7 @@ interface BookStore {
   _lastCreationTime: number;
   _pendingCreationTitle?: string;
   
-  createBook: (bookData: Omit<Book, 'id' | 'createdAt' | 'updatedAt'>) => string;
+  createBook: (bookData: Omit<Book, 'createdAt' | 'updatedAt'> & { id?: string }) => string;
   updateBook: (bookId: string, updates: Partial<Book>) => void;
   deleteBook: (bookId: string) => Promise<void>;
   reorderBooks: (fromIndex: number, toIndex: number) => void;
@@ -119,7 +119,7 @@ export const useBookStore = create<BookStore>()(
             _pendingCreationTitle: bookData.title
           });
           
-          const id = crypto.randomUUID();
+          const id = bookData.id || crypto.randomUUID();
           const newBook: Book = {
             ...bookData,
             id,
@@ -200,7 +200,7 @@ export const useBookStore = create<BookStore>()(
         deleteBook: async (bookId) => {
           const state = get();
           const book = state.books[bookId];
-          
+
           if (!book) {
             console.warn('[BookStore] Attempted to delete non-existent book:', bookId);
             return;
@@ -208,7 +208,7 @@ export const useBookStore = create<BookStore>()(
 
           // Record for undo before deletion
           undoService.recordAction('delete', 'book', book, book);
-          
+
           // Use soft delete service for proper Supabase deletion (follows low IO philosophy)
           if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(bookId)) {
             try {
@@ -219,8 +219,10 @@ export const useBookStore = create<BookStore>()(
               console.error('[BookStore] Failed to soft delete project from Supabase:', error);
               // Continue with local deletion even if remote fails
             }
+          } else {
+            console.log('[BookStore] Book ID is not a valid UUID, skipping Supabase deletion:', bookId);
           }
-          
+
           // Always delete from local storage immediately
           set((state) => {
             const newBooks = { ...state.books };
@@ -239,7 +241,7 @@ export const useBookStore = create<BookStore>()(
             documentMutationService.setProjectId(null);
             console.log('[BookStore] Cleared DocumentMutationService currentProjectId for deleted book:', bookId);
           }
-          
+
           console.log('[BookStore] Deleted book locally:', book.title);
         },
 

@@ -113,13 +113,18 @@ class SoftDeleteService {
     console.log(`[SoftDeleteService] Soft deleting project: ${projectId}`);
 
     try {
-      const { error } = await supabase.rpc('delete_project', {
+      const { data, error } = await supabase.rpc('delete_project', {
         p_project_id: projectId
       });
 
       if (error) {
+        console.error('[SoftDeleteService] Delete RPC error:', error);
+        console.error('[SoftDeleteService] Error message:', error.message);
+        console.error('[SoftDeleteService] Error details:', error.details);
+        console.error('[SoftDeleteService] Error hint:', error.hint);
+        console.error('[SoftDeleteService] Error code:', error.code);
         // If project not found or already deleted, that's okay - continue with local deletion
-        if (error.message?.includes('not found') || error.message?.includes('unauthorized')) {
+        if (error.message?.includes('not found') || error.message?.includes('unauthorized') || error.message?.includes('Project not found')) {
           console.log('[SoftDeleteService] Project not found or already deleted in Supabase, continuing with local deletion');
           return;
         }
@@ -127,7 +132,7 @@ class SoftDeleteService {
         throw error;
       }
 
-      console.log('[SoftDeleteService] Successfully soft deleted project');
+      console.log('[SoftDeleteService] Successfully soft deleted project from Supabase');
     } catch (error) {
       console.error('[SoftDeleteService] Error soft deleting project:', error);
       throw error;

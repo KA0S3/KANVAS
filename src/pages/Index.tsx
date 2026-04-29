@@ -94,6 +94,7 @@ const Index = () => {
             if (!existingBookIds.has(project.id)) {
               const bookStore = useBookStore.getState();
               bookStore.createBook({
+                id: project.id, // Use Supabase project ID instead of generating new one
                 title: project.name,
                 color: '#3b82f6',
                 coverPageSettings: project.backgrounds || {},

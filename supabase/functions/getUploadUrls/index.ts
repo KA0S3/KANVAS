@@ -273,9 +273,28 @@ serve(async (req) => {
     const r2SecretAccessKey = Deno.env.get('R2_SECRET_ACCESS_KEY')
     const r2BucketName = Deno.env.get('R2_BUCKET_NAME')
 
+    // CRITICAL DEBUG: Log R2 configuration status (without exposing secrets)
+    console.log('[getUploadUrls] R2 Configuration Check:', {
+      hasAccountId: !!r2AccountId,
+      hasAccessKeyId: !!r2AccessKeyId,
+      hasSecretAccessKey: !!r2SecretAccessKey,
+      hasBucketName: !!r2BucketName,
+      accountIdPrefix: r2AccountId ? r2AccountId.substring(0, 4) + '...' : 'missing',
+      bucketName: r2BucketName || 'missing'
+    })
+
     if (!r2AccountId || !r2AccessKeyId || !r2SecretAccessKey || !r2BucketName) {
+      console.error('[getUploadUrls] R2 configuration missing - asset uploads will fail');
       return new Response(
-        JSON.stringify({ error: 'R2 configuration missing' }),
+        JSON.stringify({ 
+          error: 'R2 configuration missing',
+          details: {
+            hasAccountId: !!r2AccountId,
+            hasAccessKeyId: !!r2AccessKeyId,
+            hasSecretAccessKey: !!r2SecretAccessKey,
+            hasBucketName: !!r2BucketName
+          }
+        }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }

@@ -305,6 +305,18 @@ class DocumentMutationService {
     // Migrate 'other' type to 'card' for database compatibility
     const migratedAsset = asset.type === 'other' ? { ...asset, type: 'card' as const } : asset;
     this.changedAssets[assetId] = migratedAsset;
+    
+    // CRITICAL FIX: Trigger auto-save for asset changes (like position changes do)
+    if (!this.autoSaveTimer) {
+      this.autoSaveTimer = setTimeout(async () => {
+        try {
+          await this.saveMetadataChanges();
+        } finally {
+          this.autoSaveTimer = null;
+        }
+      }, this.AUTO_SAVE_MS);
+    }
+    
     this.notifySubscribers();
   }
 
@@ -773,6 +785,11 @@ class DocumentMutationService {
     if (error) {
       console.error('[DocumentMutation] Failed to save metadata changes:', error);
       console.error('[DocumentMutation] Error details:', JSON.stringify(error, null, 2));
+      console.error('[DocumentMutation] Asset save context:', {
+        projectId: this.currentProjectId,
+        assetCount: changes.length,
+        currentVersion: this.currentVersion
+      });
       
       // Invalidate cache on any error
       this.documentCache.delete(this.currentProjectId);
