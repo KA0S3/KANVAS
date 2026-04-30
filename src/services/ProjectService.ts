@@ -139,13 +139,11 @@ export async function savePositions(
  */
 export async function saveAssets(
   projectId: string,
-  assets: AssetInput[],
-  expectedVersion?: number
+  assets: AssetInput[]
 ): Promise<void> {
   const { error } = await supabase.rpc('save_assets', {
     p_project_id: projectId,
-    p_assets: JSON.stringify(assets),
-    p_expected_version: expectedVersion || null
+    p_assets: JSON.stringify(assets)
   });
 
   if (error) {
@@ -166,13 +164,11 @@ export async function saveAssets(
  */
 export async function saveAssetsPartial(
   projectId: string,
-  assets: PartialAssetInput[],
-  expectedVersion?: number
+  assets: PartialAssetInput[]
 ): Promise<void> {
   const { error } = await supabase.rpc('save_assets_partial', {
     p_project_id: projectId,
-    p_assets: JSON.stringify(assets),
-    p_expected_version: expectedVersion || null
+    p_assets: JSON.stringify(assets)
   });
 
   if (error) {
@@ -317,8 +313,7 @@ export async function saveProject(
     p_leather_color: options.leatherColor || null,
     p_is_leather_mode: options.isLeatherMode || null,
     p_cover_preset_id: options.coverPresetId || null,
-    p_cover_page_settings: options.coverPageSettings || null,
-    p_expected_version: options.expectedVersion || null
+    p_cover_page_settings: options.coverPageSettings || null
   });
 
   if (error) {

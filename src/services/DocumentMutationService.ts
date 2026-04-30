@@ -387,13 +387,11 @@ class DocumentMutationService {
       performanceMonitor.incrementDatabaseRequests();
       console.log('[DocumentMutation] saveGlobalBackgrounds - Sending to RPC:', {
         p_project_id: this.currentProjectId,
-        p_backgrounds: backgrounds,
-        p_expected_version: this.currentVersion
+        p_backgrounds: backgrounds
       });
       const { error } = await supabase.rpc('save_project', {
         p_project_id: this.currentProjectId,
-        p_backgrounds: backgrounds,
-        p_expected_version: this.currentVersion
+        p_backgrounds: backgrounds
       });
 
       if (error) {
@@ -423,8 +421,7 @@ class DocumentMutationService {
             console.log('[DocumentMutation] Retrying saveGlobalBackgrounds with correct version');
             const { error: retryError } = await supabase.rpc('save_project', {
               p_project_id: this.currentProjectId,
-              p_backgrounds: backgrounds,
-              p_expected_version: this.currentVersion
+              p_backgrounds: backgrounds
             });
             if (retryError) {
               console.error('[DocumentMutation] Retry failed:', retryError);
@@ -463,8 +460,7 @@ class DocumentMutationService {
       performanceMonitor.incrementDatabaseRequests();
       const { error } = await supabase.rpc('save_project', {
         p_project_id: this.currentProjectId,
-        p_viewport: { offset: { x: offsetX, y: offsetY }, scale },
-        p_expected_version: this.currentVersion
+        p_viewport: { offset: { x: offsetX, y: offsetY }, scale }
       });
 
       if (error) {
@@ -492,8 +488,7 @@ class DocumentMutationService {
             // Retry with correct version
             const { error: retryError } = await supabase.rpc('save_project', {
               p_project_id: this.currentProjectId,
-              p_viewport: { offset: { x: offsetX, y: offsetY }, scale },
-              p_expected_version: this.currentVersion
+              p_viewport: { offset: { x: offsetX, y: offsetY }, scale }
             });
             if (retryError) {
               console.error('[DocumentMutation] Retry failed:', retryError);
@@ -531,8 +526,7 @@ class DocumentMutationService {
       performanceMonitor.incrementDatabaseRequests();
       const { error } = await supabase.rpc('save_project', {
         p_project_id: this.currentProjectId,
-        p_tags_config: tags,
-        p_expected_version: this.currentVersion
+        p_tags_config: tags
       });
 
       if (error) {
@@ -560,8 +554,7 @@ class DocumentMutationService {
             // Retry with correct version
             const { error: retryError } = await supabase.rpc('save_project', {
               p_project_id: this.currentProjectId,
-              p_tags_config: tags,
-              p_expected_version: this.currentVersion
+              p_tags_config: tags
             });
             if (retryError) {
               console.error('[DocumentMutation] Retry failed:', retryError);
@@ -609,8 +602,7 @@ class DocumentMutationService {
       performanceMonitor.incrementDatabaseRequests();
       console.log('[DocumentMutation] saveCoverMetadata - Sending to RPC:', {
         p_project_id: this.currentProjectId,
-        p_cover_config: coverConfig,
-        p_expected_version: this.currentVersion
+        p_cover_config: coverConfig
       });
 
       const { error } = await supabase.rpc('save_project', {
@@ -620,8 +612,7 @@ class DocumentMutationService {
         p_gradient: coverConfig.gradient,
         p_leather_color: coverConfig.leatherColor,
         p_is_leather_mode: coverConfig.isLeatherMode,
-        p_cover_page_settings: coverConfig.coverPageSettings,
-        p_expected_version: this.currentVersion
+        p_cover_page_settings: coverConfig.coverPageSettings
       });
 
       if (error) {
@@ -656,8 +647,7 @@ class DocumentMutationService {
               p_gradient: coverConfig.gradient,
               p_leather_color: coverConfig.leatherColor,
               p_is_leather_mode: coverConfig.isLeatherMode,
-              p_cover_page_settings: coverConfig.coverPageSettings,
-              p_expected_version: this.currentVersion
+              p_cover_page_settings: coverConfig.coverPageSettings
             });
             if (retryError) {
               console.error('[DocumentMutation] Retry failed:', retryError);
@@ -879,13 +869,11 @@ class DocumentMutationService {
     console.log('[DocumentMutation] saveMetadataChanges - Sending to RPC:', {
       p_project_id: this.currentProjectId,
       p_assets_count: changes.length,
-      p_assets: changes,
-      p_expected_version: this.currentVersion
+      p_assets: changes
     });
     const { error } = await supabase.rpc('save_assets', {
       p_project_id: this.currentProjectId,
-      p_assets: changes,
-      p_expected_version: this.currentVersion
+      p_assets: changes
     });
 
     // Only clear changes after successful save
@@ -948,8 +936,7 @@ class DocumentMutationService {
           console.log('[DocumentMutation] Retrying saveMetadataChanges with correct version');
           const { error: retryError } = await supabase.rpc('save_assets', {
             p_project_id: this.currentProjectId,
-            p_assets: changes,
-            p_expected_version: this.currentVersion
+            p_assets: changes
           });
           if (retryError) {
             console.error('[DocumentMutation] Retry failed:', retryError);

@@ -148,8 +148,7 @@ async function saveMetadataChanges(): Promise<void> {
 
   const { error } = await supabase.rpc('save_assets', {
     p_project_id: projectId,
-    p_assets: changes,
-    p_expected_version: currentProjectVersion
+    p_assets: changes
   });
 
   if (error) {
