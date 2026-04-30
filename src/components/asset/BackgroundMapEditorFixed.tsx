@@ -165,6 +165,13 @@ export function BackgroundMapEditorFixed({ isOpen, onClose, assetId, onSave }: B
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      // Reject files larger than 2MB to prevent base64 from breaking the app
+      const MAX_SIZE = 2 * 1024 * 1024; // 2MB
+      if (file.size > MAX_SIZE) {
+        alert('Background images must be under 2MB. Large images should be uploaded as assets instead.');
+        return;
+      }
+
       const reader = new FileReader();
       reader.onload = (e) => {
         const result = e.target?.result as string;

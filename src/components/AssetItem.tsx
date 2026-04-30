@@ -138,7 +138,7 @@ export function AssetItem({ asset, onDelete, onMouseDown, onTouchStart, onDouble
     portraitBlur: 0,
   };
 
-  const portraitImage = asset.thumbnail || 
+  const portraitImage = asset.cloudPath || asset.thumbnail || 
     asset.customFieldValues?.find(v => {
       const field = asset.customFields?.find(f => f.id === v.fieldId);
       return field?.label?.toLowerCase() === 'portrait' && field.type === 'image' && v.value;

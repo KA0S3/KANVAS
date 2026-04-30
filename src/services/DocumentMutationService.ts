@@ -816,9 +816,11 @@ class DocumentMutationService {
         let content = asset.content || null;
         let thumbnail = null;
         
-        // If asset has cloudPath (R2), use that as thumbnail reference in custom_fields
+        // If asset has cloudPath (R2), use that as thumbnail reference and exclude content
+        // This prevents sending 13MB base64 data to database on every sync
         if (asset.cloudPath) {
           thumbnail = asset.cloudPath;
+          content = null; // Don't send content to DB if stored in R2
         } else if (asset.thumbnail) {
           // Store base64 thumbnail in content field (unbounded TEXT via TOAST)
           // This avoids the 2KB custom_fields constraint

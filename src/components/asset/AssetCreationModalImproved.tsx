@@ -197,15 +197,9 @@ export function AssetCreationModalImproved({ isOpen, onClose, initialData, paren
       setUploadStatus('idle');
     }
 
-    // Also set as thumbnail if it's an image
-    if (file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
-        setFormData(prev => ({ ...prev, thumbnail: result }));
-      };
-      reader.readAsDataURL(file);
-    }
+    // Don't convert to base64 - use file object directly
+    // R2 upload will handle the file and set cloudPath
+    // For preview, we'll use a blob URL in the display component
   };
 
   const handleClose = () => {
