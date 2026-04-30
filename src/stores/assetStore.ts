@@ -167,6 +167,12 @@ export const useAssetStore = create<AssetStore>()(
       // Phase 3 Integration: Track metadata changes (MASTER_PLAN.md state-based tracking)
       documentMutationService.markAssetChanged(id, newAsset);
 
+      // CRITICAL FIX: Trigger immediate sync for asset creation to ensure it saves
+      // This prevents data loss if user navigates away before 40s auto-save
+      setTimeout(() => {
+        documentMutationService.syncNow();
+      }, 100);
+
       // Record for undo
       undoService.recordAction('create', 'asset', newAsset);
 
@@ -461,6 +467,12 @@ export const useAssetStore = create<AssetStore>()(
       }
       documentMutationService.markAssetDeleted(id);
     });
+
+    // CRITICAL FIX: Trigger immediate sync for asset deletion to ensure it saves
+    // This prevents data loss if user navigates away before 40s auto-save
+    setTimeout(() => {
+      documentMutationService.syncNow();
+    }, 100);
   },
 
   // Set the active asset

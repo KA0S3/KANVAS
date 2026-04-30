@@ -584,6 +584,104 @@ class DocumentMutationService {
     }
   }
 
+  // Save cover metadata (cover image, color, gradient, leather mode, etc.)
+  // Phase 2 Fix: Dedicated method for cover metadata with batching
+  async saveCoverMetadata(coverConfig: {
+    coverImage?: string;
+    color?: string;
+    gradient?: string;
+    leatherColor?: string;
+    isLeatherMode?: boolean;
+    coverPageSettings?: any;
+    coverPresetId?: string;
+  }): Promise<boolean> {
+    if (!this.currentProjectId) return false;
+
+    // Check if the current book still exists locally (might have been deleted)
+    const bookStore = useBookStore.getState();
+    if (!bookStore.books[this.currentProjectId]) {
+      console.log('[DocumentMutation] Project no longer exists locally, skipping save');
+      this.currentProjectId = null;
+      return false;
+    }
+
+    try {
+      performanceMonitor.incrementDatabaseRequests();
+      console.log('[DocumentMutation] saveCoverMetadata - Sending to RPC:', {
+        p_project_id: this.currentProjectId,
+        p_cover_config: coverConfig,
+        p_expected_version: this.currentVersion
+      });
+
+      const { error } = await supabase.rpc('save_project', {
+        p_project_id: this.currentProjectId,
+        p_cover_image: coverConfig.coverImage,
+        p_color: coverConfig.color,
+        p_gradient: coverConfig.gradient,
+        p_leather_color: coverConfig.leatherColor,
+        p_is_leather_mode: coverConfig.isLeatherMode,
+        p_cover_page_settings: coverConfig.coverPageSettings,
+        p_expected_version: this.currentVersion
+      });
+
+      if (error) {
+        console.error('[DocumentMutation] Failed to save cover metadata:', error);
+        console.error('[DocumentMutation] Error details:', JSON.stringify(error, null, 2));
+
+        // Invalidate cache on any error
+        this.documentCache.delete(this.currentProjectId);
+        this.backgroundsCache.delete(this.currentProjectId);
+
+        // If error is "Unauthorized", the project may have been deleted - don't retry
+        if (error.message?.includes('Unauthorized')) {
+          console.log('[DocumentMutation] Project may have been deleted, clearing currentProjectId');
+          this.currentProjectId = null;
+          return false;
+        }
+
+        // If version conflict, reload and retry
+        if (error.message?.includes('Version conflict')) {
+          console.log('[DocumentMutation] Version conflict detected, reloading document...');
+          const loadResult = await this.loadDocument(this.currentProjectId);
+          if (loadResult.success && loadResult.data) {
+            this.currentVersion = loadResult.data.version;
+            console.log('[DocumentMutation] Reloaded version:', this.currentVersion);
+
+            // Retry with correct version
+            console.log('[DocumentMutation] Retrying saveCoverMetadata with correct version');
+            const { error: retryError } = await supabase.rpc('save_project', {
+              p_project_id: this.currentProjectId,
+              p_cover_image: coverConfig.coverImage,
+              p_color: coverConfig.color,
+              p_gradient: coverConfig.gradient,
+              p_leather_color: coverConfig.leatherColor,
+              p_is_leather_mode: coverConfig.isLeatherMode,
+              p_cover_page_settings: coverConfig.coverPageSettings,
+              p_expected_version: this.currentVersion
+            });
+            if (retryError) {
+              console.error('[DocumentMutation] Retry failed:', retryError);
+              return false;
+            }
+            this.currentVersion += 1;
+            return true;
+          }
+        }
+        return false;
+      }
+
+      this.currentVersion += 1;
+      this.documentCache.delete(this.currentProjectId);
+      this.backgroundsCache.delete(this.currentProjectId);
+
+      console.log('[DocumentMutation] Cover metadata saved successfully');
+      return true;
+    } catch (error) {
+      console.error('[DocumentMutation] Error saving cover metadata:', error);
+      return false;
+    }
+  }
+
   // Clear stuck sync flag (for recovery)
   clearSyncInProgress(): void {
     this.syncInProgress = false;

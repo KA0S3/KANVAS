@@ -42,6 +42,7 @@ export interface MigrationResult {
   projectId?: string;
   migratedAssets?: number;
   migratedBooks?: number;
+  progress?: number; // 0-100 for progress tracking
 }
 
 class DataMigrationService {
@@ -109,8 +110,9 @@ class DataMigrationService {
 
   /**
    * Execute migration strategy
+   * Phase 3 Fix: Add progress tracking callback
    */
-  async executeMigration(strategy: MigrationStrategy, userId: string): Promise<MigrationResult> {
+  async executeMigration(strategy: MigrationStrategy, userId: string, onProgress?: (progress: number) => void): Promise<MigrationResult> {
     const localData = this.getLocalData();
     if (!localData) {
       return {
@@ -123,11 +125,11 @@ class DataMigrationService {
     try {
       switch (strategy) {
         case 'delete-old':
-          return await this.deleteOldAndMigrate(localData, userId);
+          return await this.deleteOldAndMigrate(localData, userId, onProgress);
         case 'delete-current':
           return await this.deleteCurrentAndMigrate(localData, userId);
         case 'merge-as-new':
-          return await this.mergeAsNewProject(localData, userId);
+          return await this.mergeAsNewProject(localData, userId, onProgress);
         case 'cancel':
           return {
             success: true,
@@ -156,10 +158,12 @@ class DataMigrationService {
       const bookStore = useBookStore.getState();
       const backgroundStore = useBackgroundStore.getState();
 
-      const assets = assetStore.assets;
+      // Fix: Use bookAssets instead of assets (AssetStore uses bookAssets)
+      const currentBookId = bookStore.currentBookId;
+      const assets = currentBookId ? assetStore.bookAssets[currentBookId] : {};
       const books = bookStore.books;
       const backgrounds = backgroundStore.configs;
-      const globalCustomFields = assetStore.globalCustomFields;
+      const globalCustomFields = currentBookId ? assetStore.bookGlobalCustomFields[currentBookId] : [];
 
       if (!assets || !books || (Object.keys(assets).length === 0 && Object.keys(books).length === 0)) {
         return null;
@@ -259,7 +263,10 @@ class DataMigrationService {
   /**
    * Delete old cloud data and migrate local data
    */
-  private async deleteOldAndMigrate(localData: LocalProjectData, userId: string): Promise<MigrationResult> {
+  private async deleteOldAndMigrate(localData: LocalProjectData, userId: string, onProgress?: (progress: number) => void): Promise<MigrationResult> {
+    // Progress: 5% - Deleting old data
+    onProgress?.(5);
+
     // Delete existing projects
     const { error: deleteError } = await supabase
       .from('projects')
@@ -269,7 +276,7 @@ class DataMigrationService {
     if (deleteError) throw deleteError;
 
     // Create new project with local data
-    return await this.createProjectFromLocalData(localData, userId);
+    return await this.createProjectFromLocalData(localData, userId, undefined, onProgress);
   }
 
   /**
@@ -306,81 +313,149 @@ class DataMigrationService {
   /**
    * Merge local data as new project
    */
-  private async mergeAsNewProject(localData: LocalProjectData, userId: string): Promise<MigrationResult> {
-    return await this.createProjectFromLocalData(localData, userId, `Migrated Project ${new Date().toLocaleDateString()}`);
+  private async mergeAsNewProject(localData: LocalProjectData, userId: string, onProgress?: (progress: number) => void): Promise<MigrationResult> {
+    return await this.createProjectFromLocalData(localData, userId, `Migrated Project ${new Date().toLocaleDateString()}`, onProgress);
   }
 
   /**
    * Create project from local data
+   * Phase 3 Fix: Use batched RPC calls instead of individual inserts (low-I/O compliant)
+   * Phase 3 Fix: Add progress tracking for large migrations
    */
   private async createProjectFromLocalData(
-    localData: LocalProjectData, 
-    userId: string, 
-    projectName?: string
+    localData: LocalProjectData,
+    userId: string,
+    projectName?: string,
+    onProgress?: (progress: number) => void
   ): Promise<MigrationResult> {
     try {
       const projectId = crypto.randomUUID();
       const name = projectName || `Imported Project ${new Date().toLocaleDateString()}`;
 
-      // Create project with world data
-      const worldData = {
-        assets: localData.assets,
-        globalCustomFields: localData.globalCustomFields,
-      };
+      // Progress: 10% - Creating project
+      onProgress?.(10);
 
-      const { error: projectError } = await supabase
-        .from('projects')
-        .insert({
-          id: projectId,
-          user_id: userId,
-          name,
-          description: JSON.stringify(worldData),
-          updated_at: new Date().toISOString(),
-        });
+      // Phase 3 Fix: Use create_project RPC instead of direct table insert
+      const { error: projectError } = await supabase.rpc('create_project', {
+        p_project_id: projectId,
+        p_name: name,
+        p_description: null,
+        p_cover_config: {}
+      });
 
       if (projectError) throw projectError;
 
-      // Create background configs
-      if (Object.keys(localData.backgrounds).length > 0) {
-        const { error: backgroundError } = await supabase
-          .from('assets')
-          .insert({
-            id: `${projectId}-backgrounds`,
-            user_id: userId,
-            project_id: projectId,
-            name: 'Background Configurations',
-            file_path: `backgrounds/${projectId}.json`,
-            file_type: 'application/json',
-            file_size_bytes: JSON.stringify(localData.backgrounds).length,
-            mime_type: 'application/json',
-            metadata: { configs: localData.backgrounds, type: 'background_configurations' },
-            updated_at: new Date().toISOString(),
-          });
+      // Progress: 30% - Preparing assets
+      onProgress?.(30);
 
-        if (backgroundError) throw backgroundError;
+      // Phase 3 Fix: Batch save all assets using save_assets RPC (single call)
+      const assetInputs = Object.entries(localData.assets).map(([assetId, assetData]) => {
+        const asset = assetData as any;
+        return {
+          asset_id: assetId,
+          parent_id: asset.parentId || null,
+          name: asset.name || 'Untitled',
+          type: asset.type || 'card',
+          x: Math.round(asset.x || 0),
+          y: Math.round(asset.y || 0),
+          width: Math.round(asset.width || 200),
+          height: Math.round(asset.height || 150),
+          z_index: asset.zIndex || 0,
+          is_expanded: asset.isExpanded || false,
+          content: asset.content || null,
+          background_config: asset.backgroundConfig || {},
+          viewport_config: asset.viewportConfig || {},
+          custom_fields: {
+            customFields: asset.customFields || [],
+            customFieldValues: asset.customFieldValues || [],
+            tags: asset.tags || [],
+            thumbnail: asset.cloudPath || null,
+            background: asset.background || null,
+            description: asset.description || null,
+            viewportDisplaySettings: asset.viewportDisplaySettings || {}
+          }
+        };
+      });
+
+      // Progress: 50% - Saving assets
+      onProgress?.(50);
+
+      if (assetInputs.length > 0) {
+        const { error: assetsError } = await supabase.rpc('save_assets', {
+          p_project_id: projectId,
+          p_assets: assetInputs
+        });
+
+        if (assetsError) {
+          console.error('[DataMigration] Failed to batch save assets:', assetsError);
+          throw assetsError;
+        }
       }
 
-      // Migrate books
+      // Progress: 70% - Saving backgrounds
+      onProgress?.(70);
+
+      // Phase 3 Fix: Save backgrounds using save_project RPC (single call)
+      if (Object.keys(localData.backgrounds).length > 0) {
+        const { error: backgroundsError } = await supabase.rpc('save_project', {
+          p_project_id: projectId,
+          p_backgrounds: localData.backgrounds
+        });
+
+        if (backgroundsError) {
+          console.error('[DataMigration] Failed to save backgrounds:', backgroundsError);
+          throw backgroundsError;
+        }
+      }
+
+      // Progress: 80% - Migrating books
+      onProgress?.(80);
+
+      // Phase 3 Fix: Batch save books using create_project RPC (multiple calls but necessary for separate projects)
       let migratedBooks = 0;
+      const totalBooks = Object.keys(localData.books).length;
+      let bookIndex = 0;
+
       for (const [bookId, bookData] of Object.entries(localData.books)) {
-        const { error: bookError } = await supabase
-          .from('projects')
-          .insert({
-            id: crypto.randomUUID(), // Generate new ID for book
-            user_id: userId,
-            name: (bookData as any).name || 'Untitled Book',
-            description: JSON.stringify(bookData),
-            updated_at: new Date().toISOString(),
-          });
+        const book = bookData as any;
+        const newBookId = crypto.randomUUID();
+
+        const { error: bookError } = await supabase.rpc('create_project', {
+          p_project_id: newBookId,
+          p_name: book.name || 'Untitled Book',
+          p_description: book.description || null,
+          p_cover_config: {
+            color: book.color,
+            gradient: book.gradient,
+            leatherColor: book.leatherColor,
+            isLeatherMode: book.isLeatherMode,
+            coverPageSettings: book.coverPageSettings
+          }
+        });
 
         if (!bookError) {
           migratedBooks++;
+        } else {
+          console.error('[DataMigration] Failed to migrate book:', bookId, bookError);
+        }
+
+        // Update progress during book migration
+        bookIndex++;
+        if (totalBooks > 0) {
+          const bookProgress = 80 + (bookIndex / totalBooks) * 15; // 80-95% for books
+          onProgress?.(bookProgress);
         }
       }
+
+      // Progress: 95% - Updating quota
+      onProgress?.(95);
 
       // Update quota usage
       const dataSize = this.estimateDataSize(localData);
       useCloudStore.getState().updateQuotaUsage(dataSize);
+
+      // Progress: 100% - Complete
+      onProgress?.(100);
 
       return {
         success: true,
@@ -388,7 +463,8 @@ class DataMigrationService {
         message: `Successfully migrated project "${name}" to cloud.`,
         projectId,
         migratedAssets: Object.keys(localData.assets).length,
-        migratedBooks
+        migratedBooks,
+        progress: 100
       };
     } catch (error) {
       throw new Error(`Failed to create project: ${error instanceof Error ? error.message : 'Unknown error'}`);

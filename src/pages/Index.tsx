@@ -88,11 +88,15 @@ const Index = () => {
           const currentBooks = getAllBooks();
           const existingBookIds = new Set(currentBooks.map(book => book.id));
           
-          // Sync only metadata - create local book entries for projects that don't exist locally
+          // Sync metadata - create new books OR update existing books with latest cover settings
           let syncedCount = 0;
+          let updatedCount = 0;
           for (const project of projects) {
-            if (!existingBookIds.has(project.id)) {
-              const bookStore = useBookStore.getState();
+            const bookStore = useBookStore.getState();
+            const existingBook = currentBooks.find(b => b.id === project.id);
+            
+            if (!existingBook) {
+              // Create new local book entry
               bookStore.createBook({
                 id: project.id, // Use Supabase project ID instead of generating new one
                 title: project.name,
@@ -112,10 +116,23 @@ const Index = () => {
               });
               syncedCount++;
               console.log(`[Index] Synced project metadata to local book: ${project.name}`);
+            } else {
+              // Update existing book with latest cover/text settings from Supabase
+              bookStore.updateBook(project.id, {
+                title: project.name,
+                color: project.color || existingBook.color,
+                gradient: project.gradient || existingBook.gradient,
+                leatherColor: project.leather_color || existingBook.leatherColor,
+                isLeatherMode: project.is_leather_mode ?? existingBook.isLeatherMode,
+                coverImage: project.cover_image || existingBook.coverImage,
+                coverPageSettings: project.cover_page_settings || existingBook.coverPageSettings,
+              });
+              updatedCount++;
+              console.log(`[Index] Updated existing book with latest metadata: ${project.name}`);
             }
           }
           
-          console.log(`[Index] Synced ${syncedCount} new projects from Supabase to local storage`);
+          console.log(`[Index] Synced ${syncedCount} new projects and updated ${updatedCount} existing projects from Supabase`);
           
           // Load full data for current book if one is selected
           const currentBook = currentBookId;

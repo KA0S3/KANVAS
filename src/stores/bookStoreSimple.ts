@@ -172,7 +172,7 @@ export const useBookStore = create<BookStore>()(
           // - Metadata changes are batched by DocumentMutationService
           // - Saves happen on 40-second timer OR manual save only
           // - Project metadata (viewport, backgrounds, tags) syncs via DocumentMutationService.saveGlobalBackgrounds/saveViewport/saveGlobalTags
-          
+
           // If this is the current book, trigger DocumentMutationService batching for metadata
           const currentBookId = get().currentBookId;
           if (bookId === currentBookId && documentMutationService.getCurrentProjectId() === bookId) {
@@ -180,8 +180,9 @@ export const useBookStore = create<BookStore>()(
             if (updates.coverPageSettings) {
               documentMutationService.saveGlobalBackgrounds(updates.coverPageSettings);
             }
-            
-            // Sync cover-related fields via saveProject
+
+            // CRITICAL FIX: Use new saveCoverMetadata method for cover fields
+            // This provides better batching and error handling for cover metadata
             const coverFields = {
               color: updates.color,
               gradient: updates.gradient,
@@ -192,15 +193,17 @@ export const useBookStore = create<BookStore>()(
               coverPageSettings: updates.coverPageSettings
             };
 
-            // Only call saveProject if cover fields changed
+            // Only call saveCoverMetadata if cover fields changed
             if (Object.keys(coverFields).some(key => coverFields[key as keyof typeof coverFields] !== undefined)) {
-              import('@/services/ProjectService').then(({ saveProject }) => {
-                saveProject(bookId, coverFields).catch(err => {
-                  console.error('[BookStore] Failed to save cover fields:', err);
-                });
+              // Filter out undefined values
+              const definedCoverFields = Object.fromEntries(
+                Object.entries(coverFields).filter(([_, v]) => v !== undefined)
+              );
+              documentMutationService.saveCoverMetadata(definedCoverFields).catch(err => {
+                console.error('[BookStore] Failed to save cover metadata:', err);
               });
             }
-            
+
             // Sync viewport settings
             if (updates.worldData?.viewportOffset || updates.worldData?.viewportScale) {
               documentMutationService.saveViewport(
@@ -209,7 +212,7 @@ export const useBookStore = create<BookStore>()(
                 updates.worldData.viewportScale || book.worldData?.viewportScale || 1
               );
             }
-            
+
             // Sync tags config
             if (updates.worldData?.tags) {
               documentMutationService.saveGlobalTags(updates.worldData.tags);
